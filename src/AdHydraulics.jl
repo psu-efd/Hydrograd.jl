@@ -1,7 +1,10 @@
 module AdHydraulics
 
-# Write your package code here.
-export greet_your_package_name
 include("functions.jl")
+include("mesh/mesh.jl")
+
+export greet_your_package_name
+export Mesh2D_SRHGEOM 
+
 
 end
