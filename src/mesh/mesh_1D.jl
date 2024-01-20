@@ -1,16 +1,16 @@
-mutable struct mesh_1D
+mutable struct mesh_1D{T<:Number}
     nCells::Int64     # Number of cells
     nFaces::Int64     # Number of faces (= nCells + 1)
-    L::Float64  # Length of the domain
-    xCells::Vector{Float64}  #x coordinates of cell centers 
-    xFaces::Vector{Float64}  #x coordinates of faces (points in 1D) 
+    L::T  # Length of the domain
+    xCells::Vector{T}  #x coordinates of cell centers 
+    xFaces::Vector{T}  #x coordinates of faces (points in 1D) 
 
-    dx::Float64  # Grid spacing (cell size)
+    dx::T  # Grid spacing (cell size)
 end
 
 
 # Function to initialize the mesh_1D struct
-function initialize_mesh_1D(nCells::Int64, L::Float64)
+function initialize_mesh_1D(nCells, L) 
     dx = L / nCells
     nFaces = nCells + 1
 
