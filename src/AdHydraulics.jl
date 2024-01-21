@@ -4,7 +4,7 @@ include("functions.jl")
 
 #swe_1D
 include("mesh/mesh_1D.jl")
-include("field/swe_1D_fields.jl")
+include("constants/swe_1D_constants.jl")
 include("solver/swe_1D_solvers.jl")
 include("util/swe_1D_tools.jl")
 
