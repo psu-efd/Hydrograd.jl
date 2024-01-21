@@ -1,11 +1,15 @@
-mutable struct mesh_1D{T<:Number}
+#1D mesh struct: only x coordinates, no bed elevation zb. Bed elevation information is external 
+#to the mesh_1D struct so it can be a differentiable variable (not sure whether my understanding 
+#is correct. It seems currently Zygote and Enzyme don't support struct with both differentiable
+#and non-differentiable variables. This could change in the futre.)
+mutable struct mesh_1D
     nCells::Int64     # Number of cells
     nFaces::Int64     # Number of faces (= nCells + 1)
-    L::T  # Length of the domain
-    xCells::Vector{T}  #x coordinates of cell centers 
-    xFaces::Vector{T}  #x coordinates of faces (points in 1D) 
+    L::Float64  # Length of the domain
+    xCells::Vector{Float64}  #x coordinates of cell centers 
+    xFaces::Vector{Float64}  #x coordinates of faces (points in 1D) 
 
-    dx::T  # Grid spacing (cell size)
+    dx::Float64  # Grid spacing (cell size)
 end
 
 

@@ -194,9 +194,8 @@ mesh = initialize_mesh_1D(nCells, L)
 
 #create 1D FVM fields 
 #  create parameters
-swe_1d_para = swe_1D_parameters(
+swe_1d_para = swe_1D_const(
     g=9.81,
-    ManningN=0.03,
     t=0.0,
     dt_min=0.005,
     dt=0.005,
@@ -215,11 +214,7 @@ right_bcType = "exitH"
 #right_bcType = "wall"
 right_bcValue = 1.0
 
-#leftBoundary = Boundary_1D(bcType=wall::Boundary_Type_Name, bcValue=0.0)
-#rigthBoundary = Boundary_1D(bcType=wall::Boundary_Type_Name, bcValue=0.0)
-
-
-fields = initialize_swe_1D_fields(mesh, swe_1d_para, left_bcType, left_bcValue, right_bcType, right_bcValue)
+fields = initialize_swe_1D_fields(mesh)
 
 # setup the bed 
 setup_bed!(mesh, fields)
@@ -227,8 +222,10 @@ setup_bed!(mesh, fields)
 #setup the initial free surface 
 setup_initial_eta!(mesh, fields)
 
-#p = (0.5, 1.0, 0.03, mesh, fields)   #Solution parameter: inletQ, exitH, and ManningN 
-p = [0.5, 1.0, 0.03]
+ManningN=0.03,
+
+#Solution parameters p: inletQ, exitH, and ManningN 
+p = [left_bcValue, right_bcValue, ManningN]
 Q0 = hcat(fields.h, fields.q)   #initial condition: Q = [h q]
 
 tspan = (0.0, fields.swe_1d_para.tEnd)
