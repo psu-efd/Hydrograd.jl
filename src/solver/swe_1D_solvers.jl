@@ -3,7 +3,7 @@
 # HLL Riemman solver
 #Ref: https://github.com/wme7/ShallowWaterEquations
 # bcType: -1 (for internal faces, not even a boundary face)
-function Riemann_1D_hll(g, h_face, q_face, bcType, bcValue, h_small)
+function Riemann_1D_hll!(flux, g, h_face, q_face, bcType, bcValue, h_small)
 
     h_L = h_face[1]
     h_R = h_face[2]
@@ -33,6 +33,9 @@ function Riemann_1D_hll(g, h_face, q_face, bcType, bcValue, h_small)
     if h_L <= h_small
         s_L = u_R - 2.0 * sqrt(g * h_R)
     else
+        if (h_L < 0.0 || h_R < 0.0)
+            println("h_L, h_R = ", h_L, ", ", h_R)
+        end
         s_L = min(u_R - sqrt(g * h_R), u_L - sqrt(g * h_L))
     end 
 
@@ -71,5 +74,8 @@ function Riemann_1D_hll(g, h_face, q_face, bcType, bcValue, h_small)
         q_flux = q_flux_R
     end 
 
-    return [h_flux, q_flux]
+    flux[1] = h_flux
+    flux[2] = q_flux
+
+    #return [h_flux, q_flux]
 end 

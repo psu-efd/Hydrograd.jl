@@ -19,7 +19,7 @@ export swe_1D_const
 export mesh_1D
 export initialize_mesh_1D
 
-export Riemann_1D_hll
+export Riemann_1D_hll!
 
 export swe_1D_calc_total_water_volume
 export swe_1D_save_results
