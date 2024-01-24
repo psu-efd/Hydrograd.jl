@@ -59,8 +59,8 @@ println("SWE-1D simulation and inversion ...")
 save_path = dirname(@__FILE__)
 
 #define control variables
-bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
-bPlot_Simulation_Results = true    #whether to plot simulation results
+bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
+bPlot_Simulation_Results = false    #whether to plot simulation results
 bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
@@ -69,7 +69,7 @@ bInversion_slope_loss = true   #whether to include slope loss
 bInversion_include_u = true    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
 
 #mesh related variables
-nCells = 30     # Number of cells
+nCells = 50     # Number of cells
 L = 10.0  # Length of the domain
 
 #create the 1D mesh
@@ -82,7 +82,7 @@ swe_1d_constants = swe_1D_const(
     dt_min=0.001,      #minimum dt (if adaptive time step)
     dt=0.005,          #time step size
     CFL=0.4,           #CFL number 
-    tEnd=0.1,          #end of simulation time 
+    tEnd=20.0,          #end of simulation time 
     h_small=1.0e-3,      #a small water depth for dry/wet treatment
     RiemannSolver="HLL"  #choice of Riemann problem solver 
 )
@@ -200,6 +200,8 @@ if bPerform_Inversion
 
     #open the simulation result (as the ground truth)
     sol = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
+    h_truth = Array(sol)[:,1,end]
+    u_truth = Array(sol)[:,2,end]./Array(sol)[:,1,end]
     #@show sol
 
     #inversion parameters: zb_cell
@@ -224,15 +226,27 @@ if bPerform_Inversion
 
     function loss(θ)
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred[:,1,end] - Array(sol)[:,1,end] + (θ - zb_cell_truth)  #loss = free surface elevation mismatch
+        l = pred[:,1,end] - h_truth + (θ - zb_cell_truth)  #loss = free surface elevation mismatch
+        loss_pred_eta = sum(abs2, l)
 
-        loss_pred = sum(abs2, l)
-        loss_slope = calc_slope_loss(θ, mesh.dx)
-        #loss_total = loss_pred + loss_slope
-        loss_total = loss_pred
+        loss_pred_u = 0.0
 
-        #return loss_total, loss_pred, loss_slope, pred # Mean squared error + slope loss 
-        return loss_pred, loss_pred, loss_slope, pred
+        if bInversion_include_u      #if also include u in the loss 
+            l = pred[:,2,end]./pred[:,1,end] .- u_truth
+            loss_pred_u = sum(abs2, l)
+        end 
+
+        loss_pred = loss_pred_eta + loss_pred_u
+
+        loss_slope = 0.0
+
+        if bInversion_slope_loss    #if bed slope is included in the loss 
+            loss_slope = calc_slope_loss(θ, mesh.dx)
+        end 
+
+        loss_total = loss_pred + loss_slope
+
+        return loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred
     end
 
     #grad = Zygote.gradient(loss, ps)
@@ -248,12 +262,13 @@ if bPerform_Inversion
     PRED = []                              # prediction accumulator
     PARS = []                              # parameters accumulator
 
-    callback = function (θ, loss_total, loss_pred, loss_slope, pred) #callback function to observe training
+    callback = function (θ, loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred) #callback function to observe training
         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
-        println("      iter, loss_total, loss_pred, loss_slope = ", iter, ", ", loss_total, ", ", loss_pred, ", ", loss_slope)
+        println("      iter, loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope = ", iter, ", ", 
+                  loss_total, ", ", loss_pred, ", ", loss_pred_eta, ", ", loss_pred_u, ", ", loss_slope)
 
         append!(PRED, [pred[:,1,end]])
-        append!(LOSS, [[loss_total, loss_pred, loss_slope]])
+        append!(LOSS, [[loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred]])
 
         if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
             #println("theta.u = ", θ.u)
@@ -298,17 +313,17 @@ if bPerform_Inversion
     ub_p = zeros(mesh.nCells)
     ub_p .= 0.5 
 
-    optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
-    #optprob = Optimization.OptimizationProblem(optf, ps)
+    #optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
+    optprob = Optimization.OptimizationProblem(optf, ps)
 
     #res = Optimization.solve(optprob, PolyOpt(), callback = callback)  #PolyOpt does not support lb and ub 
     #res = Optimization.solve(optprob, NLopt.LD_LBFGS(), callback = callback)   #very fast 
     #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback; iterations=30, maxiters=40, f_calls_limit=20, show_trace=true)
-    res = Optimization.solve(optprob, Optim.BFGS(), callback=callback, maxiters = 1, local_maxiters = 3; f_tol=1e-3, show_trace=false)  #iterations=10 
+    #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback, maxiters = 100; show_trace=false)  #f_tol=1e-3, iterations=10, local_maxiters = 10
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    #res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=1000)
+    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=500)
     
     @show res
     @show res.original
@@ -329,7 +344,7 @@ end
 
 time_end = Dates.now()
 
-time_elapsed = Dates.canonicalize(Dates.CompoundPeriod(time_start-time_end))
+time_elapsed = Dates.canonicalize(Dates.CompoundPeriod(time_end-time_start))
 println("Wall time: ", time_elapsed)
 
 println("Done!")

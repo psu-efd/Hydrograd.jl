@@ -36,28 +36,38 @@ function plot_invesion_loss_time_history(LOSS)
 
     loss_total = []
     loss_pred = []
+    loss_pred_eta = []
+    loss_pred_u = []
     loss_slope = []
 
     for curLoss in LOSS
         append!(loss_total, curLoss[1])
         append!(loss_pred, curLoss[2])
-        append!(loss_slope, curLoss[3])
+        append!(loss_pred_eta, curLoss[3])
+        append!(loss_pred_u, curLoss[4])
+        append!(loss_slope, curLoss[5])
     end 
 
     #get rid of zeros in loss 
     @. loss_total = max(1e-12, loss_total)
     @. loss_pred = max(1e-12, loss_pred)
+    @. loss_pred_eta = max(1e-12, loss_pred_eta)
+    @. loss_pred_u = max(1e-12, loss_pred_u)
     @. loss_slope = max(1e-12, loss_slope)
 
     p1 = plot(iter_numbers, loss_total, c=:black, dpi=300, yscale=:log10, lablel="loss_total")
     plot!(iter_numbers, loss_pred, c=:blue, lablel="loss_pred")
+    plot!(iter_numbers, loss_pred_eta, c=:green, lablel="loss_pred_eta")
+    plot!(iter_numbers, loss_pred_u, c=:red, lablel="loss_pred_u")
     plot!(iter_numbers, loss_slope, c=:green, lablel="loss_slope")
                 
     #xlims!(0, 30)
     #ylims!(-0.01, 2.01)
     xlabel!("Inversion iteration")
     ylabel!("Inversion loss")
-    plot!(legend=:topright, fg_legend=:transparent, bg_legend=:transparent)
+    plot!(legend=:bottomleft, fg_legend=:transparent, bg_legend=:transparent)
+    
+    display(p1)
 
     savefig(p1, joinpath(save_path, "inversion_loss_history.png"))
 end 
