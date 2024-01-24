@@ -59,8 +59,8 @@ println("SWE-1D simulation and inversion ...")
 save_path = dirname(@__FILE__)
 
 #define control variables
-bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
-bPlot_Simulation_Results = false    #whether to plot simulation results
+bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
+bPlot_Simulation_Results = true    #whether to plot simulation results
 bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
