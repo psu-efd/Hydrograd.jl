@@ -3,13 +3,27 @@
 #
 # This file should be problem specific (each problem may have different bed profile)
 
+#loss due to slope regularization
+function calc_slope_loss(zb_cell, dx)
+    """
+    2nd order Central difference for 1st degree derivative
+    """
+    #[[zero(eltype(zb_cell))]; (zb_cell[3:end] - zb_cell[1:(end - 2)]) ./ (2.0 * dx); [zero(eltype(zb_cell))]]
+
+    S0_max = 0.2
+    S0_center = 0.0
+
+    #return max.(S0_center, (slope_temp .- S0_max)) 
+    return sum(max.(S0_center, abs.([(zb_cell[3:end] - zb_cell[1:(end - 2)]) ./ (2.0 * dx)][1]) .- S0_max))
+end
+
 #Functions to setup the bed profile (this is just for some examples)
 function my_gauss(x::Float64; sigma::Float64=1.0, h::Float64=1.0, mid::Float64=0.0)
     variance = sigma^2
     return h * exp(-(x - mid)^2 / (2 * variance))
 end
 
-function setup_bed!(mesh, zb_face, zb_cell, S0)
+function setup_bed!(mesh, zb_cell)
 
     # parameters for bed setup
     b_bump_height = 0.3
@@ -20,7 +34,7 @@ function setup_bed!(mesh, zb_face, zb_cell, S0)
                               mid=maximum(mesh.xFaces) / 2.0)
     end
 
-    interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
+    #interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
 
     # optionally plot the bed for checking
     #plot_bed(mesh, zb_cell, zb_face, S0)

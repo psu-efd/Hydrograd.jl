@@ -81,7 +81,7 @@ function swe_1D_make_animation(sol, mesh, zb_cell, save_path)
 
             animCounter = animCounter + 1
 
-            if (animCounter % 10) == 0
+            if (animCounter % 100) == 0
 
                 plt = plot(mesh.xCells, Q[:, 1] + zb_cell, c=:aqua, label="free surface", dpi=300)
                 plot!(mesh.xCells, zb_cell, c=:black, label="bed")

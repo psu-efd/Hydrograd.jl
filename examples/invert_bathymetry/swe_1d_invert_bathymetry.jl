@@ -5,6 +5,7 @@
 # 
 #Then the code does an inversion of the bathymetry
 
+using Dates
 using Plots
 using JLD2
 using BenchmarkTools
@@ -12,33 +13,44 @@ using BenchmarkTools
 using AdHydraulics
 
 #SciML related packages
-using DifferentialEquations, Optimization, OptimizationPolyalgorithms, OptimizationNLopt,
-    Zygote, SciMLSensitivity
-using ModelingToolkit
-using Symbolics
-
-using Optim
-
-using ForwardDiff, ReverseDiff
-
+# DE
+using DifferentialEquations
 using OrdinaryDiffEq
 
+#SciML
+using SciMLSensitivity
+
+#Optimizers
+using Optimization
+using OptimizationPolyalgorithms
+using OptimizationNLopt
+using Optim
+using OptimizationFlux
+
+#AD engines
+using Zygote
+using ForwardDiff
+using ReverseDiff
+
 #for Bayesian estimation
-using Turing
+#using Turing
 
 # Load StatsPlots for visualizations and diagnostics.
-using StatsPlots
+#using StatsPlots
 
-using LinearAlgebra
+#using LinearAlgebra
 
-using Random
-Random.seed!(1234)
+#using Random
+#Random.seed!(1234)
 
 #include problem-specific Julia files (must be in the same directory as the main file)
 include("process_bed.jl")
 include("process_initial_condition.jl")
 include("semi_discretize.jl")
 include("plot_inversion_results.jl")
+
+
+time_start = Dates.now()
 
 #print some information
 println("SWE-1D simulation and inversion ...")
@@ -47,13 +59,17 @@ println("SWE-1D simulation and inversion ...")
 save_path = dirname(@__FILE__)
 
 #define control variables
-bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
-bPlot_Simulation_Results = false    #whether to plot simulation results
+bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
+bPlot_Simulation_Results = true    #whether to plot simulation results
 bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
+#options for inversion 
+bInversion_slope_loss = true   #whether to include slope loss 
+bInversion_include_u = true    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
+
 #mesh related variables
-nCells = 100     # Number of cells
+nCells = 30     # Number of cells
 L = 10.0  # Length of the domain
 
 #create the 1D mesh
@@ -63,10 +79,10 @@ mesh = initialize_mesh_1D(nCells, L)
 swe_1d_constants = swe_1D_const(
     g=9.81,
     t=0.0,             #starting time (current time)
-    dt_min=0.005,      #minimum dt (if adaptive time step)
-    dt=0.001,          #time step size
+    dt_min=0.001,      #minimum dt (if adaptive time step)
+    dt=0.005,          #time step size
     CFL=0.4,           #CFL number 
-    tEnd=20.0,          #end of simulation time 
+    tEnd=0.1,          #end of simulation time 
     h_small=1.0e-3,      #a small water depth for dry/wet treatment
     RiemannSolver="HLL"  #choice of Riemann problem solver 
 )
@@ -76,14 +92,13 @@ swe_1d_constants = swe_1D_const(
 ManningN = 0.03    #Manning's n
 
 #  setup bed 
-zb_face = zeros(Number, mesh.nFaces)      #zb at faces (points in 1D)
+#zb_face = zeros(mesh.nFaces)      #zb at faces (points in 1D)
 zb_cell = zeros(Number, mesh.nCells)      #zb at cell centers 
-S0 = zeros(Number, mesh.nCells)          #bed slope at cell centers 
+#S0 = zeros(mesh.nCells)          #bed slope at cell centers 
 
-setup_bed!(mesh, zb_face, zb_cell, S0)
+setup_bed!(mesh, zb_cell)
 
-#make a copy of the bathymetry truth: zb_face_truth, zb_cell_truth
-zb_face_truth = deepcopy(zb_face)
+#make a copy of the bathymetry truth: zb_cell_truth
 zb_cell_truth = deepcopy(zb_cell)
 
 # setup initial conditions 
@@ -121,8 +136,7 @@ t_save = 0.0:dt_save:swe_1d_constants.tEnd
 
 # define the ODE
 f = ODEFunction((dQdt, Q, p, t) -> swe_1D_rhs!(dQdt, Q, p, t,
-        mesh, swe_1d_constants, left_bcType, right_bcType, left_bcValue, right_bcValue, ManningN,
-        zb_face), 
+        mesh, swe_1d_constants, left_bcType, right_bcType, left_bcValue, right_bcValue, ManningN), 
         jac_prototype=nothing)
 
 prob = ODEProblem(f, Q0, tspan, p)
@@ -169,7 +183,7 @@ if bPlot_Simulation_Results
     swe_1D_make_plots(save_path)
 
     #make an animation of the simulation as a function of time 
-    swe_1D_make_animation(sol, mesh, zb_cell, save_path)
+    #swe_1D_make_animation(sol, mesh, zb_cell, save_path)
 end
 
 #println("Press enter to exit ...")
@@ -194,7 +208,7 @@ if bPerform_Inversion
 
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        Array(solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t))[:,1,end]
+        Array(solve(prob, Tsit5(), adaptive=true, p=θ, dt=dt, saveat=t))  #[:,1,end]
     end
 
     SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
@@ -210,9 +224,15 @@ if bPerform_Inversion
 
     function loss(θ)
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred - Array(sol)[:,1,end] + (θ - zb_cell_truth)  #loss = free surface elevation mismatch
+        l = pred[:,1,end] - Array(sol)[:,1,end] + (θ - zb_cell_truth)  #loss = free surface elevation mismatch
 
-        return sum(abs2, l), pred # Mean squared error
+        loss_pred = sum(abs2, l)
+        loss_slope = calc_slope_loss(θ, mesh.dx)
+        #loss_total = loss_pred + loss_slope
+        loss_total = loss_pred
+
+        #return loss_total, loss_pred, loss_slope, pred # Mean squared error + slope loss 
+        return loss_pred, loss_pred, loss_slope, pred
     end
 
     #grad = Zygote.gradient(loss, ps)
@@ -228,12 +248,12 @@ if bPerform_Inversion
     PRED = []                              # prediction accumulator
     PARS = []                              # parameters accumulator
 
-    callback = function (θ, l, pred) #callback function to observe training
+    callback = function (θ, loss_total, loss_pred, loss_slope, pred) #callback function to observe training
         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
-        println("      iter, loss = ", iter, ", ", l)
+        println("      iter, loss_total, loss_pred, loss_slope = ", iter, ", ", loss_total, ", ", loss_pred, ", ", loss_slope)
 
-        append!(PRED, [pred])
-        append!(LOSS, l)
+        append!(PRED, [pred[:,1,end]])
+        append!(LOSS, [[loss_total, loss_pred, loss_slope]])
 
         if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
             #println("theta.u = ", θ.u)
@@ -264,8 +284,8 @@ if bPerform_Inversion
     #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
-    #adtype = Optimization.AutoZygote()         #works, but slow. Maybe because of memory allocations?
-    adtype = Optimization.AutoForwardDiff()
+    adtype = Optimization.AutoZygote()         #works, but slow. Maybe because of memory allocations?
+    #adtype = Optimization.AutoForwardDiff()
     #adtype = Optimization.AutoReverseDiff()
     #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
 
@@ -279,16 +299,19 @@ if bPerform_Inversion
     ub_p .= 0.5 
 
     optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
+    #optprob = Optimization.OptimizationProblem(optf, ps)
 
     #res = Optimization.solve(optprob, PolyOpt(), callback = callback)  #PolyOpt does not support lb and ub 
     #res = Optimization.solve(optprob, NLopt.LD_LBFGS(), callback = callback)   #very fast 
     #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback; iterations=30, maxiters=40, f_calls_limit=20, show_trace=true)
-    res = Optimization.solve(optprob, Optim.BFGS(), callback=callback)
+    res = Optimization.solve(optprob, Optim.BFGS(), callback=callback, maxiters = 1, local_maxiters = 3; f_tol=1e-3, show_trace=false)  #iterations=10 
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
+    #res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=1000)
     
-    @show res.u
+    @show res
+    @show res.original
 
     #save the inversion results
     #@show PARS 
@@ -301,7 +324,12 @@ if bPlot_Inversion_Results
     println("   Plotting inversion results ...")
 
     #plot inversion results
-    plot_inversion_results(save_path, mesh, zb_face, zb_cell, S0, zb_cell_truth)
+    plot_inversion_results(save_path, mesh, zb_cell_truth)
 end 
+
+time_end = Dates.now()
+
+time_elapsed = Dates.canonicalize(Dates.CompoundPeriod(time_start-time_end))
+println("Wall time: ", time_elapsed)
 
 println("Done!")

@@ -4,7 +4,7 @@
 # Problem-specific function to calculate the RHS of ODE: dQdt (= dhdt and dqdt)
 # In this case, we will invert p = [inletQ, exitH, ManningN].
 function swe_1D_rhs!(dQdt, Q, p, t, mesh, swe_1d_constants, left_bcType, right_bcType, 
-                     left_bcValue, right_bcValue, ManningN, zb_face)
+                     left_bcValue, right_bcValue, ManningN)
 
     #for convenience
     dx = mesh.dx
@@ -18,9 +18,10 @@ function swe_1D_rhs!(dQdt, Q, p, t, mesh, swe_1d_constants, left_bcType, right_b
 
     #fluxes on faces 
     fluxes = zeros(eltype(Q), 2, nFaces)
-
     flux = zeros(eltype(Q), 2)
 
+    #zb at faces and slope at cells 
+    zb_face = zeros(eltype(Q), nFaces)
     S0 = zeros(eltype(Q), nCells)
 
     #println("time t = ", t)
@@ -31,8 +32,8 @@ function swe_1D_rhs!(dQdt, Q, p, t, mesh, swe_1d_constants, left_bcType, right_b
     interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
 
     #get a view (no need for a copy) of the current solution variables h and q 
-    h = Q[:,1]
-    q = Q[:,2]
+    h = @view Q[:,1]
+    q = @view Q[:,2]
 
     #ghost cells on the left and right boundaries
     #    wall (no flux, dh/dx=0 and q=hu=0), bcValue = 0.0 (not used)
