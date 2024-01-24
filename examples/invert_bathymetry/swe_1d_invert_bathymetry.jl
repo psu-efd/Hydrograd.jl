@@ -5,6 +5,8 @@
 # 
 #Then the code does an inversion of the bathymetry
 
+using Revise
+
 using Dates
 using Plots
 using JLD2
@@ -299,7 +301,7 @@ if bPerform_Inversion
     #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
-    adtype = Optimization.AutoZygote()         #works, but slow. Maybe because of memory allocations?
+    #adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
     #adtype = Optimization.AutoForwardDiff()
     #adtype = Optimization.AutoReverseDiff()
     #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
@@ -323,7 +325,7 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=500)
+    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=21)
     
     @show res
     @show res.original
