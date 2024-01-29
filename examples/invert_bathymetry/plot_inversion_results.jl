@@ -2,7 +2,9 @@
 
 using Revise
 using JLD2
-using Plots
+#using Plots
+#using PyPlot
+using CairoMakie
 using LaTeXStrings
 using Printf
 
@@ -56,23 +58,54 @@ function plot_invesion_loss_time_history(LOSS)
     @. loss_pred_u = max(1e-14, loss_pred_u)
     @. loss_slope = max(1e-14, loss_slope)
 
-    p1 = plot(iter_numbers, loss_total, c=:black, dpi=300, yscale=:log10, lablel="loss_total")
-    plot!(iter_numbers, loss_pred, c=:blue, lablel="loss_pred")
-    plot!(iter_numbers, loss_pred_eta, c=:green, lablel="loss_pred_eta")
-    plot!(iter_numbers, loss_pred_u, c=:red, lablel="loss_pred_u")
-    plot!(iter_numbers, loss_slope, c=:green, lablel="loss_slope")
+    #The following is with Plots.jl's default backend 
+    # p1 = plot()
+    # #plot!(p1, iter_numbers, loss_total, c=:black, dpi=300, yscale=:log10, lablel="loss_total")
+    # plot!(p1, iter_numbers, loss_total, c=:black, lablel="loss total")
+    # #plot!(iter_numbers, loss_pred, c=:blue, lablel="loss_pred")
+    # #plot!(iter_numbers, loss_pred_eta, c=:green, lablel="loss_pred_eta")
+    # #plot!(iter_numbers, loss_pred_u, c=:red, lablel="loss_pred_u")
+    # #plot!(iter_numbers, loss_slope, c=:green, lablel="loss_slope")
+    # plot!(yscale=:log10)
                 
-    #xlims!(0, 30)
-    #ylims!(-0.01, 2.01)
-    xlabel!("Inversion iteration")
-    ylabel!("Inversion loss")
-    #plot!(legend=:bottomleft, fg_legend=:transparent, bg_legend=:transparent)
-    #plot!(legend=:bottomleft)
+    # #xlims!(0, 30)
+    # #ylims!(-0.01, 2.01)
+    # #xlabel!("Inversion iteration")
+    # #ylabel!("Inversion loss")
+    # #plot!(legend=:bottomleft, fg_legend=:transparent, bg_legend=:transparent)
+    # plot!(legend=:bottomleft)
     
-    display(p1)
-    gui()
+    # display(p1)
+    # #gui()
 
-    #savefig(p1, joinpath(save_path, "inversion_loss_history.png"))
+    # readline()
+
+    # savefig(p1, joinpath(save_path, "inversion_loss_history.png"))
+
+    #The following is with CairoMakie
+    fig = Figure()
+    ax = fig[1, 1] = Axis(fig)
+
+    l1 = lines!(iter_numbers, Float64.(loss_total), color=:black, label="loss_total")
+    l2 = lines!(iter_numbers, Float64.(loss_pred), color=:blue, label="loss_pred")
+    l3 = lines!(iter_numbers, Float64.(loss_pred_eta), color=:green, lablel="loss_pred_eta")
+    l4 = lines!(iter_numbers, Float64.(loss_pred_u), color=:red, lablel="loss_pred_u")
+    l5 = lines!(iter_numbers, Float64.(loss_slope), color=:green, lablel="loss_slope")
+
+    ax.xlabel = "Inversion iteration"
+    ax.ylabel = "Inversion loss"
+    ax.yscale = log10
+
+    # legend(loc="lower left",fontsize=14,frameon=False)
+    #fig[1, 2] = Legend(fig, ax, "Losses", framevisible = false, position = :rt)
+    #axislegend()
+    axislegend(ax, [l1, l2, l3, l4, l5], ["loss_total", "loss_pred", "loss_pred_eta", "loss_pred_u", "loss_slope"], 
+               framevisible = false, position=:rt)
+    #fig
+
+    save(joinpath(save_path, "inversion_loss_history.png"), fig; px_per_unit=2)
+    
+
 end 
 
 function animate_inversion_process(LOSS, PRED, PARS, sol, mesh, zb_cell_truth)
