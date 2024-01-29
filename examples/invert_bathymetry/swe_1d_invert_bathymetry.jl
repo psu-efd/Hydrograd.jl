@@ -61,9 +61,9 @@ println("SWE-1D simulation and inversion ...")
 save_path = dirname(@__FILE__)
 
 #define control variables
-bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
-bPlot_Simulation_Results = true    #whether to plot simulation results
-bPerform_Inversion = true           #whether to do inversion 
+bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
+bPlot_Simulation_Results = false    #whether to plot simulation results
+bPerform_Inversion = false           #whether to do inversion 
 bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
 #options for inversion 
@@ -302,7 +302,7 @@ if bPerform_Inversion
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
     #adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
-    #adtype = Optimization.AutoForwardDiff()
+    adtype = Optimization.AutoForwardDiff()
     #adtype = Optimization.AutoReverseDiff()
     #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
 
@@ -325,7 +325,7 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=21)
+    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=1000)
     
     @show res
     @show res.original

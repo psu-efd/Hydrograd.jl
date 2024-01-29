@@ -1,18 +1,19 @@
 #functions to make plots for the inversion 
 
+using Revise
 using JLD2
 using Plots
 using LaTeXStrings
 using Printf
 
 plot_font = "sans-serif"
-default(fontfamily=plot_font,
-        linewidth=2, framestyle=:box, label=nothing, grid=false,
-        titlefont=font(16, plot_font),   #for title
-        tickfont=font(12, plot_font),    #for tick label 
-        guidefont=font(16, plot_font),   #for axis title label
-        annotationfontsize=14,           #for annotate
-        legendfont=font(10, plot_font))  #for legend
+# default(fontfamily=plot_font,
+#         linewidth=2, framestyle=:box, label=nothing, grid=false,
+#         titlefont=font(16, plot_font),   #for title
+#         tickfont=font(12, plot_font),    #for tick label 
+#         guidefont=font(16, plot_font),   #for axis title label
+#         annotationfontsize=14,           #for annotate
+#         legendfont=font(10, plot_font))  #for legend
 
 
 function  plot_inversion_results(save_path, mesh, zb_cell_truth)
@@ -26,7 +27,7 @@ function  plot_inversion_results(save_path, mesh, zb_cell_truth)
 
     plot_invesion_loss_time_history(LOSS)
 
-    animate_inversion_process(LOSS, PRED, PARS, sol, mesh, zb_cell_truth)
+    #animate_inversion_process(LOSS, PRED, PARS, sol, mesh, zb_cell_truth)
     
 end
 
@@ -49,11 +50,11 @@ function plot_invesion_loss_time_history(LOSS)
     end 
 
     #get rid of zeros in loss 
-    @. loss_total = max(1e-12, loss_total)
-    @. loss_pred = max(1e-12, loss_pred)
-    @. loss_pred_eta = max(1e-12, loss_pred_eta)
-    @. loss_pred_u = max(1e-12, loss_pred_u)
-    @. loss_slope = max(1e-12, loss_slope)
+    @. loss_total = max(1e-14, loss_total)
+    @. loss_pred = max(1e-14, loss_pred)
+    @. loss_pred_eta = max(1e-14, loss_pred_eta)
+    @. loss_pred_u = max(1e-14, loss_pred_u)
+    @. loss_slope = max(1e-14, loss_slope)
 
     p1 = plot(iter_numbers, loss_total, c=:black, dpi=300, yscale=:log10, lablel="loss_total")
     plot!(iter_numbers, loss_pred, c=:blue, lablel="loss_pred")
@@ -65,11 +66,13 @@ function plot_invesion_loss_time_history(LOSS)
     #ylims!(-0.01, 2.01)
     xlabel!("Inversion iteration")
     ylabel!("Inversion loss")
-    plot!(legend=:bottomleft, fg_legend=:transparent, bg_legend=:transparent)
+    #plot!(legend=:bottomleft, fg_legend=:transparent, bg_legend=:transparent)
+    #plot!(legend=:bottomleft)
     
     display(p1)
+    gui()
 
-    savefig(p1, joinpath(save_path, "inversion_loss_history.png"))
+    #savefig(p1, joinpath(save_path, "inversion_loss_history.png"))
 end 
 
 function animate_inversion_process(LOSS, PRED, PARS, sol, mesh, zb_cell_truth)
@@ -93,7 +96,7 @@ function animate_inversion_process(LOSS, PRED, PARS, sol, mesh, zb_cell_truth)
                 plt = plot(mesh.xCells, curPred[:, 1, end] + zb_cell, c=:aqua, label="free surface (predicted)", dpi=300)
                 scatter!(mesh.xCells, Array(sol)[:,1,end]+zb_cell_truth, mc=:blue, ms=2, ma=0.5, label="free surface (truth)")
                 plot!(mesh.xCells, zb_cell, c=:red, label="bed (inverted)")
-                plot!(mesh.xCells, zb_cell_truth, c=:black, label="bed (truth)")
+                plot!(mesh.xCells, zb_cell_truth, c=:black, linestyle=:dash, label="bed (truth)")
 
                 xlims!(-0.1, 10.1)
                 ylims!(-0.2, 2.01)
