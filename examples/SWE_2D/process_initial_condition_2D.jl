@@ -1,0 +1,51 @@
+# process initial condition, such as setting up initial free surface, water depth, etc. 
+# This file should be problem specific because each problem should have different ICs. 
+
+# setup initial condition: free surface 
+function setup_initial_eta!(numOfCells, nodeCoordinates, cell_centroids, eta, zb_cell, h, bPlot::Bool=false)
+    # parameters for initial free surface profile setup
+    
+    xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0   #mid point of the domain
+
+    bump_center_x = xMid  # center of the bump
+    
+    h_small = 0.01
+
+    #loop over cells
+    @inbounds for i in 1:numOfCells
+        if cell_centroids[i,1] < bump_center_x
+            eta[i] = 1.0
+        else
+            eta[i] = 0.5    #0.5
+        end
+    end
+
+    #update water depth
+    @inbounds for i in 1:numOfCells
+        h[i] = eta[i] - zb_cell[i]
+    end
+
+    h[h.<0.0] .= h_small  #ensure positivity of water depth h
+
+    #update the free surface elevation again in case h has been clipped
+    @inbounds for i in 1:numOfCells
+        eta[i] = h[i] + zb_cell[i]
+    end
+
+    #optionally plot the free surface for checking 
+    if bPlot
+        vector_data = [] 
+        vector_names = []
+
+        scalar_data = [eta, h, zb_cell]
+        scalar_names = ["eta", "h", "zb_cell"]
+
+        file_path = joinpath(@__DIR__, "eta_h_zb.vtk" ) 
+        export_to_vtk(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        println("eta, h, and zb are saved to ", file_path)
+        #exit(0)
+    end
+    
+end
+
+

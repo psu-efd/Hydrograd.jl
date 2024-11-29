@@ -16,7 +16,7 @@ using AdHydraulics
 
 #SciML related packages
 # DE
-using DifferentialEquations
+#using DifferentialEquations
 using OrdinaryDiffEq
 
 #SciML
@@ -24,15 +24,17 @@ using SciMLSensitivity
 
 #Optimizers
 using Optimization
-using OptimizationPolyalgorithms
-using OptimizationNLopt
-using Optim
-using OptimizationFlux
+using OptimizationOptimisers
+#using OptimizationPolyalgorithms
+#using OptimizationNLopt
+#using Optim
+#using OptimizationFlux
+#using Flux
 
 #AD engines
-using Zygote
-using ForwardDiff
-using ReverseDiff
+#using Zygote
+#using ForwardDiff
+#using ReverseDiff
 
 #for Bayesian estimation
 #using Turing
@@ -63,7 +65,7 @@ save_path = dirname(@__FILE__)
 #define control variables
 bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
 bPlot_Simulation_Results = false    #whether to plot simulation results
-bPerform_Inversion = false           #whether to do inversion 
+bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
 #options for inversion 
@@ -301,8 +303,9 @@ if bPerform_Inversion
     #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
-    #adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
-    adtype = Optimization.AutoForwardDiff()
+    adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
+    
+    #adtype = Optimization.AutoForwardDiff()
     #adtype = Optimization.AutoReverseDiff()
     #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
 
@@ -325,7 +328,7 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Flux.Adam(0.01), callback=callback, maxiters=1000)
+    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=1000)
     
     @show res
     @show res.original

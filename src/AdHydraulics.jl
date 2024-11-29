@@ -12,6 +12,8 @@ include("util/swe_1D_tools.jl")
 include("mesh/mesh_SRHGEOM.jl")
 include("mesh/mesh_GMSH2D.jl")
 
+include("mesh/SRH_2D_Data.jl")
+
 export greet_your_package_name
 
 #swe_1D
@@ -27,8 +29,15 @@ export swe_1D_make_plots
 export swe_1D_make_animation
 
 #swe_2D
-export readSRHGEOM
-export readGmshMesh
+export read_srhgeom
+export check_cell_nodes_counter_clockwise_srhgeom
+export compute_mesh_properties_srhgeom
+export read_srhmat
+
+export read_gmsh_v2
+export compute_mesh_properties
+
+export SRH2D
 
 
 end

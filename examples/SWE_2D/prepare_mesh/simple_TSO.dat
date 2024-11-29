@@ -1,0 +1,7 @@
+
+ *********************************************************************
+ * Time Series Output Correspondence between index i and Actual time *
+ *   _RSTi.dat _SRHi.dat etc: i refers to time as shown below        *
+ *********************************************************************
+
+     i_Index  ITIME  TIME(hour) =     1       360      0.10
