@@ -1,106 +1,109 @@
 #semin-discretize the 2D SWE to convert it to an ODE system
 #This file should be problem specific because we may invert different parameters 
 
-# Problem-specific function to calculate the RHS of ODE: dQdt (= dhdt dq_xdt dq_ydt)
-# In this case, we will invert para = [zb_cell].
-function swe_2D_rhs!(dQdt, Q, para, t, mesh, swe_1d_constants, left_bcType, right_bcType, 
-                     left_bcValue, right_bcValue, ManningN)
-
-    #for convenience
-    dx = mesh.dx
-    nCells = mesh.nCells
-    nFaces = mesh.nFaces
-
-    g = swe_1d_constants.g
-    h_small = swe_1d_constants.h_small
-    RiemannSolver = swe_1d_constants.RiemannSolver
+# Problem-specific function to calculate the RHS of ODE: 
+# dQdt (= dhdt dq_xdt dq_ydt)
+# Q = [h, q_x, q_y] is the solution vector. q_x = h*u_x, q_y = h*u_y
+# Q_ghost = [h_ghost, q_x_ghost, q_y_ghost] is the ghost cell values
 
 
-    #fluxes on faces 
-    fluxes = zeros(eltype(Q), 2, nFaces)
-    flux = zeros(eltype(Q), 2)
+# In this case, we will invert para = [zb_cells].
+function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, ManningN_cells, ManningN_ghostCells,
+    nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+    inletQ_TotalA, inletQ_DryWet,  
+    nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+    exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+    nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
+    )
+
+    #mesh data
+    numOfCells = my_mesh_2D.numOfCells
+    numOfFaces = my_mesh_2D.numOfFaces
+
+    cell_areas = my_mesh_2D.cell_areas
+    cell_normals = my_mesh_2D.cell_normals
+    face_normals = my_mesh_2D.face_normals  
+    face_lengths = my_mesh_2D.face_lengths
+
+    faceLeftCellID_Dict = my_mesh_2D.faceLeftCellID_Dict
+    faceRightCellID_Dict = my_mesh_2D.faceRightCellID_Dict
+
+    g = swe_2d_constants.g
+    h_small = swe_2d_constants.h_small
+    RiemannSolver = swe_2d_constants.RiemannSolver
+
+    h = @view Q_cells[:,1]
+    q_x = @view Q_cells[:,2]
+    q_y = @view Q_cells[:,3]
+
+    #fluxes on faces: 
+    fluxes = zeros(eltype(Q), 3, numOfFaces)
+    flux = zeros(eltype(Q), 3)
 
     #zb at faces and slope at cells 
-    zb_face = zeros(eltype(Q), nFaces)
-    S0 = zeros(eltype(Q), nCells)
+    zb_faces = zeros(eltype(Q), numOfFaces)
+    S0 = zeros(eltype(Q), numOfCells)
 
     #println("time t = ", t)
 
     #set the parameter values 
-    zb_cell = para
-    #interpolate zb at cells to faces and update S0
-    interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
+    zb_cells = para
+    
+    #interpolate zb from cell to face 
+    cells_to_faces_scalar!(numOfFaces, my_mesh_2D.faceCells_Dict, zb_cells, zb_faces)
 
-    #get a view (no need for a copy) of the current solution variables h and q 
-    h = @view Q[:,1]
-    q = @view Q[:,2]
+    #compute bed slope at cell centers
+    compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_lengths, 
+        my_mesh_2D.cellNodesCount, my_mesh_2D.cellFacesList, my_mesh_2D.cellNeighbors_Dict, 
+        zb_cells, S0)
 
-    #ghost cells on the left and right boundaries
-    #    wall (no flux, dh/dx=0 and q=hu=0), bcValue = 0.0 (not used)
-    #    zeroGradient (dh/dx=0, dq/dx=0), bcValue = 0.0 (not used)
-    #    inletQ (specify inlet specific discharge q=hu=q_in), bcValue = q_in
-    #    exitH (specify outlet water depth, h = h_outlet), bcValue = h_outlet
+    #bed slope is negative of zb gradient 
+    S0 = -S0
 
-    #left boundary
-    if left_bcType=="wall"   #wall
-        h_ghostCell_left = h[1]
-        q_ghostCell_left = -q[1]    #flux goes the opposite direction -> no flux
-    elseif left_bcType=="zeroGradient #zeroGradient"
-        h_ghostCell_left = h[1]
-        q_ghostCell_left = q[1]
-    elseif left_bcType=="inletQ" #inletQ (bcValue=q_in)
-        h_ghostCell_left = h[1]
-        q_ghostCell_left = left_bcValue
-    elseif left_bcType=="exitH" #exitH (bcValue=h_outlet)
-        h_ghostCell_left = left_bcValue
-        q_ghostCell_left = q[1]
-    else 
-        println("Left boundary condition type not recognized.")
-        exit(-1)  #exit with an error code of -1
-    end
+    #Process the boundaries: update ghost cells
+    process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+    inletQ_TotalA, inletQ_DryWet, Q, Q_ghost, swe_2D_constants)
 
-    # right boundary
-    if right_bcType == "wall"  # wall
-        h_ghostCell_right = h[nCells]
-        q_ghostCell_right = -q[nCells]
-    elseif right_bcType == "zeroGradient"  # zeroGradient
-        h_ghostCell_right = h[nCells]
-        q_ghostCell_right = q[nCells]
-    elseif right_bcType == "inletQ"  # inletQ (bcValue=q_in)
-        h_ghostCell_right = h[nCells]
-        q_ghostCell_right = right_bcValue
-    elseif right_bcType == "exitH"  # exitH (bcValue=h_outlet)
-        h_ghostCell_right = right_bcValue
-        q_ghostCell_right = q[nCells]
-    else 
-        println("Right boundary condition type not recognized.")
-        exit(-1)  #exit with an error code of -1
-    end
+    process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+    exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE, Q, Q_ghost, swe_2D_constants)
+
+    process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, Q, Q_ghost)
+
 
     #loop through all faces
-    @inbounds for iFace in 1:nFaces
-        if (iFace == 1)               #left boundary face
-            h_face = [h_ghostCell_left, h[1]]
-            q_face = [q_ghostCell_left, q[1]]
-            bcType = left_bcType
-            bcValue = left_bcValue
-        elseif (iFace == nFaces)   #right boundary face
-            h_face = [h[nCells], h_ghostCell_right]
-            q_face = [q[nCells], q_ghostCell_right]
-            bcType = left_bcType
-            bcValue = left_bcValue
-        else                          #internal face
-            h_face = [h[iFace-1], h[iFace]]
-            q_face = [q[iFace-1], q[iFace]]
+    @inbounds for iFace in 1:my_mesh_2D.numOfFaces
+        left_cellID = faceLeftCellID_Dict[iFace]
+        right_cellID = faceRightCellID_Dict[iFace]
+        face_boundary_ID = my_mesh_2D.faceBoundaryID_Dict[iFace]
+
+        h_face = [h[left_cellID], h[rigth_cellID]]
+        q_x_face = [q_x[left_cellID], q_x[right_cellID]]
+        q_y_face = [q_y[left_cellID], q_y[right_cellID]]
+
+        if face_boundary_ID !=0                       #boundary face
+            if iFace in inletQ_faceIDs
+                bcType = "inletQ"
+            elseif iFace in exitH_faceIDs
+                bcType = "exitH"
+            elseif iFace in wall_faceIDs
+                bcType = "wall"
+            else
+                println("Error: wrong face boundary ID")
+                exit(-1)  #exit with an error code of -1
+            end
+        else
             bcType = "internal"
-            bcValue = zero(eltype(p))  #not used
         end 
 
         if (RiemannSolver == "Roe")
             println("Not implemented yet")
             exit(-1)  #exit with an error code of -1
         elseif (RiemannSolver == "HLL")
-            Riemann_1D_hll!(flux, g, h_face, q_face, bcType, bcValue, h_small)
+            Riemann_2D_hll!(flux, g, h_face, q_x_face, q_y_face, bcType, h_small)
         elseif (RiemannSolver == "HLLC")
             println("Not implemented yet")
             exit(-1)  #exit with an error code of -1
@@ -111,16 +114,13 @@ function swe_2D_rhs!(dQdt, Q, para, t, mesh, swe_1d_constants, left_bcType, righ
 
         fluxes[1,iFace] = flux[1] 
         fluxes[2,iFace] = flux[2]
+        fluxes[3,iFace] = flux[3]
     end 
 
     #loop through all cells
     @inbounds for iCell in 1:nCells
 
         #calcuate the RHS of the ODEs
-        #flux_east = @view fluxes[:,iCell+1] #flux on east face
-        #flux_west = @view fluxes[:,iCell]   #flux on west face
-        #flux_east = fluxes[:,iCell+1] #flux on east face
-        #flux_west = fluxes[:,iCell]   #flux on west face
 
         #fields.dhdt[iCell] = - (flux_east[1]- flux_west[1]) / dx
         dQdt[iCell,1] = - (fluxes[:,iCell+1][1]- fluxes[:,iCell][1]) / dx

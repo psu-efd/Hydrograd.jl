@@ -53,20 +53,7 @@ function setup_bed!(numOfCells, numOfNodes, nodeCoordinates, cellNodesList, cell
     
 end
 
-#update bed elevation at ghost cells
-function update_ghost_cells_bed!(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, zb_cell, zb_ghostCells)
-    for iBoundaryFace in 1:numOfAllBounaryFaces
-    
-        if length(faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]]) !=1
-            println("Error: the number of cells for boundary face ", allBoundaryFacesIDs_List[iBoundaryFace], " is not 1.")
-            exit(0)
-        end
-    
-        cellID_neighbor = faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]][1]
-        zb_ghostCells[iBoundaryFace] = zb_cell[cellID_neighbor]
-    end
-    #println("zb_ghostCells: ", zb_ghostCells)
-end
+
 
 function interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
 

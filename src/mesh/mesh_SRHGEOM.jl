@@ -1,5 +1,3 @@
-using Revise
-
 function read_srhgeom(file_path)
     name = ""
     grid_unit = ""
@@ -53,7 +51,7 @@ function read_srhgeom(file_path)
 end
 
 # Function to compute geometric and topological properties
-function compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faces_r_Dict)
+function compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
     cell_areas = zeros(Float64, numOfCells)
     cell_centroids = zeros(Float64, numOfCells, 2)
     cell_normals = Vector{Vector{Vector{Float64}}}(undef, numOfCells)
@@ -88,7 +86,7 @@ function compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nod
     #loop over all faces to compute face normals
     for faceID in 1:numOfFaces
         # Get the node IDs for the current face
-        nodeList = faces_r_Dict[faceID]
+        nodeList = faceNodes_r_Dict[faceID]
 
         # Get coordinates of the face's nodes
         vertices = [nodeCoordinates[nodeList[iNode],:][1:2] for iNode in 1:2]
