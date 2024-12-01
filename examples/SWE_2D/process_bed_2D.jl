@@ -26,7 +26,7 @@ end
 #Set up the bed elevation
 function setup_bed!(numOfCells, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, cell_centroids, zb_cell, bPlotBed::Bool=false)
     # parameters for bed setup
-    b_bump_height = 0.1
+    b_bump_height = 0.0
 
     xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0
 
@@ -47,7 +47,7 @@ function setup_bed!(numOfCells, numOfNodes, nodeCoordinates, cellNodesList, cell
         scalar_names = ["zb_cell"]
 
         file_path = joinpath(@__DIR__, "bed.vtk" ) 
-        export_to_vtk(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
         println("Bed is saved to ", file_path)
     end
     

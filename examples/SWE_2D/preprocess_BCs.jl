@@ -14,6 +14,7 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
             println("The boundary: ", srhhydro_BC[iBoundary])
         else
             println("Key iBoundary does not exist in the Python dictionary srhhydro_BC.")
+            readline()
             exit(-1)
         end
         
@@ -35,6 +36,7 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
                 
             else
                 println("Key IQParams does not exist in the Python dictionary srhhydro_IQParams.")
+                readline()
                 exit(-1)
             end
             
@@ -54,6 +56,7 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
                 
             else
                 println("Key EWSParamsC does not exist in the Python dictionary srhhydro_EWSParamsC.")
+                readline()
                 exit(-1)
             end
             
@@ -310,7 +313,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
             current_inletQ_ManningN[iFace] = ManningN_cells[internalCellID]   #Manning's n for the current inlet-q boundary
 
             #get the water depth of the internal Cell
-            if h[internalCellID] > swe_2D_constants.hmin
+            if h[internalCellID] > swe_2D_constants.h_small
                 current_inletQ_DryWet[iFace] = 1   #wet cell
                 current_inletQ_A[iFace] = current_inletQ_Length[iFace]^(5/3) * h[internalCellID] / current_inletQ_ManningN[iFace]    #using conveyance method
                 inletQ_TotalA[iInletQ] += current_inletQ_A[iFace]   #accumulate the total cross-sectional wet area
@@ -321,6 +324,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
 
         if inletQ_TotalA[iInletQ] <= 1e-10
             println("Error: total cross-sectional conveyance for the current inlet-q boundary is not positive: ", iInletQ)
+            readline()
             exit(-1)
         end
         
@@ -332,7 +336,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
 
             h_ghost[ghostCellID] = h[internalCellID]   #update the ghost cell water depth. Use the internal cell value no matter dry or wet
 
-            if currrent_inletQ_DryWet[iFace] == 0   #dry cell
+            if current_inletQ_DryWet[iFace] == 0   #dry cell
                 q_x_ghost[ghostCellID] = 0.0   #update the ghost cell discharge
                 q_y_ghost[ghostCellID] = 0.0   #update the ghost cell discharge
             
@@ -388,7 +392,7 @@ function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, 
             faceCentroid = exitH_faceCentroids[iExitH][iFace, :]
 
             #update the ghost cell water depth. Use the exit water surface elevation
-            h_ghost[ghostCellID] = max(swe_2D_constants.hmin, exitH_WSE[iExitH] - faceCentroid[3])  
+            h_ghost[ghostCellID] = max(swe_2D_constants.h_small, exitH_WSE[iExitH] - faceCentroid[3])  
 
             #update the ghost cell discharge                
             q_x_ghost[ghostCellID] = q_x[internalCellID]   #update the ghost cell discharge

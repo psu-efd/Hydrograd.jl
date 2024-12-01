@@ -1,5 +1,6 @@
 #/Manifest.toml
 
+**/*.vtk
 *.mp4
 *.jif
 *.csv

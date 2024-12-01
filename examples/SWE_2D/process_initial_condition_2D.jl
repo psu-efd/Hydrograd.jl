@@ -16,7 +16,7 @@ function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNode
         if cell_centroids[i,1] < bump_center_x
             eta[i] = 1.0
         else
-            eta[i] = 0.5    #0.5
+            eta[i] = 1.0    #0.5
         end
     end
     
@@ -41,7 +41,7 @@ function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNode
         scalar_names = ["eta", "h", "zb_cell"]
         
         file_path = joinpath(@__DIR__, "eta_h_zb.vtk" ) 
-        export_to_vtk(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
         println("eta, h, and zb are saved to ", file_path)
         #exit(0)
     end

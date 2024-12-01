@@ -215,6 +215,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
 
             if (boundaryFace_ID in cellFacesList) && (-boundaryFace_ID) in cellFacesList    #if the positive and negative face ID are in cellFacesList, it is wrong. A boundary face should only show up once. 
                 println("boundary face ID is both positive and negative. It is wrong.")
+                readline()
                 exit(-1)
             end
 
@@ -434,6 +435,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
             #check whether the boundary face has found its boundary
             if !haskey(faceBoundaryID_Dict, iFace)
                 println("Error: boundary face has not found its boundary: ", iFace)
+                readline()
                 exit(-1)
             end
         end
@@ -441,6 +443,8 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         println("faceID: ", iFace, ", faceLeftCellID: ", faceLeftCellID_Dict[iFace], ", faceRightCellID: ", faceRightCellID_Dict[iFace], ", 
             faceBoundaryID: ", faceBoundaryID_Dict[iFace])
     end
+
+    println("faceBoundaryID_Dict: ", faceBoundaryID_Dict)
 
     #create an empty mesh_2D object
     my_mesh_2D = mesh_2D()

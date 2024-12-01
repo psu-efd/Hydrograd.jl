@@ -10,9 +10,11 @@ include("util/swe_1D_tools.jl")
 
 #swe_2D
 include("constants/swe_2D_constants.jl")
+include("solver/swe_2D_solvers.jl")
 include("mesh/mesh_2D.jl")
 include("mesh/mesh_SRHGEOM.jl")
 include("mesh/mesh_GMSH2D.jl")
+include("util/swe_2D_tools.jl")
 
 include("mesh/SRH_2D_Data.jl")
 
@@ -34,6 +36,7 @@ export swe_1D_make_animation
 export swe_2D_consts
 export mesh_2D
 export initialize_mesh_2D
+export Riemann_2D_Roe!
 
 export read_srhgeom
 export check_cell_nodes_counter_clockwise_srhgeom
@@ -42,6 +45,10 @@ export read_srhmat
 
 export read_gmsh_v2
 export compute_mesh_properties
+
+export export_to_vtk_2D
+export swe_2D_calc_total_water_volume
+export swe_2D_save_results
 
 export SRH2D
 

@@ -79,3 +79,156 @@ function Riemann_2D_hll!(flux, g, h_face, q_face, bcType, bcValue, h_small)
 
     #return [h_flux, q_flux]
 end 
+
+function hll_riemann_solver(hL, huL, hvL, hR, huR, hvR, g, n; hmin=1e-6)
+    # Extract normal components
+    nx, ny = n
+
+    # Handle dry bed conditions
+    if hL < hmin && hR < hmin
+        # Both sides are dry
+        return 0.0, 0.0, 0.0
+    elseif hL < hmin
+        # Left side is dry
+        h_flux = huR * nx + hvR * ny
+        hu_flux = (huR * (huR / hR) + 0.5 * g * hR^2) * nx + huR * (hvR / hR) * ny
+        hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * hR^2) * ny
+        return h_flux, hu_flux, hv_flux
+    elseif hR < hmin
+        # Right side is dry
+        h_flux = huL * nx + hvL * ny
+        hu_flux = (huL * (huL / hL) + 0.5 * g * hL^2) * nx + huL * (hvL / hL) * ny
+        hv_flux = (hvL * (huL / hL)) * nx + (hvL * (hvL / hL) + 0.5 * g * hL^2) * ny
+        return h_flux, hu_flux, hv_flux
+    end
+
+    # Compute velocities on left and right
+    uL = huL / hL
+    vL = hvL / hL
+    uR = huR / hR
+    vR = hvR / hR
+
+    # Compute normal velocities
+    unL = uL * nx + vL * ny
+    unR = uR * nx + vR * ny
+
+    # Compute wave speeds (assuming shallow water equations)
+    cL = sqrt(g * hL)
+    cR = sqrt(g * hR)
+
+    SL = min(unL - cL, unR - cR)
+    SR = max(unL + cL, unR + cR)
+
+    # Handle cases for SL and SR
+    if SL >= 0
+        # Use left state flux
+        h_flux = huL * nx + hvL * ny
+        hu_flux = (huL * uL + 0.5 * g * hL^2) * nx + huL * vL * ny
+        hv_flux = (hvL * uL) * nx + (hvL * vL + 0.5 * g * hL^2) * ny
+        return h_flux, hu_flux, hv_flux
+    elseif SR <= 0
+        # Use right state flux
+        h_flux = huR * nx + hvR * ny
+        hu_flux = (huR * uR + 0.5 * g * hR^2) * nx + huR * vR * ny
+        hv_flux = (hvR * uR) * nx + (hvR * vR + 0.5 * g * hR^2) * ny
+        return h_flux, hu_flux, hv_flux
+    else
+        # Use HLL flux
+        h_flux_L = huL * nx + hvL * ny
+        h_flux_R = huR * nx + hvR * ny
+        hu_flux_L = (huL * uL + 0.5 * g * hL^2) * nx + huL * vL * ny
+        hu_flux_R = (huR * uR + 0.5 * g * hR^2) * nx + huR * vR * ny
+        hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * hL^2) * ny
+        hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * hR^2) * ny
+
+        h_flux = (SR * h_flux_L - SL * h_flux_R + SL * SR * (hR - hL)) / (SR - SL)
+        hu_flux = (SR * hu_flux_L - SL * hu_flux_R + SL * SR * (huR - huL)) / (SR - SL)
+        hv_flux = (SR * hv_flux_L - SL * hv_flux_R + SL * SR * (hvR - hvL)) / (SR - SL)
+        return h_flux, hu_flux, hv_flux
+    end
+end
+
+function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
+    # Extract unit normal components
+    nx, ny = normal
+
+    # Handle dry bed conditions
+    if hL < hmin && hR < hmin
+        # Both sides are dry
+        flux[1] = 0.0
+        flux[2] = 0.0
+        flux[3] = 0.0
+    elseif hL < hmin
+        # Left side is dry
+        h_flux = huR * nx + hvR * ny
+        hu_flux = (huR * (huR / hR) + 0.5 * g * hR^2) * nx + huR * (hvR / hR) * ny
+        hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * hR^2) * ny
+
+        flux[1] = h_flux
+        flux[2] = hu_flux
+        flux[3] = hv_flux
+    elseif hR < hmin
+        # Right side is dry
+        h_flux = huL * nx + hvL * ny
+        hu_flux = (huL * (huL / hL) + 0.5 * g * hL^2) * nx + huL * (hvL / hL) * ny
+        hv_flux = (hvL * (huL / hL)) * nx + (hvL * (hvL / hL) + 0.5 * g * hL^2) * ny
+
+        flux[1] = h_flux
+        flux[2] = hu_flux
+        flux[3] = hv_flux
+    end
+
+    # Compute velocities on left and right
+    uL = huL / hL
+    vL = hvL / hL
+    uR = huR / hR
+    vR = hvR / hR
+
+    # Compute normal velocities
+    unL = uL * nx + vL * ny
+    unR = uR * nx + vR * ny
+
+    # Compute Roe averages
+    sqrt_hL = sqrt(hL)
+    sqrt_hR = sqrt(hR)
+    hRoe = (hL + hR)/2.0
+    uRoe = (sqrt_hL * uL + sqrt_hR * uR) / (sqrt_hL + sqrt_hR)
+    vRoe = (sqrt_hL * vL + sqrt_hR * vR) / (sqrt_hL + sqrt_hR)
+    unRoe = uRoe * nx + vRoe * ny
+    cRoe = sqrt(g * hRoe)
+
+    # Compute wave speeds
+    SL = unRoe - cRoe
+    SR = unRoe + cRoe
+
+    # Compute fluxes
+    h_flux_L = huL * nx + hvL * ny
+    hu_flux_L = (huL * uL + 0.5 * g * hL^2) * nx + huL * vL * ny
+    hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * hL^2) * ny
+
+    h_flux_R = huR * nx + hvR * ny
+    hu_flux_R = (huR * uR + 0.5 * g * hR^2) * nx + huR * vR * ny
+    hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * hR^2) * ny
+
+    # Compute the Roe flux
+    if SL >= 0
+        # Use left state flux
+        flux[1] = h_flux_L
+        flux[2] = hu_flux_L
+        flux[3] = hv_flux_L
+    elseif SR <= 0
+        # Use right state flux
+        flux[1] = h_flux_R
+        flux[2] = hu_flux_R
+        flux[3] = hv_flux_R
+    else
+        # Roe flux
+        h_flux = (SR * h_flux_L - SL * h_flux_R + SL * SR * (hR - hL)) / (SR - SL)
+        hu_flux = (SR * hu_flux_L - SL * hu_flux_R + SL * SR * (huR - huL)) / (SR - SL)
+        hv_flux = (SR * hv_flux_L - SL * hv_flux_R + SL * SR * (hvR - hvL)) / (SR - SL)
+
+        flux[1] = h_flux
+        flux[2] = hu_flux
+        flux[3] = hv_flux
+    end
+end

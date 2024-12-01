@@ -1,10 +1,14 @@
 using Revise
 
+using JLD2
+
 using IterTools
 
 using PyCall
 
 using AdHydraulics
+
+using OrdinaryDiffEq
 
 include("process_SRH_2D_input.jl")
 include("process_ManningN.jl")
@@ -13,6 +17,11 @@ include("process_bed_2D.jl")
 include("process_initial_condition_2D.jl")
 include("semi_discretize_2D.jl")
 include("misc_utilities_2D.jl")
+
+println("Solving 2D SWE...")
+
+#directory to save to (the same directory as the main file)
+save_path = dirname(@__FILE__)
 
 #define a swe_2D_const
 swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
@@ -63,7 +72,7 @@ if false
     scalar_names = ["zb_cells"]
     
     file_path = joinpath(@__DIR__, "zb_S0.vtk" ) 
-    export_to_vtk(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
+    export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
     scalar_data, scalar_names, vector_data, vector_names)    
     
     println("zb and S0 are saved to ", file_path)
@@ -165,24 +174,105 @@ preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall_faceIDs,
     wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A)
 
 
+println("inletQ_faceIDs: ", inletQ_faceIDs)
+println("exitH_faceIDs: ", exitH_faceIDs)
+println("wall_faceIDs: ", wall_faceIDs)
 
 #set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
 para = zb_cells
 Q0 = hcat(h, q_x, q_y)   #initial condition: Q = [h q_x q_y]
 
+Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell values of Q
+
 # time information 
-tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
-dt = swe_2D_constants.dt
+#tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
+#dt = swe_2D_constants.dt
+#t = tspan[1]:dt:tspan[2]
+
+tspan = (0.0, 1.0)
+dt = 0.1
 t = tspan[1]:dt:tspan[2]
 
 dt_save = (tspan[2] - tspan[1])/10.0
 t_save = tspan[1]:dt_save:tspan[2]
 
-# define the ODE
-ode_f = ODEFunction((dQdt, Q, para, t) -> swe_2D_rhs!(dQdt, Q, para, t,
-mesh, swe_1d_constants, left_bcType, right_bcType, left_bcValue, right_bcValue, ManningN), 
-jac_prototype=nothing)
+# # define the ODE
+# ode_f = ODEFunction((dQdt, Q, para, t) -> swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+#         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+#         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+#         inletQ_TotalA, inletQ_DryWet,  
+#         nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+#         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+#         nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+#         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
+#         ),
+#     jac_prototype=nothing
+#     )
 
-prob = ODEProblem(ode_f, Q0, tspan, p)
+# prob = ODEProblem(ode_f, Q0, tspan, para)
+
+# sol = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t)
+
+# #save the results
+# #save the simulation solution results
+# jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+
+#swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+
+# Finite Volume Update
+function update_cells(dQdt, Q, my_mesh_2D, dt)
+    new_Q = copy(Q)
+
+    # compute dQdt 
+    swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+         inletQ_TotalA, inletQ_DryWet,  
+         nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+         nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
+         )
+
+    for iCell in 1:my_mesh_2D.numOfCells
+        new_Q[iCell, :] += dt * dQdt[iCell, :]        
+    end
+
+    return new_Q
+end
+
+# Main Solver Function
+function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
+    t = 0.0
+    iStep = 0
+    while t < t_end
+        println("t = ", t)
+
+        Q = update_cells(dQdt, Q, my_mesh_2D, dt)
+
+        if true
+            vector_data = [] 
+            vector_names = []
+            
+            scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cells]
+            scalar_names = ["h", "hu", "hv", "zb_cell"]
+            
+            file_path = joinpath(save_path, "solution_$(iStep).vtk" ) 
+            export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        end 
+
+        t += dt
+        iStep += 1
+    end
+    return Q
+end
+
+t_end = 1.0
+dt = 0.1
+
+dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
+
+solve_shallow_water(my_mesh_2D, dQdt, Q0, t_end, dt)
+
 
 println("All done!")

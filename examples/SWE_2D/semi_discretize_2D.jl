@@ -34,9 +34,9 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
     h_small = swe_2d_constants.h_small
     RiemannSolver = swe_2d_constants.RiemannSolver
 
-    h = @view Q_cells[:,1]
-    q_x = @view Q_cells[:,2]
-    q_y = @view Q_cells[:,3]
+    h = @view Q[:,1]
+    q_x = @view Q[:,2]
+    q_y = @view Q[:,3]
 
     #fluxes on faces: 
     fluxes = zeros(eltype(Q), 3, numOfFaces)
@@ -44,7 +44,7 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
 
     #zb at faces and slope at cells 
     zb_faces = zeros(eltype(Q), numOfFaces)
-    S0 = zeros(eltype(Q), numOfCells)
+    S0 = zeros(eltype(Q), numOfCells, 2)
 
     #println("time t = ", t)
 
@@ -75,40 +75,48 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
 
 
     #loop through all faces
-    @inbounds for iFace in 1:my_mesh_2D.numOfFaces
+    @inbounds for iFace in 1:numOfFaces
         left_cellID = faceLeftCellID_Dict[iFace]
         right_cellID = faceRightCellID_Dict[iFace]
         face_boundary_ID = my_mesh_2D.faceBoundaryID_Dict[iFace]
 
-        h_face = [h[left_cellID], h[rigth_cellID]]
-        q_x_face = [q_x[left_cellID], q_x[right_cellID]]
-        q_y_face = [q_y[left_cellID], q_y[right_cellID]]
+        #face normal vector
+        face_normal = face_normals[iFace]
 
-        if face_boundary_ID !=0                       #boundary face
-            if iFace in inletQ_faceIDs
-                bcType = "inletQ"
-            elseif iFace in exitH_faceIDs
-                bcType = "exitH"
-            elseif iFace in wall_faceIDs
-                bcType = "wall"
-            else
-                println("Error: wrong face boundary ID")
-                exit(-1)  #exit with an error code of -1
-            end
-        else
-            bcType = "internal"
-        end 
+        # if face_boundary_ID !=0                       #boundary face
+        #     println("face_boundary_ID: ", face_boundary_ID)
+        #     if iFace in inletQ_faceIDs
+        #         bcType = "inletQ"
+        #     elseif iFace in exitH_faceIDs
+        #         bcType = "exitH"
+        #     elseif iFace in wall_faceIDs
+        #         bcType = "wall"
+        #     else
+        #         println("Error: wrong face boundary ID")
+        #         # Pause execution
+        #         readline()
+        #         #exit(-1)  #exit with an error code of -1
+
+        #     end
+        # else
+        #     bcType = "internal"
+        # end 
 
         if (RiemannSolver == "Roe")
-            println("Not implemented yet")
-            exit(-1)  #exit with an error code of -1
+            #Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, face_normal; hmin=h_small)
+            Riemann_2D_Roe!(flux, h[left_cellID], q_x[left_cellID], q_y[left_cellID], h[right_cellID], q_x[right_cellID], q_y[right_cellID], g, face_normal; hmin=h_small)
+
+            #println("Not implemented yet")
+            #exit(-1)  #exit with an error code of -1
         elseif (RiemannSolver == "HLL")
-            Riemann_2D_hll!(flux, g, h_face, q_x_face, q_y_face, bcType, h_small)
+            #Riemann_2D_hll!(flux, g, h_face, q_x_face, q_y_face, bcType, h_small)
         elseif (RiemannSolver == "HLLC")
             println("Not implemented yet")
+            readline()
             exit(-1)  #exit with an error code of -1
         else
             println("Wrong choice of RiemannSolver")
+            readline()
             exit(-1)  #exit with an error code of -1
         end
 
@@ -117,23 +125,40 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
         fluxes[3,iFace] = flux[3]
     end 
 
-    #loop through all cells
-    @inbounds for iCell in 1:nCells
+    #initialize the RHS of the ODEs to be zero
+    dQdt .*= 0.0
 
-        #calcuate the RHS of the ODEs
+    #loop through all cells to calculate the RHS of the ODEs
+    @inbounds for iCell in 1:numOfCells
 
-        #fields.dhdt[iCell] = - (flux_east[1]- flux_west[1]) / dx
-        dQdt[iCell,1] = - (fluxes[:,iCell+1][1]- fluxes[:,iCell][1]) / dx
+        #get cell area
+        cell_area = cell_areas[iCell]
 
-        if (h[iCell] <= h_small) #if a dry cell, no flow resistance term
-            #fields.dqdt[iCell] = -(flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
-            dQdt[iCell,2] = -(fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
-        else
-            #fields.dqdt[iCell] = (- (flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
-            #           - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(fields.q[iCell])*fields.q[iCell])
-            dQdt[iCell,2] = (- (fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
-                       - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(q[iCell])*q[iCell])
+        #loop through all faces of the cell
+        for iFace in my_mesh_2D.cellFacesList[iCell]
+            #get face length 
+            face_lenght = face_lengths[iFace]
+
+            dQdt[iCell,1] -= fluxes[1,iFace] * face_lenght
+            dQdt[iCell,2] -= fluxes[2,iFace] * face_lenght
+            dQdt[iCell,3] -= fluxes[3,iFace] * face_lenght
+    
         end
+
+        # if (h[iCell] <= h_small) #if a dry cell, no flow resistance term
+        #     #fields.dqdt[iCell] = -(flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
+        #     dQdt[iCell,2] = -(fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
+        # else
+        #     #fields.dqdt[iCell] = (- (flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
+        #     #           - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(fields.q[iCell])*fields.q[iCell])
+        #     dQdt[iCell,2] = (- (fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
+        #                - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(q[iCell])*q[iCell])
+        # end
+
+        #divide by cell area
+        dQdt[iCell,1] /= cell_area
+        dQdt[iCell,2] /= cell_area
+        dQdt[iCell,3] /= cell_area
     end 
 
 end

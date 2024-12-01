@@ -13,5 +13,5 @@ Base.@kwdef mutable struct swe_2D_consts
 
     h_small::Float64 = 1.0e-3  #dry bed water depth threshold (e.g., 1.0e-3)
 
-    RiemannSolver::String = "HLL"  #The choice of Riemann solver, e.g., Roe, HLL, and HLLC 
+    RiemannSolver::String = "Roe"  #The choice of Riemann solver, e.g., Roe, HLL, and HLLC 
 end
