@@ -3,6 +3,8 @@ mutable struct mesh_2D
     numOfCells::Int64     # Number of cells
     numOfFaces::Int64     # Number of faces 
     numOfNodes::Int64     # Number of nodes
+
+    maxNumOfCellFaces::Int64  # Maximum number of faces for each cell
     
     numOfNodeStrings::Int64  # Number of node strings (number of boundaries; it does not include the default boundary)
     
@@ -69,6 +71,7 @@ mutable struct mesh_2D
         numOfCells::Int64=0,
         numOfFaces::Int64=0,
         numOfNodes::Int64=0,
+        maxNumOfCellFaces::Int64=0,
         numOfNodeStrings::Int64=0,
         numOfBoundaries::Int64=0,
         numOfTotalCells::Int64=0,
@@ -106,6 +109,7 @@ mutable struct mesh_2D
         return new(numOfCells,
                 numOfFaces,
                 numOfNodes,
+                maxNumOfCellFaces,
                 numOfNodeStrings,
                 numOfBoundaries,
                 numOfTotalCells,
@@ -151,12 +155,15 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     
     cellNodesList = srhgeom_obj.elementNodesList    # List of cell's nodes  (2D Int array: [cellID, gMax_Nodes_per_Cell])
     cellNodesCount = srhgeom_obj.elementNodesCount  # Count of cell's nodes: how many nodes for each cell (1D Int array: [numOfCells])
+
+    maxNumOfCellFaces = maximum(cellNodesCount)  # Maximum number of faces for each cell
     
     cellFacesList = srhgeom_obj.elementEdgesList    # List of cell's faces  (2D Int array: [cellID, gMax_Nodes_per_Cell]). The numbers of nodes and faces are the same for each cell.
     
     println("cellNodesCount: ", cellNodesCount)
     println("cellNodesList: ", cellNodesList)
     println("cellFacesList: ", cellFacesList)
+    println("maxNumOfCellFaces: ", maxNumOfCellFaces)
     
     nodeCoordinates = srhgeom_obj.nodeCoordinates      # Node coordinates: Float64 2D array [numOfNodes, 3]
     twoDMeshBoundingbox = srhgeom_obj.twoDMeshBoundingbox  # 2D mesh bounding box: array [xmin, ymin, zmin, xmax, ymax, zmax]
@@ -453,6 +460,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     my_mesh_2D.numOfCells = numOfCells
     my_mesh_2D.numOfFaces = numOfFaces
     my_mesh_2D.numOfNodes = numOfNodes
+    my_mesh_2D.maxNumOfCellFaces = maxNumOfCellFaces
     my_mesh_2D.numOfNodeStrings = numOfNodeStrings
     my_mesh_2D.numOfBoundaries = numOfBoundaries
     my_mesh_2D.numOfTotalCells = numOfTotalCells

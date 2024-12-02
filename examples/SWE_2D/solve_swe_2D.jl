@@ -220,9 +220,8 @@ t_save = tspan[1]:dt_save:tspan[2]
 #swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
 
 # Finite Volume Update
-function update_cells(dQdt, Q, my_mesh_2D, dt)
-    new_Q = copy(Q)
-
+function update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+    
     # compute dQdt 
     swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
          nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
@@ -235,10 +234,9 @@ function update_cells(dQdt, Q, my_mesh_2D, dt)
          )
 
     for iCell in 1:my_mesh_2D.numOfCells
-        new_Q[iCell, :] += dt * dQdt[iCell, :]        
+        Q[iCell, :] += dt * dQdt[iCell, :]        
     end
 
-    return new_Q
 end
 
 # Main Solver Function
@@ -248,11 +246,20 @@ function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
     while t < t_end
         println("t = ", t)
 
-        Q = update_cells(dQdt, Q, my_mesh_2D, dt)
+        if iStep == 5000
+            print("Here.")
+        end
 
-        if true
-            vector_data = [] 
-            vector_names = []
+        update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+
+        if true && iStep % 100 == 0
+
+            u_temp = Q[:,2] ./ Q[:,1]
+            v_temp = Q[:,3] ./ Q[:,1]
+            U_vector = hcat(u_temp, v_temp)
+
+            vector_data = [U_vector] 
+            vector_names = ["U"]
             
             scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cells]
             scalar_names = ["h", "hu", "hv", "zb_cell"]
@@ -267,8 +274,8 @@ function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
     return Q
 end
 
-t_end = 1.0
-dt = 0.1
+t_end = 10.0
+dt = 0.001
 
 dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
 
