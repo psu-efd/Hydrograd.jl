@@ -15,7 +15,9 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
     nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
     exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
     nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
+    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+    nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
     )
     
     #mesh data
@@ -77,16 +79,19 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
     process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
     wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, Q, Q_ghost)
     
+    process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, Q, Q_ghost)
+    
     #loop through all celss to calculate the fluxes on faces
     for iCell in 1:numOfCells
 
-        if iCell==5 && abs(t-5.0)<0.0001
-            println("iCell = ", iCell)
-            println("h = ", h[iCell])
-            println("q_x = ", q_x[iCell])
-            println("q_y = ", q_y[iCell])
-            println("S0 = ", S0[iCell,:])
-        end
+        # if iCell==5 && abs(t-5.0)<0.0001
+        #     println("iCell = ", iCell)
+        #     println("h = ", h[iCell])
+        #     println("q_x = ", q_x[iCell])
+        #     println("q_y = ", q_y[iCell])
+        #     println("S0 = ", S0[iCell,:])
+        # end
 
         #loop through all faces of the cell
         for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
@@ -139,6 +144,16 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
             fluxes[iCell, iFace, 1] = flux[1]
             fluxes[iCell, iFace, 2] = flux[2]
             fluxes[iCell, iFace, 3] = flux[3]
+
+            # if (iCell==5 || iCell==8) && abs(t-5.0)<0.0001
+            #     println("iCell = ", iCell, "iFace = ", iFace, "faceID = ", faceID)   
+            #     println("h = ", h[iCell])
+            #     println("q_x = ", q_x[iCell])
+            #     println("q_y = ", q_y[iCell])
+            #     println("S0 = ", S0[iCell,:])
+
+            #     println("fluxes = ", fluxes[iCell, iFace, :])
+            # end
         end
 
     end
@@ -159,20 +174,23 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
             #get face length 
             face_lenght = face_lengths[faceID]
             
-            dQdt[iCell,1] -= fluxes[iCell, iFace, 1] * face_lenght
+            dQdt[iCell,1] -= fluxes[iCell, iFace, 1] * face_lenght 
             dQdt[iCell,2] -= fluxes[iCell, iFace, 2] * face_lenght
             dQdt[iCell,3] -= fluxes[iCell, iFace, 3] * face_lenght
         end
         
-        # if (h[iCell] <= h_small) #if a dry cell, no flow resistance term
-        #     #fields.dqdt[iCell] = -(flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
-        #     dQdt[iCell,2] = -(fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
-        # else
-        #     #fields.dqdt[iCell] = (- (flux_east[2] - flux_west[2]) / dx + g * h[iCell] * fields.S0[iCell]
-        #     #           - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(fields.q[iCell])*fields.q[iCell])
-        #     dQdt[iCell,2] = (- (fluxes[:,iCell+1][2] - fluxes[:,iCell][2]) / dx + g * h[iCell] * S0[iCell]
-        #                - g*ManningN^2/max(h[iCell], h_small)^(7.0/3.0)*abs(q[iCell])*q[iCell])
-        # end
+        #add flow resistance term and gravity/bed slope term
+        if (h[iCell] <= h_small) #if a dry cell, no flow resistance term
+            dQdt[iCell,2] += g * h[iCell] * S0[iCell,1] * cell_area
+            dQdt[iCell,3] += g * h[iCell] * S0[iCell,2] * cell_area
+        else
+            u_temp = q_x[iCell] / h[iCell]
+            v_temp = q_y[iCell] / h[iCell]
+            u_mag = sqrt(u_temp^2 + v_temp^2)
+
+            dQdt[iCell,2] += (g * h[iCell] * S0[iCell,1] - g*ManningN_cells[iCell]^2/h[iCell]^(1.0/3.0)*u_mag*u_temp) * cell_area
+            dQdt[iCell,3] += (g * h[iCell] * S0[iCell,2] - g*ManningN_cells[iCell]^2/h[iCell]^(1.0/3.0)*u_mag*v_temp) * cell_area
+        end
         
         #divide by cell area
         dQdt[iCell,1] /= cell_area

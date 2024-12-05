@@ -156,6 +156,7 @@ function process_SRH_2D_input!(srhhydro_file_name::String)
     srh_all_Dict["nInletQ_BCs"] = nInletQ_BCs
     srh_all_Dict["nExitH_BCs"] = nExitH_BCs
     srh_all_Dict["nWall_BCs"] = 0  #nWall_BCs not defined yet. It is computed outside later. 
+    srh_all_Dict["nSymm_BCs"] = 0  #nSymm_BCs not defined yet. It is computed outside later. 
 
     srh_all_Dict["srhgeom_obj"] = srhgeom_obj
     srh_all_Dict["srhmat_obj"] = srhmat_obj

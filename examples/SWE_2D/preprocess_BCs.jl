@@ -1,7 +1,9 @@
 #preprcess all boundary conditions, such as calculate the list of faces, internal cells, ghost cells, etc.
 #These functions are supposed to be called only once before the time loop
 
-function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices)
+using LinearAlgebra
+
+function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices)
 
     srhhydro_BC = srh_all_Dict["srhhydro_BC"]   #boundary conditions
     srhhydro_IQParams = srh_all_Dict["srhhydro_IQParams"]   #inlet-Q parameters
@@ -64,6 +66,11 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
             println("WALL boundary condition is set for boundary ", iBoundary)
             
             push!(wall_BC_indices, iBoundary)
+            
+        elseif lowercase(boundaryType) == "symm"
+            println("SYMMETRY boundary condition is set for boundary ", iBoundary)
+            
+            push!(symm_BC_indices, iBoundary)
         end
         
     end
@@ -72,9 +79,14 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
     nWall_BCs = length(wall_BC_indices)
     srh_all_Dict["nWall_BCs"] = nWall_BCs  #update the number of wall boundaries in the dictionary
     
+    #number of symmetry boundaries
+    nSymm_BCs = length(symm_BC_indices)
+    srh_all_Dict["nSymm_BCs"] = nSymm_BCs  #update the number of symmetry boundaries in the dictionary
+    
     println("inletQ_BC_indices: ", inletQ_BC_indices)
     println("exitH_BC_indices: ", exitH_BC_indices) 
     println("wall_BC_indices: ", wall_BC_indices)
+    println("symm_BC_indices: ", symm_BC_indices)
     
 end
 
@@ -253,10 +265,66 @@ function preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall
         end
         
         #get the ghost cell ID of the current wall boundary
-        wall_H[iWall] = zeros(Float64, nBoundaryFaces)   #inlet water depth for the current wall boundary   
-        wall_A[iWall] = zeros(Float64, nBoundaryFaces)   #inlet cross-sectional area for the current wall boundary  
+        wall_H[iWall] = zeros(Float64, nBoundaryFaces)   # water depth for the current wall boundary   
+        wall_A[iWall] = zeros(Float64, nBoundaryFaces)   # cross-sectional area for the current wall boundary  
     end
     
+end
+
+#preprocess symmetry boundaries: called every time step to update the boundary condition
+function preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A)
+
+    face_normals = my_mesh_2D.face_normals   #face normals
+    boundaryFaces_direction_Dict = my_mesh_2D.boundaryFaces_direction_Dict   #face directions of boundary faces
+    
+    #loop through all symmetry boundaries
+    for iSymm in 1:nSymm_BCs
+        iBoundary = symm_BC_indices[iSymm]
+        
+        println("Preprocessing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+        
+        #get the boundary face IDs of the current wall boundary
+        current_boundaryFaceIDs = my_mesh_2D.boundaryFaces_Dict[iBoundary]
+        current_boundaryFace_directions = boundaryFaces_direction_Dict[iBoundary]
+        current_ghostCellIDs = [my_mesh_2D.boundaryFaceID_to_ghostCellID_Dict[abs(faceID)] for faceID in current_boundaryFaceIDs]
+        current_internalCellIDs = [my_mesh_2D.boundaryFaceID_to_internalCellID_Dict[abs(faceID)] for faceID in current_boundaryFaceIDs]
+        
+        symm_faceIDs[iSymm] = current_boundaryFaceIDs   #the face ID of the current symmetry boundary
+        symm_ghostCellIDs[iSymm] = current_ghostCellIDs   #the ghost cell ID of the current symmetry boundary
+        symm_internalCellIDs[iSymm] = current_internalCellIDs   #the internal cell ID of the current symmetry boundary    
+        
+        #number of bounary faces for the current symmetry boundary
+        nBoundaryFaces = length(current_boundaryFaceIDs)
+        
+        symm_faceCentroids[iSymm] = zeros(Float64, nBoundaryFaces, 3)   #face centroids of the current symmetry boundary
+        symm_outwardNormals[iSymm] = zeros(Float64, nBoundaryFaces, 2)   #face outward normals of the current symmetry boundary
+        
+        #loop through all faces in the current symmetry boundary
+        for iFace in 1:nBoundaryFaces
+            faceID = current_boundaryFaceIDs[iFace]
+            ghostCellID = current_ghostCellIDs[iFace]
+            internalCellID = current_internalCellIDs[iFace]
+            
+            #get the face centroid of the current symmetry boundary
+            faceCentroid = (my_mesh_2D.nodeCoordinates[my_mesh_2D.faceNodes_r_Dict[abs(faceID)][1],:] + my_mesh_2D.nodeCoordinates[my_mesh_2D.faceNodes_r_Dict[abs(faceID)][2],:]) / 2.0
+            symm_faceCentroids[iSymm][iFace, :] = faceCentroid
+
+            #get the face direction of the current symmetry boundary
+            face_direction = current_boundaryFace_directions[iFace]
+
+            #get the face outward normal of the current symmetry boundary
+            face_normal = face_normals[faceID]
+            symm_outwardNormals[iSymm][iFace, :] = face_direction .* face_normal  
+            
+            println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", symm_faceCentroids[iSymm][iFace, :], ", Face normal: ", symm_outwardNormals[iSymm][iFace, :])
+        end
+        
+        #get the ghost cell ID of the current symmetry boundary
+        symm_H[iSymm] = zeros(Float64, nBoundaryFaces)   # water depth for the current symmetry boundary   
+        symm_A[iSymm] = zeros(Float64, nBoundaryFaces)   # cross-sectional area for the current symmetry boundary  
+    end
+
 end
 
 #process inlet-q boundaries: called every time step to update the boundary condition
@@ -276,7 +344,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
     for iInletQ in 1:nInletQ_BCs
         iBoundary = inletQ_BC_indices[iInletQ]
         
-        println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+        #println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
         
         #get the boundary face IDs of the current inlet-q boundary
         
@@ -372,7 +440,7 @@ function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, 
     for iExitH in 1:nExitH_BCs
         iBoundary = exitH_BC_indices[iExitH]
         
-        println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
+        #println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
         
         #get the boundary face IDs of the current exit-h boundary
         current_boundaryFaceIDs = exitH_faceIDs[iExitH]         #the face ID of the current exit-h boundary
@@ -419,7 +487,7 @@ function process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_
     for iWall in 1:nWall_BCs
         iBoundary = wall_BC_indices[iWall]
         
-        println("Prrocessing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+        #println("Prrocessing WALL boundary ", iWall, " with index in BC list ", iBoundary)
         
         #get the boundary face IDs of the current wall boundary
         current_boundaryFaceIDs = wall_faceIDs[iWall]       #the face ID of the current wall boundary
@@ -447,6 +515,66 @@ function process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_
             #update the ghost cell discharge                
             q_x_ghost[ghostCellID] = -q_x[internalCellID]   #update the ghost cell discharge
             q_y_ghost[ghostCellID] = -q_y[internalCellID]   #update the ghost cell discharge            
+        end
+       
+    end
+    
+end
+
+#process symmetry boundaries: called every time step to update the boundary condition
+function process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, Q_cells, Q_ghostCells)
+
+    h = @view Q_cells[:,1]
+    q_x = @view Q_cells[:,2]
+    q_y = @view Q_cells[:,3]
+
+    h_ghost = @view Q_ghostCells[:,1]
+    q_x_ghost = @view Q_ghostCells[:,2]
+    q_y_ghost = @view Q_ghostCells[:,3]
+    
+    #loop through all symmetry boundaries
+    for iSymm in 1:nSymm_BCs
+        iBoundary = symm_BC_indices[iSymm]
+        
+        #println("Prrocessing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+        
+        #get the boundary face IDs of the current symmetry boundary
+        current_boundaryFaceIDs = symm_faceIDs[iSymm]       #the face ID of the current symmetry boundary
+        current_ghostCellIDs = symm_ghostCellIDs[iSymm]     #the ghost cell ID of the current symmetry boundary
+        current_internalCellIDs = symm_internalCellIDs[iSymm] #the internal cell ID of the current symmetry boundary    
+        
+        #number of bounary faces for the current symmetry boundary
+        nBoundaryFaces = length(current_boundaryFaceIDs)
+        
+        #loop through all faces in the current symmetry boundary
+        for iFace in 1:nBoundaryFaces
+            faceID = current_boundaryFaceIDs[iFace]
+            ghostCellID = current_ghostCellIDs[iFace]
+            internalCellID = current_internalCellIDs[iFace]
+            
+            #get the face centroid of the current symmetry boundary
+            faceCentroid = symm_faceCentroids[iSymm][iFace, :]
+
+            #get the face outward normal of the current symmetry boundary
+            face_normal = symm_outwardNormals[iSymm][iFace, :]
+            
+            #update the ghost cell water depth. Use the internal cell value
+            h_ghost[ghostCellID] = h[internalCellID]   
+
+            #update the ghost cell discharge: symmetry about the face
+            #Get internal cell velocity vector
+            v_internal = [q_x[internalCellID], q_y[internalCellID]]
+            
+            #Compute reflection of velocity vector about face normal
+            #v_reflected = v - 2(v·n)n where n is unit normal
+            v_dot_n = dot(v_internal, face_normal)
+            v_reflected = v_internal - 2 * v_dot_n * face_normal
+            
+            #Update ghost cell velocity components
+            q_x_ghost[ghostCellID] = v_reflected[1]
+            q_y_ghost[ghostCellID] = v_reflected[2]
+
         end
        
     end

@@ -3,6 +3,8 @@
 #
 # This file should be problem specific (each problem may have different bed profile)
 
+using Statistics 
+
 #loss due to slope regularization
 function calc_slope_loss(zb_cell, dx)
     """
@@ -23,17 +25,20 @@ function my_gauss(x::Float64; sigma::Float64=1.0, h::Float64=1.0, mid::Float64=0
     return h * exp(-(x - mid)^2 / (2 * variance))
 end
 
-#Set up the bed elevation
+#Set up the bed elevation: assuming the nodes coordinates already have the bed elevation
+#   interpolate the bed elevation from nodes to cells 
+#   
 function setup_bed!(numOfCells, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, cell_centroids, zb_cell, bPlotBed::Bool=false)
-    # parameters for bed setup
-    b_bump_height = 0.0
-
-    xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0
 
     #loop through cells
     @inbounds for i in 1:numOfCells
-        zb_cell[i] = my_gauss(cell_centroids[i,1], sigma=1.0, h=b_bump_height, 
-                              mid=xMid)
+
+        #get the node coordinates of the cell
+        cell_nodes = cellNodesList[i,:][1:cellNodesCount[i]]
+        cell_node_coordinates = nodeCoordinates[cell_nodes, :]
+
+        #interpolate the bed elevation from nodes to cell centroid
+        zb_cell[i] = mean(cell_node_coordinates[:, 3])
     end
 
     #interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)

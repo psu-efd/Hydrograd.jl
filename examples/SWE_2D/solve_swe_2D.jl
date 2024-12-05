@@ -27,7 +27,7 @@ save_path = dirname(@__FILE__)
 swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
 
 #read data from SRH-2D hydro, geom, and material files
-srhhydro_file_name = "simple.srhhydro"
+srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
 srh_all_Dict = process_SRH_2D_input!(srhhydro_file_name)
 
 #update swe_2D_constants based on the SRH-2D data
@@ -36,7 +36,7 @@ update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
 #get the 2D mesh 
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
-#  setup bed 
+#  setup bed elevation 
 zb_faces = zeros(Float64, my_mesh_2D.numOfFaces)      #zb at faces 
 zb_cells = zeros(Float64, my_mesh_2D.numOfCells)      #zb at cell centers 
 zb_ghostCells = zeros(Float64, my_mesh_2D.numOfAllBounaryFaces)   #zb at ghost cell centers 
@@ -64,7 +64,7 @@ println("zb_cells: ", zb_cells)
 println("zb_faces: ", zb_faces)
 println("S0: ", S0) 
 
-if false
+if true
     vector_data = [S0] 
     vector_names = ["S0"]
     
@@ -99,7 +99,7 @@ h_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)            #water depth at
 q_x_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_x=hu at ghost cells 
 q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghost cells 
 
-total_water_volume = Float64[]   #total volume of water in the domain 
+total_water_volume = []   #total volume of water in the domain 
 
 #setup initial condition for eta, h, q_x, q_y
 setup_initial_eta!(my_mesh_2D.numOfCells, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, 
@@ -113,13 +113,15 @@ eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 inletQ_BC_indices = Int[]   #indices of inlet-Q boundaries in the boundary list
 exitH_BC_indices = Int[]    #indices of exit-H boundaries in the boundary list
 wall_BC_indices = Int[]     #indices of wall boundaries in the boundary list
+symm_BC_indices = Int[]     #indices of symmetry (no slip) boundaries in the boundary list
 
-#compute the indices of each boundary in the global boundary list (nWall_BCs is updated in this function)
-compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices)
+#compute the indices of each boundary in the global boundary list (nWall_BCs and nSymm_BCs are updated in this function)
+compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices)
 
 nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]   #number of inlet-Q boundaries
 nExitH_BCs = srh_all_Dict["nExitH_BCs"]     #number of exit-H boundaries
 nWall_BCs = srh_all_Dict["nWall_BCs"]       #number of wall boundaries
+nSymm_BCs = srh_all_Dict["nSymm_BCs"]       #number of symmetry boundaries
 
 #some data arrays for inlet-q bounaries:
 inletQ_faceIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #face IDs of the inlet-q boundaries
@@ -173,10 +175,25 @@ wall_A = Array{Array{Float64}}(undef, nWall_BCs)   #cross-sectional area for eac
 preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
     wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A)
 
+#some data arrays for symmetry boundaries:
+symm_faceIDs = Array{Array{Int}}(undef, nSymm_BCs)
+symm_ghostCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
+symm_internalCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
+
+symm_faceCentroids = Vector{Matrix{Float64}}(undef, nSymm_BCs)
+symm_outwardNormals = Vector{Matrix{Float64}}(undef, nSymm_BCs)
+
+symm_H = Array{Array{Float64}}(undef, nSymm_BCs)
+symm_A = Array{Array{Float64}}(undef, nSymm_BCs)
+
+#preprocess symmetry boundaries
+preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
+    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A)
 
 println("inletQ_faceIDs: ", inletQ_faceIDs)
 println("exitH_faceIDs: ", exitH_faceIDs)
 println("wall_faceIDs: ", wall_faceIDs)
+println("symm_faceIDs: ", symm_faceIDs)
 
 #set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
 para = zb_cells
@@ -230,12 +247,25 @@ function update_cells!(dQdt, Q, my_mesh_2D, t, dt)
          nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
          exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
          nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
+         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+         nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+         symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
          )
 
     for iCell in 1:my_mesh_2D.numOfCells
         Q[iCell, :] += dt * dQdt[iCell, :]        
+
+        #update water depth in case of dry cells
+        if Q[iCell, 1] < swe_2D_constants.h_small
+            Q[iCell, 1] = swe_2D_constants.h_small
+            Q[iCell, 2] = 0.0
+            Q[iCell, 3] = 0.0
+        end
+
+        #update WSE
+        eta[iCell] = Q[iCell, 1] + zb_cells[iCell]
     end
+    
 
 end
 
@@ -252,7 +282,12 @@ function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
 
         update_cells!(dQdt, Q, my_mesh_2D, t, dt)
 
-        if true && iStep % 100 == 0
+        if iStep % 100 == 0
+           #compute and record the total water volume
+            push!(total_water_volume, [t, sum(Q[:,1] .* my_mesh_2D.cell_areas)])
+        end
+
+        if true && iStep % 1000 == 0
 
             u_temp = Q[:,2] ./ Q[:,1]
             v_temp = Q[:,3] ./ Q[:,1]
@@ -261,8 +296,8 @@ function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
             vector_data = [U_vector] 
             vector_names = ["U"]
             
-            scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cells]
-            scalar_names = ["h", "hu", "hv", "zb_cell"]
+            scalar_data = [Q[:,1], Q[:,2], Q[:,3], eta, zb_cells, ManningN_cells]
+            scalar_names = ["h", "hu", "hv", "eta", "zb_cell", "ManningN"]
             
             file_path = joinpath(save_path, "solution_$(iStep).vtk" ) 
             export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
@@ -274,12 +309,20 @@ function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
     return Q
 end
 
-t_end = 10.0
-dt = 0.001
+t_end = 1000.0
+dt = 0.01
 
 dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
 
 solve_shallow_water(my_mesh_2D, dQdt, Q0, t_end, dt)
+
+#save total water volume to file 
+open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
+    println(fo, "time, total_water_volume")
+    for time_volume in total_water_volume
+        println(fo, time_volume[1], ",", time_volume[2])
+    end
+end
 
 
 println("All done!")
