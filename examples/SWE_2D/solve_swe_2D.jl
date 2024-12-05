@@ -10,6 +10,34 @@ using AdHydraulics
 
 using OrdinaryDiffEq
 
+#SciML
+using SciMLSensitivity
+
+#Optimizers
+using Optimization
+using OptimizationOptimisers
+#using OptimizationPolyalgorithms
+#using OptimizationNLopt
+#using Optim
+#using OptimizationFlux
+#using Flux
+
+#AD engines
+#using Zygote
+#using ForwardDiff
+#using ReverseDiff
+
+#for Bayesian estimation
+#using Turing
+
+# Load StatsPlots for visualizations and diagnostics.
+#using StatsPlots
+
+#using LinearAlgebra
+
+#using Random
+#Random.seed!(1234)
+
 include("process_SRH_2D_input.jl")
 include("process_ManningN.jl")
 include("preprocess_BCs.jl")
@@ -20,6 +48,16 @@ include("misc_utilities_2D.jl")
 
 println("Solving 2D SWE...")
 
+#define control variables
+bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
+bPlot_Simulation_Results = false   #whether to plot simulation results
+bPerform_Inversion = true           #whether to do inversion 
+bPlot_Inversion_Results = false     #whehter to plot the inversion results
+
+#options for inversion 
+bInversion_slope_loss = true   #whether to include slope loss 
+bInversion_include_u = true    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
+
 #directory to save to (the same directory as the main file)
 save_path = dirname(@__FILE__)
 
@@ -27,7 +65,8 @@ save_path = dirname(@__FILE__)
 swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
 
 #read data from SRH-2D hydro, geom, and material files
-srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
+#srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
+srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
 srh_all_Dict = process_SRH_2D_input!(srhhydro_file_name)
 
 #update swe_2D_constants based on the SRH-2D data
@@ -60,11 +99,11 @@ zb_cells, S0)
 #bed slope is negative of zb gradient 
 S0 = -S0
 
-println("zb_cells: ", zb_cells)   
-println("zb_faces: ", zb_faces)
-println("S0: ", S0) 
+#println("zb_cells: ", zb_cells)   
+#println("zb_faces: ", zb_faces)
+#println("S0: ", S0) 
 
-if true
+if false
     vector_data = [S0] 
     vector_names = ["S0"]
     
@@ -190,10 +229,10 @@ symm_A = Array{Array{Float64}}(undef, nSymm_BCs)
 preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
     symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A)
 
-println("inletQ_faceIDs: ", inletQ_faceIDs)
-println("exitH_faceIDs: ", exitH_faceIDs)
-println("wall_faceIDs: ", wall_faceIDs)
-println("symm_faceIDs: ", symm_faceIDs)
+#println("inletQ_faceIDs: ", inletQ_faceIDs)
+#println("exitH_faceIDs: ", exitH_faceIDs)
+#println("wall_faceIDs: ", wall_faceIDs)
+#println("symm_faceIDs: ", symm_faceIDs)
 
 #set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
 para = zb_cells
@@ -206,122 +245,313 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 1.0)
-dt = 0.1
+tspan = (0.0, 200.0)
+dt = 0.05
 t = tspan[1]:dt:tspan[2]
 
 dt_save = (tspan[2] - tspan[1])/10.0
 t_save = tspan[1]:dt_save:tspan[2]
 
 # # define the ODE
-# ode_f = ODEFunction((dQdt, Q, para, t) -> swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-#         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-#         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-#         inletQ_TotalA, inletQ_DryWet,  
-#         nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-#         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-#         nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-#         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals
-#         ),
-#     jac_prototype=nothing
-#     )
+ode_f = ODEFunction((dQdt, Q, para, t) -> swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+            nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+            inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+            inletQ_TotalA, inletQ_DryWet,  
+            nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+            exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+            nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+            wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+            nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+            symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
+            ),
+            jac_prototype=nothing
+        )
 
-# prob = ODEProblem(ode_f, Q0, tspan, para)
+prob = ODEProblem(ode_f, Q0, tspan, para)
 
-# sol = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t)
+if bSimulate_Synthetic_Data
 
-# #save the results
-# #save the simulation solution results
-# jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+    println("   Performing 1D SWE simulation ...")
 
-#swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+    #for direct sensivity analysis
+    #prob = ODEForwardSensitivityProblem((Q, p, t) -> swe_1D_rhs!(Q, p, t, 
+    #                          mesh, swe_1d_constants, left_bcType, right_bcType, S0), Q0, tspan, p)
 
-# Finite Volume Update
-function update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+    # solve the ODE with a solver of your choice 
+    #bm = @benchmark solve(prob, Heun(), adaptive=false, dt=dt, saveat=t)
+    #@show bm 
     
-    # compute dQdt 
-    swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-         inletQ_TotalA, inletQ_DryWet,  
-         nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-         nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-         nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-         symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
-         )
+    sol = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
+    #sol = solve(prob, Heun(), adaptive=false, dt=dt, saveat=t)
+    #sol = solve(prob, AB3(), adaptive=false, dt=dt, saveat = t)
+    #sol = solve(prob, Rosenbrock23(), adaptive=false, dt=dt, saveat = t)  #implicit
 
-    for iCell in 1:my_mesh_2D.numOfCells
-        Q[iCell, :] += dt * dQdt[iCell, :]        
+    #x, dp = extract_local_sensitivities(sol)
+    #da = dp[1]
+    #plot(sol.t, da', lw = 3)
 
-        #update water depth in case of dry cells
-        if Q[iCell, 1] < swe_2D_constants.h_small
-            Q[iCell, 1] = swe_2D_constants.h_small
-            Q[iCell, 2] = 0.0
-            Q[iCell, 3] = 0.0
-        end
+    #println("Press any key to exit ...")
+    #readline()
+    #exit()
 
-        #update WSE
-        eta[iCell] = Q[iCell, 1] + zb_cells[iCell]
-    end
-    
+    # #save the results
+    # #save the simulation solution results
+    jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+
+    swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+
+    #My own ODE Solver
+    # if false
+    #     # Finite Volume Update
+    #     function update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+            
+    #         # compute dQdt 
+    #         swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+    #         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+    #         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+    #         inletQ_TotalA, inletQ_DryWet,  
+    #         nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+    #         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+    #         nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+    #         wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+    #         nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+    #         symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
+    #         )
+            
+    #         for iCell in 1:my_mesh_2D.numOfCells
+    #             Q[iCell, :] += dt * dQdt[iCell, :]        
+                
+    #             #update water depth in case of dry cells
+    #             if Q[iCell, 1] < swe_2D_constants.h_small
+    #                 Q[iCell, 1] = swe_2D_constants.h_small
+    #                 Q[iCell, 2] = 0.0
+    #                 Q[iCell, 3] = 0.0
+    #             end
+                
+    #             #update WSE
+    #             eta[iCell] = Q[iCell, 1] + zb_cells[iCell]
+    #         end
+            
+            
+    #     end
+        
+    #     # Main Solver Function
+    #     function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
+    #         t = 0.0
+    #         iStep = 0
+    #         while t < t_end
+    #             println("t = ", t)
+                
+    #             if iStep == 5000
+    #                 print("Here.")
+    #             end
+                
+    #             update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+                
+    #             if iStep % 100 == 0
+    #                 #compute and record the total water volume
+    #                 push!(total_water_volume, [t, sum(Q[:,1] .* my_mesh_2D.cell_areas)])
+    #             end
+                
+    #             if true && iStep % 1000 == 0
+                    
+    #                 u_temp = Q[:,2] ./ Q[:,1]
+    #                 v_temp = Q[:,3] ./ Q[:,1]
+    #                 U_vector = hcat(u_temp, v_temp)
+                    
+    #                 vector_data = [U_vector] 
+    #                 vector_names = ["U"]
+                    
+    #                 scalar_data = [Q[:,1], Q[:,2], Q[:,3], eta, zb_cells, ManningN_cells]
+    #                 scalar_names = ["h", "hu", "hv", "eta", "zb_cell", "ManningN"]
+                    
+    #                 file_path = joinpath(save_path, "solution_$(iStep).vtk" ) 
+    #                 export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+    #             end 
+                
+    #             t += dt
+    #             iStep += 1
+    #         end
+    #         return Q
+    #     end
+        
+    #     t_end = 200.0
+    #     dt = 0.05
+        
+    #     dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
+        
+    #     solve_shallow_water(my_mesh_2D, dQdt, Q0, t_end, dt)
+        
+    #     #save total water volume to file 
+    #     open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
+    #         println(fo, "time, total_water_volume")
+    #         for time_volume in total_water_volume
+    #             println(fo, time_volume[1], ",", time_volume[2])
+    #         end
+    #     end
+        
+    # end
 
 end
 
-# Main Solver Function
-function solve_shallow_water(my_mesh_2D, dQdt, Q, t_end, dt)
-    t = 0.0
-    iStep = 0
-    while t < t_end
-        println("t = ", t)
+if bPlot_Simulation_Results
 
-        if iStep == 5000
-            print("Here.")
-        end
+    println("   Plotting 2D SWE simulation results ...")
 
-        update_cells!(dQdt, Q, my_mesh_2D, t, dt)
+    #open the simulation result
+    sol = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
 
-        if iStep % 100 == 0
-           #compute and record the total water volume
-            push!(total_water_volume, [t, sum(Q[:,1] .* my_mesh_2D.cell_areas)])
-        end
+    #plot the results at tEnd
+    swe_1D_make_plots(save_path)
 
-        if true && iStep % 1000 == 0
+    #make an animation of the simulation as a function of time 
+    #swe_1D_make_animation(sol, mesh, zb_cell, save_path)
+end
 
-            u_temp = Q[:,2] ./ Q[:,1]
-            v_temp = Q[:,3] ./ Q[:,1]
-            U_vector = hcat(u_temp, v_temp)
 
-            vector_data = [U_vector] 
-            vector_names = ["U"]
-            
-            scalar_data = [Q[:,1], Q[:,2], Q[:,3], eta, zb_cells, ManningN_cells]
-            scalar_names = ["h", "hu", "hv", "eta", "zb_cell", "ManningN"]
-            
-            file_path = joinpath(save_path, "solution_$(iStep).vtk" ) 
-            export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+################
+#Inversion part# 
+################
+
+if bPerform_Inversion
+
+    println("   Performing inversion ...")
+
+    #open the simulation result (as the ground truth)
+    sol = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
+    h_truth = Array(sol)[:,1,end]
+    u_truth = Array(sol)[:,2,end]./Array(sol)[:,1,end]
+    #@show sol
+
+    #inversion parameters: zb_cell
+    # initial guess for the parameters
+    ps = zeros(my_mesh_2D.numOfCells)
+
+    function predict(θ)
+        #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
+        Array(solve(prob, Tsit5(), adaptive=true, p=θ, dt=dt, saveat=t_save))  #[:,1,end]
+    end
+
+    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+    #jac = ForwardDiff.jacobian(predict, ps)
+    #jac = Zygote.jacobian(predict, ps)
+    #jac = ReverseDiff.jacobian(predict, ps)
+    #@show jac
+    #plot(jac)
+    #exit()
+
+    ## Defining Loss function
+    #zb_cell_local = zeros(Number, mesh.nCells)
+
+    function loss(θ)
+        pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
+        l = pred[:,1,end] - h_truth  #loss = free surface elevation mismatch
+        loss_pred_eta = sum(abs2, l)
+
+        loss_pred_u = 0.0
+
+        if bInversion_include_u      #if also include u in the loss 
+            l = pred[:,2,end]./pred[:,1,end] .- u_truth
+            loss_pred_u = sum(abs2, l)
         end 
 
-        t += dt
-        iStep += 1
+        loss_pred = loss_pred_eta + loss_pred_u
+
+        loss_slope = 0.0
+
+        if bInversion_slope_loss    #if bed slope is included in the loss 
+            loss_slope = calc_slope_loss(θ, my_mesh_2D)
+        end 
+
+        loss_total = loss_pred + loss_slope
+
+        return loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred
     end
-    return Q
-end
 
-t_end = 1000.0
-dt = 0.01
+    #grad = Zygote.gradient(loss, ps)
+    #grad = ForwardDiff.gradient(loss, ps)
+    #grad = ForwardDiff.gradient(predict, θ)
+    #@show grad
+    #println("grad = ", grad)
+    #readline()
+    #exit()
 
-dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
 
-solve_shallow_water(my_mesh_2D, dQdt, Q0, t_end, dt)
+    LOSS = []                              # Loss accumulator
+    PRED = []                              # prediction accumulator
+    PARS = []                              # parameters accumulator
 
-#save total water volume to file 
-open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
-    println(fo, "time, total_water_volume")
-    for time_volume in total_water_volume
-        println(fo, time_volume[1], ",", time_volume[2])
+    callback = function (θ, loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred) #callback function to observe training
+        iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+        println("      iter, loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope = ", iter, ", ", 
+                  loss_total, ", ", loss_pred, ", ", loss_pred_eta, ", ", loss_pred_u, ", ", loss_slope)
+
+        append!(PRED, [pred[:,1,end]])
+        append!(LOSS, [[loss_total, loss_pred, loss_pred_eta, loss_pred_u, loss_slope, pred]])
+
+        if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
+            #println("theta.u = ", θ.u)
+            append!(PARS, [copy(θ.u)])
+        else
+            append!(PARS, [θ])
+        end
+
+        #if l > 1e-9
+        #    false
+        #else 
+        #    true   #force the optimizer to stop 
+        #end
+
+        false
     end
+
+    # Let see prediction vs. Truth
+    #scatter(sol[:, end], label = "Truth", size = (800, 500))
+    #plot!(PRED[end][:, end], lw = 2, label = "Prediction")
+
+    #The following is from SciMLSensitivity documentation regarding the choice of AD 
+    #  AutoForwardDiff(): The fastest choice for small optimizations
+    #  AutoReverseDiff(compile=false): A fast choice for large scalar optimizations
+    #  AutoTracker(): Like ReverseDiff but GPU-compatible
+    #  AutoZygote(): The fastest choice for non-mutating array-based (BLAS) functions
+    #  AutoFiniteDiff(): Finite differencing, not optimal but always applicable
+    #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
+    #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
+
+    #adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
+    
+    adtype = Optimization.AutoForwardDiff()
+    #adtype = Optimization.AutoReverseDiff()
+    #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
+
+    optf = Optimization.OptimizationFunction((θ, p) -> loss(θ), adtype)
+
+    #setup the bounds for the bathymetry
+    lb_p = zeros(my_mesh_2D.numOfCells)
+    lb_p .= -0.2  
+
+    ub_p = zeros(my_mesh_2D.numOfCells)
+    ub_p .= 0.2 
+
+    #optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
+    optprob = Optimization.OptimizationProblem(optf, ps)
+
+    #res = Optimization.solve(optprob, PolyOpt(), callback = callback)  #PolyOpt does not support lb and ub 
+    #res = Optimization.solve(optprob, NLopt.LD_LBFGS(), callback = callback)   #very fast 
+    #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback; iterations=30, maxiters=40, f_calls_limit=20, show_trace=true)
+    #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback, maxiters = 100; show_trace=false)  #f_tol=1e-3, iterations=10, local_maxiters = 10
+    #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
+    #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
+    #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
+    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=1000)
+    
+    @show res
+    @show res.original
+
+    #save the inversion results
+    #@show PARS 
+    jldsave(joinpath(save_path, "inversion_results.jld2"); LOSS, PRED, PARS, sol)
+
 end
 
 

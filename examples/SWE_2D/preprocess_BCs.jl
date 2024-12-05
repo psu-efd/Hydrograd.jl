@@ -83,10 +83,10 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
     nSymm_BCs = length(symm_BC_indices)
     srh_all_Dict["nSymm_BCs"] = nSymm_BCs  #update the number of symmetry boundaries in the dictionary
     
-    println("inletQ_BC_indices: ", inletQ_BC_indices)
-    println("exitH_BC_indices: ", exitH_BC_indices) 
-    println("wall_BC_indices: ", wall_BC_indices)
-    println("symm_BC_indices: ", symm_BC_indices)
+    #println("inletQ_BC_indices: ", inletQ_BC_indices)
+    #println("exitH_BC_indices: ", exitH_BC_indices) 
+    #println("wall_BC_indices: ", wall_BC_indices)
+    #println("symm_BC_indices: ", symm_BC_indices)
     
 end
 
@@ -140,7 +140,7 @@ function preprocess_inlet_q_boundaries(my_mesh_2D, nInletQ_BCs, srhhydro_IQParam
             #get the length of the current face
             inletQ_Length[iInletQ][iFace] = my_mesh_2D.face_lengths[faceID]
             
-            println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", inletQ_faceCentroids[iInletQ][iFace, :], ", Face normal: ", inletQ_faceOutwardNormals[iInletQ][iFace, :], ", Face length: ", inletQ_Length[iInletQ][iFace])
+            #println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", inletQ_faceCentroids[iInletQ][iFace, :], ", Face normal: ", inletQ_faceOutwardNormals[iInletQ][iFace, :], ", Face length: ", inletQ_Length[iInletQ][iFace])
         end
         
         #get the total discharge of the current inlet-q boundary
@@ -202,7 +202,7 @@ function preprocess_exit_h_boundaries(my_mesh_2D, nExitH_BCs, srhhydro_EWSParams
             face_normal = face_normals[faceID]
             exitH_faceOutwardNormals[iExitH][iFace, :] = face_direction .* face_normal  
             
-            println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", exitH_faceCentroids[iExitH][iFace, :], ", Face normal: ", exitH_faceOutwardNormals[iExitH][iFace, :])
+            #println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", exitH_faceCentroids[iExitH][iFace, :], ", Face normal: ", exitH_faceOutwardNormals[iExitH][iFace, :])
         end
         
         #get the water surface elevation of the current exit-h boundary
@@ -261,7 +261,7 @@ function preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall
             face_normal = face_normals[faceID]
             wall_outwardNormals[iWall][iFace, :] = face_direction .* face_normal  
             
-            println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", wall_faceCentroids[iWall][iFace, :], ", Face normal: ", wall_outwardNormals[iWall][iFace, :])
+            #println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", wall_faceCentroids[iWall][iFace, :], ", Face normal: ", wall_outwardNormals[iWall][iFace, :])
         end
         
         #get the ghost cell ID of the current wall boundary
@@ -317,7 +317,7 @@ function preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, 
             face_normal = face_normals[faceID]
             symm_outwardNormals[iSymm][iFace, :] = face_direction .* face_normal  
             
-            println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", symm_faceCentroids[iSymm][iFace, :], ", Face normal: ", symm_outwardNormals[iSymm][iFace, :])
+            #println("Face ID: ", faceID, ", Ghost cell ID: ", ghostCellID, ", Internal cell ID: ", internalCellID, ", Face centroid: ", symm_faceCentroids[iSymm][iFace, :], ", Face normal: ", symm_outwardNormals[iSymm][iFace, :])
         end
         
         #get the ghost cell ID of the current symmetry boundary

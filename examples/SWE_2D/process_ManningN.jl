@@ -25,6 +25,6 @@ function setup_ManningN!(ManningN_cells, ManningN_ghostCells, my_mesh_2D, srh_al
     update_ghost_cells_scalar!(my_mesh_2D.numOfAllBounaryFaces, my_mesh_2D.allBoundaryFacesIDs_List, 
         my_mesh_2D.faceCells_Dict, ManningN_cells, ManningN_ghostCells)
    
-    println("ManningN_cells: ", ManningN_cells)
-    println("ManningN_ghostCells: ", ManningN_ghostCells)
+    #println("ManningN_cells: ", ManningN_cells)
+    #println("ManningN_ghostCells: ", ManningN_ghostCells)
 end

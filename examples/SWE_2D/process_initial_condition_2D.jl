@@ -61,7 +61,7 @@ function update_ghost_cells_eta_h_q!(numOfAllBounaryFaces, allBoundaryFacesIDs_L
         q_y_ghostCells[iBoundaryFace] = q_y[cellID_neighbor]
     end
     
-    println("h_ghostCells: ", h_ghostCells)
+    #println("h_ghostCells: ", h_ghostCells)
 end 
 
 

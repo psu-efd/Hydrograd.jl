@@ -27,9 +27,11 @@ function swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cell, save_
    
     vector_data = [] 
     vector_names = []
+
+    WSE = Q_final[:,1] + zb_cell
         
-    scalar_data = [Q_final[:,1], Q_final[:,2], Q_final[:,3], zb_cell]
-    scalar_names = ["h", "hu", "hv", "zb_cell"]
+    scalar_data = [Q_final[:,1], Q_final[:,2], Q_final[:,3], zb_cell, WSE]
+    scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
         
     file_path = joinpath(save_path, "solution_final.vtk" ) 
     export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    

@@ -230,7 +230,7 @@ if bPerform_Inversion
 
     function loss(θ)
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred[:,1,end] - h_truth + (θ - zb_cell_truth)  #loss = free surface elevation mismatch
+        l = pred[:,1,end] - h_truth  #+ (θ - zb_cell_truth)  #loss = free surface elevation mismatch
         loss_pred_eta = sum(abs2, l)
 
         loss_pred_u = 0.0

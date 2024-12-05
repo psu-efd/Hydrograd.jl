@@ -160,10 +160,10 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     
     cellFacesList = srhgeom_obj.elementEdgesList    # List of cell's faces  (2D Int array: [cellID, gMax_Nodes_per_Cell]). The numbers of nodes and faces are the same for each cell.
     
-    println("cellNodesCount: ", cellNodesCount)
-    println("cellNodesList: ", cellNodesList)
-    println("cellFacesList: ", cellFacesList)
-    println("maxNumOfCellFaces: ", maxNumOfCellFaces)
+    # println("cellNodesCount: ", cellNodesCount)
+    # println("cellNodesList: ", cellNodesList)
+    # println("cellFacesList: ", cellFacesList)
+    # println("maxNumOfCellFaces: ", maxNumOfCellFaces)
     
     nodeCoordinates = srhgeom_obj.nodeCoordinates      # Node coordinates: Float64 2D array [numOfNodes, 3]
     twoDMeshBoundingbox = srhgeom_obj.twoDMeshBoundingbox  # 2D mesh bounding box: array [xmin, ymin, zmin, xmax, ymax, zmax]
@@ -178,31 +178,31 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     #faceNodes_r_Dict (reverse of faceNodes_Dict): key: face ID, value: (node1, node2)
     faceNodes_r_Dict = Dict{Int, Tuple{Int, Int}}(convert(Int64,k) => tuple(convert(Int64,v[1]), convert(Int64,v[2])) for (k, v) in srhgeom_obj.edges_r)
     
-    println("faceNodes_Dict: ")
-    for key in keys(faceNodes_Dict)
-        println("Key: $key, Value: $(faceNodes_Dict[key])")
-    end
+    # println("faceNodes_Dict: ")
+    # for key in keys(faceNodes_Dict)
+    #     println("Key: $key, Value: $(faceNodes_Dict[key])")
+    # end
     
-    println("faceNodes_r_Dict: ")
-    for key in sort(collect(keys(faceNodes_r_Dict)))
-        println("Key: $key, Value: $(faceNodes_r_Dict[key])")
-    end
+    # println("faceNodes_r_Dict: ")
+    # for key in sort(collect(keys(faceNodes_r_Dict)))
+    #     println("Key: $key, Value: $(faceNodes_r_Dict[key])")
+    # end
     
     faceCells_Dict = srhgeom_obj.edgeElements       # Dictionary for the List of face's cells: dictionary: {faceID: [cell list]}
     numOfFaces = length(faceCells_Dict)             # Number of faces
     
-    println("numOfFaces: ", numOfFaces)
+    #println("numOfFaces: ", numOfFaces)
     
-    println("faceCells_Dict: ")
-    for key in sort(collect(keys(faceCells_Dict)))
-        println("Key: $key, Value: $(faceCells_Dict[key])")
-    end
+    #println("faceCells_Dict: ")
+    #for key in sort(collect(keys(faceCells_Dict)))
+    #    println("Key: $key, Value: $(faceCells_Dict[key])")
+    #end
     
     boundaryFaces_Dict = srhgeom_obj.boundaryEdges    # Dictionary for the List of boundary faces: dictionary: {boundaryID: [list of face IDs]}. It also has the default boundary (default: wall)
     allBoundaryFacesIDs_List = srhgeom_obj.allBoundaryEdgeIDs  # List of all boundary faces IDs: all lumped to one list
     numOfAllBounaryFaces = length(allBoundaryFacesIDs_List)  # Number of all boundary faces
     
-    println("boundaryFaces_Dict: (before) ", boundaryFaces_Dict)
+    #println("boundaryFaces_Dict: (before) ", boundaryFaces_Dict)
     
     #boundaryFaces_Dict's face ID is negative for the boundary faces whose normal is pointing inwward the domain. Here is to record that.
     boundaryFaces_direction_Dict = Dict()  #Dictionary for the direction of boundary faces: {boundaryFaceID: direction}. direction = 1: normal is pointing outward; direction = -1: normal is pointing inward
@@ -234,9 +234,9 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         boundaryFaces_direction_Dict[boundaryID] = boundaryFaces_direction
     end
     
-    println("boundaryFaces_Dict: (after) ", boundaryFaces_Dict)
-    println("boundaryFaces_direction_Dict: ", boundaryFaces_direction_Dict)
-    println("allBoundaryFacesIDs_List: ", allBoundaryFacesIDs_List)
+    #println("boundaryFaces_Dict: (after) ", boundaryFaces_Dict)
+    #println("boundaryFaces_direction_Dict: ", boundaryFaces_direction_Dict)
+    #println("allBoundaryFacesIDs_List: ", allBoundaryFacesIDs_List)
     
     numOfNodeStrings = srhgeom_obj.numOfNodeStrings    # Number of node strings (number of boundaries; it does not include the default boundary)
     
@@ -289,9 +289,9 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         ghostCellID_to_boundaryFaceID_Dict[ghostCellIDs[iGhostCell]] = allBoundaryFacesIDs_List[iGhostCell]
     end
     
-    println("boundaryFaceID_to_ghostCellID_Dict: ", boundaryFaceID_to_ghostCellID_Dict)
-    println("boundaryFaceID_to_internalCellID_Dict: ", boundaryFaceID_to_internalCellID_Dict)
-    println("ghostCellID_to_boundaryFaceID_Dict: ", ghostCellID_to_boundaryFaceID_Dict)
+    #println("boundaryFaceID_to_ghostCellID_Dict: ", boundaryFaceID_to_ghostCellID_Dict)
+    #println("boundaryFaceID_to_internalCellID_Dict: ", boundaryFaceID_to_internalCellID_Dict)
+    #println("ghostCellID_to_boundaryFaceID_Dict: ", ghostCellID_to_boundaryFaceID_Dict)
     
     #cell's neighbors: key: cell ID, value: list of neighbor cell IDs
     cellNeighbors_Dict = Dict{Int, Vector{Int}}()
@@ -321,10 +321,10 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         end
     end
     
-    println("cellNeighbors_Dict: ")
-    for key in sort(collect(keys(cellNeighbors_Dict)))
-        println("Key: $key, Value: $(cellNeighbors_Dict[key])")
-    end
+    #println("cellNeighbors_Dict: ")
+    #for key in sort(collect(keys(cellNeighbors_Dict)))
+    #    println("Key: $key, Value: $(cellNeighbors_Dict[key])")
+    #end
     
     #check cell's nodes counter-clockwise
     check_cell_nodes_counter_clockwise_srhgeom(numOfCells, cellNodesList, nodeCoordinates, cellNodesCount)
@@ -332,60 +332,60 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     #compute mesh properties
     cell_areas, cell_centroids, cell_normals, face_normals, face_lengths = compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
     
-    let counter_temp = 0
-        println("cell_areas: ")
-        for area in cell_areas
-            println(area)
-            counter_temp += 1
-            if counter_temp == 5
-                break
-            end
-        end
-    end 
+    #let counter_temp = 0
+    #    println("cell_areas: ")
+    #    for area in cell_areas
+    #        println(area)
+    #        counter_temp += 1
+    #        if counter_temp == 5
+    #            break
+    #        end
+    #    end
+    #end 
     
-    let counter_temp = 0
-        println("cell_centroids: ")
-        for i in 1:size(cell_centroids, 1)
-            println(cell_centroids[i,:])
-            counter_temp += 1
-            if counter_temp == 5
-                break
-            end
-        end
-    end 
+    # let counter_temp = 0
+    #     println("cell_centroids: ")
+    #     for i in 1:size(cell_centroids, 1)
+    #         println(cell_centroids[i,:])
+    #         counter_temp += 1
+    #         if counter_temp == 5
+    #             break
+    #         end
+    #     end
+    # end 
     
-    let counter_temp = 0
-        println("cell_normals: ")
-        for normals in cell_normals
-            println(counter_temp+1, ": ", normals)
-            counter_temp += 1
-            if counter_temp == 5
-                #break
-            end
-        end
-    end 
+    # let counter_temp = 0
+    #     println("cell_normals: ")
+    #     for normals in cell_normals
+    #         println(counter_temp+1, ": ", normals)
+    #         counter_temp += 1
+    #         if counter_temp == 5
+    #             #break
+    #         end
+    #     end
+    # end 
     
-    let counter_temp = 0
-        println("face_normals: ")
-        for normals in face_normals
-            println(counter_temp+1, ": ", normals)
-            counter_temp += 1
-            if counter_temp == 5
-                #break
-            end
-        end
-    end 
+    # let counter_temp = 0
+    #     println("face_normals: ")
+    #     for normals in face_normals
+    #         println(counter_temp+1, ": ", normals)
+    #         counter_temp += 1
+    #         if counter_temp == 5
+    #             #break
+    #         end
+    #     end
+    # end 
     
-    let counter_temp = 0
-        println("face_lengths: ")
-        for face_length in face_lengths
-            println(counter_temp+1, ": ", face_length)
-            counter_temp += 1
-            if counter_temp == 5
-                #break
-            end
-        end
-    end 
+    # let counter_temp = 0
+    #     println("face_lengths: ")
+    #     for face_length in face_lengths
+    #         println(counter_temp+1, ": ", face_length)
+    #         counter_temp += 1
+    #         if counter_temp == 5
+    #             #break
+    #         end
+    #     end
+    # end 
 
     #compute the left and right cells of each face
     #For internal face, the left cell -> the right cell is in the same direction of the outer normal vector 
@@ -447,11 +447,11 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
             end
         end
 
-        println("faceID: ", iFace, ", faceLeftCellID: ", faceLeftCellID_Dict[iFace], ", faceRightCellID: ", faceRightCellID_Dict[iFace], ", 
-            faceBoundaryID: ", faceBoundaryID_Dict[iFace])
+        #println("faceID: ", iFace, ", faceLeftCellID: ", faceLeftCellID_Dict[iFace], ", faceRightCellID: ", faceRightCellID_Dict[iFace], ", 
+        #    faceBoundaryID: ", faceBoundaryID_Dict[iFace])
     end
 
-    println("faceBoundaryID_Dict: ", faceBoundaryID_Dict)
+    #println("faceBoundaryID_Dict: ", faceBoundaryID_Dict)
 
     #create an empty mesh_2D object
     my_mesh_2D = mesh_2D()

@@ -6,17 +6,31 @@
 using Statistics 
 
 #loss due to slope regularization
-function calc_slope_loss(zb_cell, dx)
-    """
-    2nd order Central difference for 1st degree derivative
-    """
-    #[[zero(eltype(zb_cell))]; (zb_cell[3:end] - zb_cell[1:(end - 2)]) ./ (2.0 * dx); [zero(eltype(zb_cell))]]
+function calc_slope_loss(zb_cells, my_mesh_2D)
+    
+     #zb at faces and slope at cells 
+     zb_faces_temp = zeros(eltype(Q), my_mesh_2D.numOfFaces)
+     S0_temp = zeros(eltype(Q), my_mesh_2D.numOfCells, 2)
+     
+     #interpolate zb from cell to face 
+     cells_to_faces_scalar!(my_mesh_2D.numOfFaces, my_mesh_2D.faceCells_Dict, zb_cells, zb_faces_temp)
+     
+     #compute bed slope at cell centers
+     compute_scalar_gradients!(my_mesh_2D.numOfCells, my_mesh_2D.cell_areas, my_mesh_2D.cell_normals, my_mesh_2D.face_lengths, 
+     my_mesh_2D.cellNodesCount, my_mesh_2D.cellFacesList, my_mesh_2D.cellNeighbors_Dict, 
+     zb_cells, S0_temp)
+     
+     #bed slope is negative of zb gradient 
+     S0_temp = -S0_temp
+
+     #compute the magnitude of S0
+     S0_mag = sqrt.(S0_temp[:,1].^2 + S0_temp[:,2].^2)  
 
     S0_max = 0.2
     S0_center = 0.0
 
     #return max.(S0_center, (slope_temp .- S0_max)) 
-    return sum(max.(S0_center, abs.([(zb_cell[3:end] - zb_cell[1:(end - 2)]) ./ (2.0 * dx)][1]) .- S0_max))
+    return sum(max.(S0_center, (S0_mag .- S0_max)))
 end
 
 #Functions to setup the bed elevation (this is just for some examples)
@@ -57,8 +71,6 @@ function setup_bed!(numOfCells, numOfNodes, nodeCoordinates, cellNodesList, cell
     end
     
 end
-
-
 
 function interploate_zb_from_cell_to_face_and_compute_S0!(mesh, zb_face, zb_cell, S0)
 

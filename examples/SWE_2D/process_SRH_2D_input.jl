@@ -19,10 +19,10 @@ function process_SRH_2D_input!(srhhydro_file_name::String)
     #println("ManningN_cell: ", ManningN_cell)
     #println("ManningN_node: ", ManningN_node)
     
-    println("Result from Python function: ", my_srh_2d_data)
-    for (k, v) in my_srh_2d_data.srhhydro_obj.srhhydro_content
-        println("$k => $v")
-    end
+    # println("Result from Python function: ", my_srh_2d_data)
+    # for (k, v) in my_srh_2d_data.srhhydro_obj.srhhydro_content
+    #     println("$k => $v")
+    # end
     
     #println("srhgeom file: ", my_srh_2d_data.srhgeom_obj.nodeCoordinates)
     println("srhgeom file: ", typeof(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
@@ -85,11 +85,11 @@ function process_SRH_2D_input!(srhhydro_file_name::String)
     #srhhydro_EQParams = srhhydro_obj.srhhydro_content["EQParams"]
     #srhhydro_NDParams = srhhydro_obj.srhhydro_content["NDParams"]
     
-    println("ManningsN: ", srhhydro_ManningsN)
-    println("BC: ", srhhydro_BC)
-    println("MONITORING: ", srhhydro_MONITORINGLines)
-    println("IQParams: ", srhhydro_IQParams)
-    println("EWSParamsC: ", srhhydro_EWSParamsC)
+    # println("ManningsN: ", srhhydro_ManningsN)
+    # println("BC: ", srhhydro_BC)
+    # println("MONITORING: ", srhhydro_MONITORINGLines)
+    # println("IQParams: ", srhhydro_IQParams)
+    # println("EWSParamsC: ", srhhydro_EWSParamsC)
     #println("ISupCrParams: ", srhhydro_ISupCrParams)
     #println("EWSParamsRC: ", srhhydro_EWSParamsRC)
     #println("EQParams: ", srhhydro_EQParams)
@@ -125,10 +125,10 @@ function process_SRH_2D_input!(srhhydro_file_name::String)
         end
     end
     
-    println("numOfMaterials: ", srhmat_numOfMaterials)
-    println("matNameList: ", srhmat_matNameList)
-    println("matZoneCells: ", srhmat_matZoneCells)
-    println("matID_cells: ", matID_cells)
+    # println("numOfMaterials: ", srhmat_numOfMaterials)
+    # println("matNameList: ", srhmat_matNameList)
+    # println("matZoneCells: ", srhmat_matZoneCells)
+    # println("matID_cells: ", matID_cells)
 
     #assemble all data into a dictionary and return
     srh_all_Dict = Dict()
