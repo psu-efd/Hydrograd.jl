@@ -25,11 +25,12 @@ function compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_le
         exit(-1)
     end
 
-    fill!(grad_scalar_variable, 0.0)
+    fill!(grad_scalar_variable, zero(eltype(scalar_variable)))
     
     #loop over all cells to compute the gradient of the scalar field
     for iCell in 1:numOfCells
-        cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
+        #cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
+        cell_gradient = zeros(eltype(scalar_variable), 2)
         
         #neighbor cells of the current cell
         cellNeighbors = cellNeighbors_Dict[iCell]
