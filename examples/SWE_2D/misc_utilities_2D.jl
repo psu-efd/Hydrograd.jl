@@ -2,14 +2,13 @@
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
 function update_ghost_cells_scalar(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, scalar_cells)
-    scalar_ghostCells = zeros(Float64, numOfAllBounaryFaces)
+    #scalar_ghostCells = zeros(Float64, numOfAllBounaryFaces)
+    scalar_ghostCells = zeros(eltype(scalar_cells), numOfAllBounaryFaces)
 
     for iBoundaryFace in 1:numOfAllBounaryFaces
     
         if length(faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]]) !=1
-            println("Error: the number of cells for boundary face ", allBoundaryFacesIDs_List[iBoundaryFace], " is not 1.")
-            readline()
-            exit(0)
+            error("Error: the number of cells for boundary face $(allBoundaryFacesIDs_List[iBoundaryFace]) is not 1.")
         end
     
         cellID_neighbor = faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]][1]

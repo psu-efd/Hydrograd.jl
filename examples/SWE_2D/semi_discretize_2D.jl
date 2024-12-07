@@ -8,7 +8,7 @@
 
 
 # In this case, we will invert para = [zb_cells].
-function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+function swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
     swe_2d_constants, ManningN_cells, ManningN_ghostCells,
     nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
@@ -20,6 +20,12 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
     nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
     symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
     )
+
+    h_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)            #water depth at ghost cells 
+    q_x_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)          #q_x=hu at ghost cells 
+    q_y_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghost cells 
+
+    Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell values of Q
     
     #mesh data
     numOfCells = my_mesh_2D.numOfCells
@@ -46,8 +52,10 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
     q_y = @view Q[:,3]
     
     #fluxes on faces: 
-    fluxes = zeros(Float64, numOfCells, maxNumOfCellFaces, 3)
-    flux = zeros(Float64, 3)
+    #fluxes = zeros(Float64, numOfCells, maxNumOfCellFaces, 3)
+    #flux = zeros(Float64, 3)
+    fluxes = zeros(eltype(Q), numOfCells, maxNumOfCellFaces, 3)
+    flux = zeros(eltype(Q), 3)
     
     #zb at faces and slope at cells 
     #zb_faces = zeros(Float64, numOfFaces)
@@ -59,7 +67,8 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
     zb_cells = para
 
     #interpolate zb from cell to face and compute the bed slope at cells
-    interploate_zb_from_cell_to_face_and_compute_S0!(my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0)
+    #interploate_zb_from_cell_to_face_and_compute_S0!(my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0)
+    zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells)
     
     #Process the boundaries: update ghost cells
     process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 

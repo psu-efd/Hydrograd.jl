@@ -394,9 +394,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         end
 
         if inletQ_TotalA[iInletQ] <= 1e-10
-            println("Error: total cross-sectional conveyance for the current inlet-q boundary is not positive: ", iInletQ)
-            readline()
-            exit(-1)
+            error("Error: total cross-sectional conveyance for the current inlet-q boundary is not positive: $iInletQ, $(inletQ_TotalA[iInletQ])")
         end
         
         #loop through all faces in the current inlet-q boundary and update the boundary condition

@@ -14,7 +14,7 @@ function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNode
     #loop over cells
     @inbounds for i in 1:numOfCells
         if cell_centroids[i,1] < bump_center_x
-            eta[i] = 0.33
+            eta[i] = 0.5     #0.33
         else
             eta[i] = 0.33    #0.5
         end

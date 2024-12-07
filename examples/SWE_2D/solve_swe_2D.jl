@@ -23,8 +23,8 @@ using OptimizationOptimisers
 #using Flux
 
 #AD engines
-#using Zygote
-#using ForwardDiff
+using Zygote
+using ForwardDiff
 #using ReverseDiff
 
 #for Bayesian estimation
@@ -55,8 +55,8 @@ bPerform_Inversion = true           #whether to do inversion
 bPlot_Inversion_Results = false     #whehter to plot the inversion results
 
 #options for inversion 
-bInversion_slope_loss = true   #whether to include slope loss 
-bInversion_include_u = true    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
+bInversion_slope_loss = false   #whether to include slope loss 
+bInversion_include_u = false    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
 
 #directory to save to (the same directory as the main file)
 save_path = dirname(@__FILE__)
@@ -66,7 +66,8 @@ swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
 
 #read data from SRH-2D hydro, geom, and material files
 #srhhydro_file_name = "simple.srhhydro"
-srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
+#srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
+srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
 #srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
 
 srh_all_Dict = process_SRH_2D_input!(srhhydro_file_name)
@@ -215,28 +216,32 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 10.0)    #100.0
-dt = 0.05
+tspan = (0.0, 1.0)    #100.0
+dt = 0.01
 t = tspan[1]:dt:tspan[2]
 
 dt_save = (tspan[2] - tspan[1])/10.0
 t_save = tspan[1]:dt_save:tspan[2]
 
-# # define the ODE
-ode_f = ODEFunction((dQdt, Q, para, t) -> swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-            swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-            nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-            inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-            inletQ_TotalA, inletQ_DryWet,  
-            nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-            exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-            nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-            wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-            nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-            symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
-            ),
-            jac_prototype=nothing
-        )
+# Define the ODE function with explicit types
+function swe_2d_ode!(dQdt::AbstractArray, Q::AbstractArray, para::AbstractArray, t::Real)
+    swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+        swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+        nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+        inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
+        inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+        inletQ_TotalA, inletQ_DryWet,  
+        nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+        exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+        nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+        wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+        nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+        symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)
+end
+
+# Create the ODEFunction with the typed function
+ode_f = ODEFunction(swe_2d_ode!;
+    jac_prototype=nothing)
 
 prob = ODEProblem(ode_f, Q0, tspan, para)
 
@@ -288,7 +293,7 @@ if bSimulate_Synthetic_Data
         function update_cells!(dQdt, Q, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0, t, dt)
             
             # compute dQdt 
-            swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+            swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
             swe_2D_constants, ManningN_cells, ManningN_ghostCells,
             nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
             inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
@@ -408,20 +413,32 @@ if bPerform_Inversion
 
     #inversion parameters: zb_cell
     # initial guess for the parameters
-    ps = zeros(my_mesh_2D.numOfCells)
+    ps = zeros(Float64, my_mesh_2D.numOfCells)
 
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
         Array(solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save))  #[:,1,end]
     end
 
+    function my_loss(θ)
+        pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
+        l = pred[:,1,end] .- 0.5  #loss = free surface elevation mismatch
+        loss = sum(abs2, l)
+
+        println("h_truth = ", h_truth)
+        println("pred = ", pred[:,1,end])
+        println("loss = ", loss)
+
+        return loss
+    end
+
     SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-    #jac = ForwardDiff.jacobian(predict, ps)
+    jac = ForwardDiff.gradient(my_loss, ps)
     #jac = Zygote.jacobian(predict, ps)
     #jac = ReverseDiff.jacobian(predict, ps)
-    #@show jac
-    #plot(jac)
-    #exit()
+    @show jac
+    plot(jac)
+    exit()
 
     ## Defining Loss function
     #zb_cell_local = zeros(Number, mesh.nCells)

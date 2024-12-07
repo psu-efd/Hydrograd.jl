@@ -16,14 +16,13 @@ function setup_ManningN!(ManningN_cells, ManningN_ghostCells, my_mesh_2D, srh_al
         if haskey(srhhydro_ManningsN, matID)
             ManningN_cells[iCell] = srhhydro_ManningsN[matID]
         else
-            println("Material ", matName, " does not have Manning's n. Assign the default value 0.03.")
-            exit(-1)
+            error("Material $matName does not have Manning's n. Assign the default value 0.03.")
         end
     end
 
     #setup Manning's n at ghost cells
-    update_ghost_cells_scalar!(my_mesh_2D.numOfAllBounaryFaces, my_mesh_2D.allBoundaryFacesIDs_List, 
-        my_mesh_2D.faceCells_Dict, ManningN_cells, ManningN_ghostCells)
+    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D.numOfAllBounaryFaces, my_mesh_2D.allBoundaryFacesIDs_List, 
+        my_mesh_2D.faceCells_Dict, ManningN_cells)    
    
     #println("ManningN_cells: ", ManningN_cells)
     #println("ManningN_ghostCells: ", ManningN_ghostCells)
