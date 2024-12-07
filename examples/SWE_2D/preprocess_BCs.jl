@@ -33,8 +33,8 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
                 println("Inlet specific discharge: ", srhhydro_IQParams[iBoundary])
                 
                 #update the boundary value: currenlty only support constant discharge
-                Q_value = parse(Float64, srhhydro_IQParams[iBoundary][1])
-                println("Inlet discharge: ", Q_value)
+                #Q_value = parse(Float64, srhhydro_IQParams[iBoundary][1])
+                #println("Inlet discharge: ", Q_value)
                 
             else
                 println("Key IQParams does not exist in the Python dictionary srhhydro_IQParams.")
@@ -53,8 +53,8 @@ function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, 
                 println("Exit water depth: ", srhhydro_EWSParamsC[iBoundary])
                 
                 #update the boundary value: currenlty only support constant water depth
-                H_value = parse(Float64, srhhydro_EWSParamsC[iBoundary][1])
-                println("Exit water depth: ", H_value)
+                #H_value = parse(Float64, srhhydro_EWSParamsC[iBoundary][1])
+                #println("Exit water depth: ", H_value)
                 
             else
                 println("Key EWSParamsC does not exist in the Python dictionary srhhydro_EWSParamsC.")
@@ -92,8 +92,9 @@ end
 
 #preprocess inlet-q boundaries
 function preprocess_inlet_q_boundaries(my_mesh_2D, nInletQ_BCs, srhhydro_IQParams, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet)
-        
+    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, 
+    inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet)
+
     face_normals = my_mesh_2D.face_normals   #face normals
     boundaryFaces_direction_Dict = my_mesh_2D.boundaryFaces_direction_Dict   #face directions of boundary faces
 
@@ -146,7 +147,7 @@ function preprocess_inlet_q_boundaries(my_mesh_2D, nInletQ_BCs, srhhydro_IQParam
         #get the total discharge of the current inlet-q boundary
         inletQ_TotalQ[iInletQ] = parse(Float64, srhhydro_IQParams[iBoundary][1])
         
-        #get the ghost cell ID of the current inlet-q boundary
+        #define some variables for the current inlet-q boundary
         inletQ_H[iInletQ] = zeros(Float64, nBoundaryFaces)   #inlet water depth for the current inlet-q boundary
         inletQ_A[iInletQ] = zeros(Float64, nBoundaryFaces)   #inlet cross-sectional area for the current inlet-q boundary
         inletQ_ManningN[iInletQ] = zeros(Float64, nBoundaryFaces)   #Manning's n for the current inlet-q boundary
@@ -331,6 +332,7 @@ end
 function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
     inletQ_TotalA, inletQ_DryWet, Q_cells, Q_ghostCells, swe_2D_constants)
+    
 
     h = @view Q_cells[:,1]
     q_x = @view Q_cells[:,2]
@@ -351,16 +353,17 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         current_boundaryFaceIDs = inletQ_faceIDs[iInletQ]          #the face ID of the current inlet-q boundary
         current_ghostCellIDs = inletQ_ghostCellIDs[iInletQ]        #the ghost cell ID of the current inlet-q boundary
         current_internalCellIDs = inletQ_internalCellIDs[iInletQ]  #the internal cell ID of the current inlet-q boundary    
+        
+        
+        #number of bounary faces for the current inlet-q boundary
+        nBoundaryFaces = length(current_boundaryFaceIDs)
 
         current_inletQ_H = inletQ_H[iInletQ]   #inlet water depth for each face in the current inlet-q boundary
         current_inletQ_A = inletQ_A[iInletQ]   #area for each face in the current inlet-q boundary
         current_inletQ_ManningN = inletQ_ManningN[iInletQ]   #Manning's n for each face in the current inlet-q boundary
         current_inletQ_Length = inletQ_Length[iInletQ]   #length for each face in the current inlet-q boundary
-        current_inletQ_DryWet = inletQ_DryWet[iInletQ]   #dry(=0)/wet(=1) flag for each face in the current inlet-q boundary
-        
-        #number of bounary faces for the current inlet-q boundary
-        nBoundaryFaces = length(current_boundaryFaceIDs)
-        
+        current_inletQ_DryWet = inletQ_DryWet[iInletQ]   #dry(=0)/wet(=1) flag for each face in the current inlet-q boundary    
+
         current_inletQ_faceCentroids = inletQ_faceCentroids[iInletQ]  #face centroids of the current inlet-q boundary
 
         #get current total discharge for the current inlet-q boundary

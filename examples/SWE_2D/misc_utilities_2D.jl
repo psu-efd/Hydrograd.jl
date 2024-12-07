@@ -1,7 +1,9 @@
 #Some tools for 2D shallow water equations solver
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
-function update_ghost_cells_scalar!(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, scalar_cells, scalar_ghostCells)
+function update_ghost_cells_scalar(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, scalar_cells)
+    scalar_ghostCells = zeros(Float64, numOfAllBounaryFaces)
+
     for iBoundaryFace in 1:numOfAllBounaryFaces
     
         if length(faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]]) !=1
@@ -14,10 +16,55 @@ function update_ghost_cells_scalar!(numOfAllBounaryFaces, allBoundaryFacesIDs_Li
         scalar_ghostCells[iBoundaryFace] = scalar_cells[cellID_neighbor]
     end
     #println("scalar_ghostCells: ", scalar_ghostCells)
+
+    return scalar_ghostCells
 end
 
 # computer gradient of a scalar field
-function compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable, grad_scalar_variable)
+function compute_scalar_gradients(numOfCells, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)
+    return reduce(vcat, [compute_cell_gradient(iCell, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)' for iCell in 1:numOfCells])
+end
+
+function compute_cell_gradient(iCell, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)
+    # ... cell gradient computation logic ...
+    cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
+    #cell_gradient = zeros(Float64, 2)
+    
+    #neighbor cells of the current cell
+    cellNeighbors = cellNeighbors_Dict[iCell]
+    
+    #number of nodes for the current cell
+    nNodes = cellNodesCount[iCell]
+    
+    cell_faces = cellFacesList[iCell,:]
+    
+    #loop over all faces of the current cell
+    for iFace in 1:nNodes
+        faceID = cell_faces[iFace]
+        neighbor_cellID = cellNeighbors[iFace]
+        
+        # Value of the variable at the current cell and neighbor cell
+        variable_c = scalar_variable[iCell]
+        if neighbor_cellID < 0  # Boundary face
+            variable_n = variable_c  # Assume zero gradient at boundary
+        else
+            variable_n = scalar_variable[neighbor_cellID]
+        end
+        
+        # Compute the variable value on face (average of cell and neighbor for now; can be improved with interpolation)
+        variable_f = (variable_c + variable_n) / 2.0
+        
+        # Compute flux contribution
+        flux_temp = cell_normals[iCell][iFace] * variable_f * face_lengths[abs(faceID)]
+        
+        cell_gradient = cell_gradient + flux_temp
+
+    end
+    
+    return cell_gradient / cell_areas[iCell]
+end
+
+function compute_scalar_gradients_old!(numOfCells, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable, grad_scalar_variable)
     #check the size of the grad_scalar_variable
     if size(grad_scalar_variable) != (numOfCells, 2)
         println("Error: grad_scalar_variable size is not correct.")
@@ -25,12 +72,12 @@ function compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_le
         exit(-1)
     end
 
-    fill!(grad_scalar_variable, zero(eltype(scalar_variable)))
+    fill!(grad_scalar_variable, 0.0)
     
     #loop over all cells to compute the gradient of the scalar field
     for iCell in 1:numOfCells
-        #cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
-        cell_gradient = zeros(eltype(scalar_variable), 2)
+        cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
+        #cell_gradient = zeros(Float64, 2)
         
         #neighbor cells of the current cell
         cellNeighbors = cellNeighbors_Dict[iCell]
@@ -57,8 +104,11 @@ function compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_le
             variable_f = (variable_c + variable_n) / 2.0
             
             # Compute flux contribution
-            flux = cell_normals[iCell][iFace] * variable_f * face_lengths[abs(faceID)]
-            cell_gradient .+= flux
+            flux_temp = cell_normals[iCell][iFace] * variable_f * face_lengths[abs(faceID)]
+
+            #cell_gradient .+= flux_temp
+            cell_gradient[1] = cell_gradient[1] + flux_temp[1]
+            cell_gradient[2] = cell_gradient[2] + flux_temp[2]
         end
         
         # Finalize the gradient by dividing by the cell area
@@ -68,7 +118,25 @@ function compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_le
 end
 
 # interpolate a scalar field from cell centers to face centers
-function cells_to_faces_scalar!(numOfFaces, faceCells_Dict, scalar_variable_c, scalar_variable_f)
+function cells_to_faces_scalar(numOfFaces, faceCells_Dict, scalar_variable_c)
+    # Use map to create array without mutations
+    scalar_variable_f = map(1:numOfFaces) do iFace
+        facecells = faceCells_Dict[iFace]
+        
+        if length(facecells) == 2
+            (scalar_variable_c[facecells[1]] + scalar_variable_c[facecells[2]]) / 2.0
+        else
+            scalar_variable_c[facecells[1]]
+        end
+    end
+
+    return scalar_variable_f
+end
+
+function cells_to_faces_scalar_old(numOfFaces, faceCells_Dict, scalar_variable_c)
+
+    # Create new array instead of modifying in-place
+    scalar_variable_f = zeros(Float64, numOfFaces)
     
     #loop through faces  
     @inbounds for iFace in 1:numOfFaces
@@ -81,6 +149,8 @@ function cells_to_faces_scalar!(numOfFaces, faceCells_Dict, scalar_variable_c, s
             scalar_variable_f[iFace] = scalar_variable_c[facecells[1]]  
         end
     end
+
+    return scalar_variable_f
 end
 
 

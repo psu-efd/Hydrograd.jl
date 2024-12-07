@@ -8,7 +8,8 @@
 
 
 # In this case, we will invert para = [zb_cells].
-function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, ManningN_cells, ManningN_ghostCells,
+function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+    swe_2d_constants, ManningN_cells, ManningN_ghostCells,
     nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
     inletQ_TotalA, inletQ_DryWet,  
@@ -45,28 +46,20 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, swe_2d_constants, Ma
     q_y = @view Q[:,3]
     
     #fluxes on faces: 
-    fluxes = zeros(eltype(Q), numOfCells, maxNumOfCellFaces, 3)
-    flux = zeros(eltype(Q), 3)
+    fluxes = zeros(Float64, numOfCells, maxNumOfCellFaces, 3)
+    flux = zeros(Float64, 3)
     
     #zb at faces and slope at cells 
-    zb_faces = zeros(eltype(Q), numOfFaces)
-    S0 = zeros(eltype(Q), numOfCells, 2)
+    #zb_faces = zeros(Float64, numOfFaces)
+    #S0 = zeros(Float64, numOfCells, 2)
     
     #println("time t = ", t)
     
     #set the parameter values 
     zb_cells = para
-    
-    #interpolate zb from cell to face 
-    cells_to_faces_scalar!(numOfFaces, my_mesh_2D.faceCells_Dict, zb_cells, zb_faces)
-    
-    #compute bed slope at cell centers
-    compute_scalar_gradients!(numOfCells, cell_areas, cell_normals, face_lengths, 
-    my_mesh_2D.cellNodesCount, my_mesh_2D.cellFacesList, my_mesh_2D.cellNeighbors_Dict, 
-    zb_cells, S0)
-    
-    #bed slope is negative of zb gradient 
-    S0 = -S0
+
+    #interpolate zb from cell to face and compute the bed slope at cells
+    interploate_zb_from_cell_to_face_and_compute_S0!(my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0)
     
     #Process the boundaries: update ghost cells
     process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 

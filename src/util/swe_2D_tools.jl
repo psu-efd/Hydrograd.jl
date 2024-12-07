@@ -16,25 +16,34 @@ end
 function swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
 
     #solution at the end of the simulation
-    Q_final = sol.u[end]
+    #Q_final = sol.u[end]
 
     #calculate total volume of water 
-    for (Q, t) in tuples(sol)
+    for (index, item) in enumerate(tuples(sol))
+
+        Q = item[1]
+
         push!(total_water_volume, swe_2D_calc_total_water_volume(Q[:, 1], my_mesh_2D))
+
+        u_temp = Q[:,2] ./ Q[:,1]
+        v_temp = Q[:,3] ./ Q[:,1]
+        U_vector = hcat(u_temp, v_temp)
+                        
+        vector_data = [U_vector] 
+        vector_names = ["U"]
+
+        WSE = Q[:,1] + zb_cell
+            
+        scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cell, WSE]
+        scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
+
+        vtk_fileName = @sprintf("solution_%04d_AdHydraulics.vtk", index)
+            
+        file_path = joinpath(save_path, vtk_fileName ) 
+        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+    
     end
 
-    #save results to vtk files the same directory of this jl file
-   
-    vector_data = [] 
-    vector_names = []
-
-    WSE = Q_final[:,1] + zb_cell
-        
-    scalar_data = [Q_final[:,1], Q_final[:,2], Q_final[:,3], zb_cell, WSE]
-    scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
-        
-    file_path = joinpath(save_path, "solution_final.vtk" ) 
-    export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
         
     open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
         println(fo, "total_water_volume")

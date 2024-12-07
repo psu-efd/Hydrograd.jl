@@ -131,7 +131,10 @@ def plot_surface(x, zb, WSE_AdHydraulics, WSE_srh_2dD):
 
 if __name__ == "__main__":
 
-    vtk_file = "solution_100000.vtk"
+    # Define the filename of VTK file
+    srh_filename = 'SRH2D_twoD_channel_with_bump_C_0001.vtk'
+    #AdHydraulics_filename = 'solution_final.vtk'
+    AdHydraulics_filename = 'solution_3800.vtk'
 
     num_samples = 100
 
@@ -143,10 +146,6 @@ if __name__ == "__main__":
 
     # read the sampling input file
     vtk_handler = pyHMT2D.Misc.vtkHandler()
-
-    # Define the filename of VTK file
-    srh_filename = 'SRH2D_oneD_channel_with_bump_C_0001.vtk'
-    AdHydraulics_filename = 'solution_100000.vtk'
 
     # Define the numer of interpolation points
     numPoints = 100
@@ -166,8 +165,7 @@ if __name__ == "__main__":
     # for AdHydraulics
     reader = vtk_handler.readVTK_UnstructuredGrid(AdHydraulics_filename)  # read the VTKfile
     line = vtk_handler.createVtkLine(p1, p2, numPoints)  # Create the line
-    points, WSE_AdHydraulics, zb_AdHydraulics = vtk_handler.probeUnstructuredGridVTKOverLine(line, reader,
-                                                                          'eta')  # interpolate the data over the line
+    points, WSE_AdHydraulics, zb_AdHydraulics = vtk_handler.probeUnstructuredGridVTKOverLine(line, reader, 'WSE')  # interpolate the data over the line
     # print(points)
     # print(U)
 
