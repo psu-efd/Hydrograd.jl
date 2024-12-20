@@ -46,44 +46,49 @@ function loss(p)
     sol = solve(prob, Tsit5(), p = p, saveat = tsteps)
     #sol = solve(prob, TRBDF2(), p = p, saveat = tsteps)
     pred = Array(sol)
-    loss = sum(abs2, pred .- Array(sol_true))
+    l = sum(abs2, pred .- Array(sol_true))
     #println(pred[end,:])
     #println(Array(sol_true)[end,:])
 
-    pred_real = ForwardDiff.value.(pred)
-    println("size of pred_real", size(pred_real))
-    println("size of sol", size(sol.u))
-    println("sol.u[1] ", ForwardDiff.value.(sol.u[1]))
-    println("sol.u[end] ", ForwardDiff.partials.(sol.u[end]))
-    println("sol.t ", sol.t)
-    println("size of sol_true", size(Array(sol_true)))
+    #pred_real = ForwardDiff.value.(pred)
+    pred_real = pred
 
-    display(loss)
-    plt = plot(pred_real', 
-         label="Predicted",
-         #ylim=(0, 10),
-         xlabel="t",
-         ylabel="u(t)",
-         linestyle=:solid)
+    Zygote.ignore() do
+        println("size of pred_real", size(pred_real))
+        println("size of sol", size(sol.u))
+        println("sol.u[1] ", ForwardDiff.value.(sol.u[1]))
+        println("sol.u[end] ", ForwardDiff.partials.(sol.u[end]))
+        println("sol.t ", sol.t)
+        println("size of sol_true", size(Array(sol_true)))
 
-    plot!(Array(sol_true)', label="True", linestyle=:dash)
+        display(l)
+        plt = plot(pred_real', 
+            label="Predicted",
+            #ylim=(0, 10),
+            xlabel="t",
+            ylabel="u(t)",
+            linestyle=:solid)
 
-    display(plt)
+        plot!(Array(sol_true)', label="True", linestyle=:dash)
 
-    return loss
+        display(plt)
+    end
+
+    return l
 end
 
 #set inital guess for inversion
 p_init = [1.4, 1.0, 2.0, 1.0]
 
 # Add this before gradient computation
-@code_warntype(loss(p_init))
+#@code_warntype(loss(p_init))
 
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-jac = ForwardDiff.gradient(loss, p_init)
+#jac = ForwardDiff.gradient(loss, p_init)
+grad = Zygote.gradient(loss, p_init)
 #jac = Zygote.jacobian(predict, ps)
 #jac = ReverseDiff.jacobian(predict, ps)
-@show jac
+@show grad
 #plot(jac)
 #readline()
 throw("stop here")

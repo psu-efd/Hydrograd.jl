@@ -1,5 +1,7 @@
 using Revise
 
+using Dates
+
 using JLD2
 
 using IterTools
@@ -35,8 +37,15 @@ using ForwardDiff
 
 #using LinearAlgebra
 
+using Plots
+
+using InteractiveUtils
+
 #using Random
 #Random.seed!(1234)
+
+#Timing 
+start_time = now()  # Current date and time
 
 include("process_SRH_2D_input.jl")
 include("process_ManningN.jl")
@@ -65,9 +74,9 @@ save_path = dirname(@__FILE__)
 swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
 
 #read data from SRH-2D hydro, geom, and material files
-#srhhydro_file_name = "simple.srhhydro"
+srhhydro_file_name = "simple.srhhydro"
 #srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
-srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
+#srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
 #srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
 
 srh_all_Dict = process_SRH_2D_input!(srhhydro_file_name)
@@ -83,6 +92,11 @@ zb_faces = zeros(Float64, my_mesh_2D.numOfFaces)      #zb at faces
 zb_cells = zeros(Float64, my_mesh_2D.numOfCells)      #zb at cell centers 
 zb_ghostCells = zeros(Float64, my_mesh_2D.numOfAllBounaryFaces)   #zb at ghost cell centers 
 S0 = zeros(Float64, my_mesh_2D.numOfCells, 2)          #bed slope at cell centers 
+
+#If performing inversion, set the bed elevation to zero
+if bPerform_Inversion
+    my_mesh_2D.nodeCoordinates[:,3] .= 0.0
+end
 
 #setup bed elevation: computer zb at cell centers from nodes, then interpolate zb from cell to face and compute the bed slope at cells
 setup_bed!(my_mesh_2D.numOfCells, my_mesh_2D.numOfNodes, my_mesh_2D.nodeCoordinates, 
@@ -417,28 +431,69 @@ if bPerform_Inversion
 
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        Array(solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save))  #[:,1,end]
+        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+
+        if !SciMLBase.successful_retcode(sol)
+            @warn "ODE solve failed!"
+            return NaN
+        end
+
+        return sol
     end
 
     function my_loss(θ)
-        pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred[:,1,end] .- 0.5  #loss = free surface elevation mismatch
+        # Add debug prints
+        Zygote.ignore() do
+            println("Current parameters: ", ForwardDiff.value.(θ))
+        end
+
+        sol = predict(θ)            #Forward prediction with current θ (=zb at cells)
+        l = sol[:,1,end] .- 0.5  #loss = free surface elevation mismatch
         loss = sum(abs2, l)
 
-        println("h_truth = ", h_truth)
-        println("pred = ", pred[:,1,end])
-        println("loss = ", loss)
+        Zygote.ignore() do
+            #println("loss value = ", ForwardDiff.value(loss))
+            #println("dloss/dθ = ", ForwardDiff.partials(loss))
+            println("loss = ", loss)
+        end
+
+        #pred_real = ForwardDiff.value.(sol)
+        pred_real = sol
+        
+        #println("size of pred_real", size(pred_real))
+        #println("size of h_truth", size(h_truth))
+        #println("pred = ", pred_real[:,1,end])
+        #println("h_truth = ", h_truth)
+
+        Zygote.ignore() do
+            plt = plot(pred_real[:,1,end], 
+                label="Predicted",
+                #ylim=(0, 10),
+                xlabel="x",
+                ylabel="h",
+                linestyle=:solid)
+
+            plot!(h_truth, label="True", linestyle=:dash)
+
+            display(plt)
+        end
 
         return loss
     end
 
-    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-    jac = ForwardDiff.gradient(my_loss, ps)
+    # Add this before gradient computation
+    #@code_warntype(my_loss(ps))
+
+    #SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+    #grad = ForwardDiff.gradient(my_loss, ps)
+    grad = Zygote.gradient(my_loss, ps)
     #jac = Zygote.jacobian(predict, ps)
     #jac = ReverseDiff.jacobian(predict, ps)
-    @show jac
-    plot(jac)
-    exit()
+    @show grad
+    #plot(jac)
+    #readline()
+    #exit()
+    throw("stop here")
 
     ## Defining Loss function
     #zb_cell_local = zeros(Number, mesh.nCells)
@@ -556,5 +611,10 @@ if bPerform_Inversion
 
 end
 
+#Timing 
+end_time = now()  # Current date and time
+elapsed_time = end_time - start_time
+elapsed_seconds = Millisecond(elapsed_time).value / 1000
+println("Elapsed time in seconds: $elapsed_seconds")
 
 println("All done!")

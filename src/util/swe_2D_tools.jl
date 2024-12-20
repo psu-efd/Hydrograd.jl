@@ -64,7 +64,7 @@ function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCou
         
         # Write the nodes
         num_nodes = size(nodeCoordinates, 1)
-        println(file, "POINTS $num_nodes float")
+        println(file, "POINTS $num_nodes double")
         for row in eachrow(nodeCoordinates)
             println(file, "$(row[1]) $(row[2]) $(row[3])")
         end
@@ -89,7 +89,7 @@ function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCou
         
         # Write scalar data
         for (scalar, name) in zip(scalar_data, scalar_names)
-            println(file, "SCALARS $name float 1")
+            println(file, "SCALARS $name double 1")
             println(file, "LOOKUP_TABLE default")
             for value in scalar
                 println(file, value)
@@ -98,7 +98,7 @@ function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCou
         
         # Write vector data
         for (vector, name) in zip(vector_data, vector_names)
-            println(file, "VECTORS $name float")
+            println(file, "VECTORS $name double")
             for vec in eachrow(vector)
                 println(file, "$(vec[1]) $(vec[2]) 0.0")  # Add 0.0 for the z-component
             end
