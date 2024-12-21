@@ -1,6 +1,6 @@
 #process input files for SRH-2D case, e.g.. srhhydro, srhgeom, srhmat, srhmon files
 
-function process_SRH_2D_input!(srhhydro_file_name::String)
+function process_SRH_2D_input(srhhydro_file_name::String)
     println("Python version: ", PyCall.pyversion)
     println("Python path: ", PyCall.pyprogramname)
     

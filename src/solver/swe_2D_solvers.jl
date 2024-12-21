@@ -148,7 +148,11 @@ function hll_riemann_solver(hL, huL, hvL, hR, huR, hvR, g, n; hmin=1e-6)
     end
 end
 
-function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
+function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
+    
+    #Data type 
+    T = eltype(hL)
+
     # Extract unit normal components
     nx, ny = normal
 
@@ -156,10 +160,8 @@ function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     if hL < hmin && hR < hmin
         # Both sides are dry
         print("Both sides are dry")
-        flux[1] = 0.0
-        flux[2] = 0.0
-        flux[3] = 0.0
-        return
+        
+        return zeros(eltype(hL), 3)
     elseif hL < hmin
         # Left side is dry
         print("Left side is dry")
@@ -167,10 +169,7 @@ function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
         hu_flux = (huR * (huR / hR) + 0.5 * g * hR^2) * nx + huR * (hvR / hR) * ny
         hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * hR^2) * ny
 
-        flux[1] = h_flux
-        flux[2] = hu_flux
-        flux[3] = hv_flux
-        return
+        return [h_flux, hu_flux, hv_flux]
     elseif hR < hmin
         # Right side is dry
         print("Right side is dry")
@@ -178,10 +177,7 @@ function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
         hu_flux = (huL * (huL / hL) + 0.5 * g * hL^2) * nx + huL * (hvL / hL) * ny
         hv_flux = (hvL * (huL / hL)) * nx + (hvL * (hvL / hL) + 0.5 * g * hL^2) * ny
 
-        flux[1] = h_flux
-        flux[2] = hu_flux
-        flux[3] = hv_flux
-        return
+        return [h_flux, hu_flux, hv_flux]
     end
 
     # Compute velocities on left and right
@@ -208,9 +204,9 @@ function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     SR = unRoe + cRoe
 
     # define matrices 
-    R_mat = [0.0 1.0 1.0; ny uRoe-cRoe*nx uRoe+cRoe*nx; -nx vRoe-cRoe*ny vRoe+cRoe*ny]
+    R_mat = [T(0.0) T(1.0) T(1.0); ny uRoe-cRoe*nx uRoe+cRoe*nx; -nx vRoe-cRoe*ny vRoe+cRoe*ny]
     L_mat = [-(uRoe*ny-vRoe*nx) ny -nx; unRoe/2/cRoe+0.5 -nx/2/cRoe -ny/2/cRoe; -unRoe/2/cRoe+0.5 nx/2/cRoe ny/2/cRoe]
-    absLamda = [abs(unRoe) 0.0 0.0; 0.0 abs(unRoe-cRoe) 0.0; 0.0 0.0 abs(unRoe+cRoe)]
+    absLamda = [abs(unRoe) T(0.0) T(0.0); T(0.0) abs(unRoe-cRoe) T(0.0); T(0.0) T(0.0) abs(unRoe+cRoe)]
 
     absA = R_mat * absLamda * L_mat 
 
@@ -232,8 +228,6 @@ function Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     hu_flux = (hu_flux_L + hu_flux_R - absA_dQ[2]) / 2.0
     hv_flux = (hv_flux_L + hv_flux_R - absA_dQ[3]) / 2.0
 
-    flux[1] = h_flux
-    flux[2] = hu_flux
-    flux[3] = hv_flux
+    return [h_flux, hu_flux, hv_flux]
 
 end

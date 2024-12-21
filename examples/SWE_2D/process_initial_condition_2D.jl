@@ -1,35 +1,41 @@
 # process initial condition, such as setting up initial free surface, water depth, etc. 
 # This file should be problem specific because each problem should have different ICs. 
 
-# setup initial condition: free surface 
-function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNodesCount, cell_centroids, eta, zb_cell, h, bPlot::Bool=false)
+# setup initial condition: wse, h, q_x, q_y
+function setup_initial_condition!(my_mesh_2D, eta, zb_cell, h, q_x, q_y, bPlot::Bool=false)
     # parameters for initial free surface profile setup
     
-    xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0   #mid point of the domain
+    xMid = (minimum(my_mesh_2D.nodeCoordinates[:,1])+maximum(my_mesh_2D.nodeCoordinates[:,1])) / 2.0   #mid point of the domain
     
     bump_center_x = xMid  # center of the bump
     
     h_small = 0.01
     
     #loop over cells
-    @inbounds for i in 1:numOfCells
-        if cell_centroids[i,1] < bump_center_x
-            eta[i] = 0.5     #0.33
+    @inbounds for i in 1:my_mesh_2D.numOfCells
+        if my_mesh_2D.cell_centroids[i,1] < bump_center_x
+            eta[i] = 1.0 #0.5     #0.33   #1.0 for simple.srhhydro
         else
-            eta[i] = 0.33    #0.5
+            eta[i] = 1.0 #0.5 #0.33    #0.5
         end
     end
     
     #update water depth
-    @inbounds for i in 1:numOfCells
+    @inbounds for i in 1:my_mesh_2D.numOfCells
         h[i] = eta[i] - zb_cell[i]
     end
     
     h[h.<0.0] .= h_small  #ensure positivity of water depth h
     
     #update the free surface elevation again in case h has been clipped
-    @inbounds for i in 1:numOfCells
+    @inbounds for i in 1:my_mesh_2D.numOfCells
         eta[i] = h[i] + zb_cell[i]
+    end
+
+    #update q_x, q_y
+    @inbounds for i in 1:my_mesh_2D.numOfCells
+        q_x[i] = 0.0
+        q_y[i] = 0.0
     end
     
     #optionally plot the free surface for checking 
@@ -41,7 +47,8 @@ function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNode
         scalar_names = ["eta", "h", "zb_cell"]
         
         file_path = joinpath(@__DIR__, "eta_h_zb.vtk" ) 
-        export_to_vtk_2D(file_path, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
+                         scalar_data, scalar_names, vector_data, vector_names)    
         println("eta, h, and zb are saved to ", file_path)
         #exit(0)
     end
@@ -49,11 +56,10 @@ function setup_initial_eta!(numOfCells, nodeCoordinates, cellNodesList, cellNode
 end
 
 #update ghost cells for eta, h, q_x, q_y
-function update_ghost_cells_eta_h_q!(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, eta, h, q_x, q_y, 
-    eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+function setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
-    for iBoundaryFace in 1:numOfAllBounaryFaces
-        cellID_neighbor = faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]][1]
+    for iBoundaryFace in 1:my_mesh_2D.numOfAllBounaryFaces
+        cellID_neighbor = my_mesh_2D.faceCells_Dict[my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]][1]
         
         eta_ghostCells[iBoundaryFace] = eta[cellID_neighbor]
         h_ghostCells[iBoundaryFace] = h[cellID_neighbor]

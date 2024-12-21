@@ -1,6 +1,9 @@
 #process the Manning's n values 
 
-function setup_ManningN!(ManningN_cells, ManningN_ghostCells, my_mesh_2D, srh_all_Dict)
+function setup_ManningN(my_mesh_2D, srh_all_Dict)
+
+    # Initialize Manning's n values for cells
+    ManningN_cells = zeros(Float64, my_mesh_2D.numOfCells)
     
     srhhydro_ManningsN = srh_all_Dict["srhhydro_ManningsN"]  
     srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]  
@@ -21,9 +24,10 @@ function setup_ManningN!(ManningN_cells, ManningN_ghostCells, my_mesh_2D, srh_al
     end
 
     #setup Manning's n at ghost cells
-    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D.numOfAllBounaryFaces, my_mesh_2D.allBoundaryFacesIDs_List, 
-        my_mesh_2D.faceCells_Dict, ManningN_cells)    
+    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
    
     #println("ManningN_cells: ", ManningN_cells)
     #println("ManningN_ghostCells: ", ManningN_ghostCells)
+
+    return ManningN_cells, ManningN_ghostCells
 end

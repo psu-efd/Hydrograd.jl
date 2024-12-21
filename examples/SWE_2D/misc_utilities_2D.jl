@@ -1,17 +1,17 @@
 #Some tools for 2D shallow water equations solver
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
-function update_ghost_cells_scalar(numOfAllBounaryFaces, allBoundaryFacesIDs_List, faceCells_Dict, scalar_cells)
+function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
     #scalar_ghostCells = zeros(Float64, numOfAllBounaryFaces)
-    scalar_ghostCells = zeros(eltype(scalar_cells), numOfAllBounaryFaces)
+    scalar_ghostCells = zeros(eltype(scalar_cells), my_mesh_2D.numOfAllBounaryFaces)
 
-    for iBoundaryFace in 1:numOfAllBounaryFaces
+    for iBoundaryFace in 1:my_mesh_2D.numOfAllBounaryFaces
     
-        if length(faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]]) !=1
-            error("Error: the number of cells for boundary face $(allBoundaryFacesIDs_List[iBoundaryFace]) is not 1.")
+        if length(my_mesh_2D.faceCells_Dict[my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]]) !=1
+            error("Error: the number of cells for boundary face $(my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]) is not 1.")
         end
     
-        cellID_neighbor = faceCells_Dict[allBoundaryFacesIDs_List[iBoundaryFace]][1]
+        cellID_neighbor = my_mesh_2D.faceCells_Dict[my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]][1]
         scalar_ghostCells[iBoundaryFace] = scalar_cells[cellID_neighbor]
     end
     #println("scalar_ghostCells: ", scalar_ghostCells)
@@ -20,22 +20,21 @@ function update_ghost_cells_scalar(numOfAllBounaryFaces, allBoundaryFacesIDs_Lis
 end
 
 # computer gradient of a scalar field
-function compute_scalar_gradients(numOfCells, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)
-    return reduce(vcat, [compute_cell_gradient(iCell, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)' for iCell in 1:numOfCells])
+function compute_scalar_gradients(my_mesh_2D, scalar_variable)
+    return reduce(vcat, [compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)' for iCell in 1:my_mesh_2D.numOfCells])
 end
 
-function compute_cell_gradient(iCell, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable)
+function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
     # ... cell gradient computation logic ...
-    cell_gradient = [0.0, 0.0]  # Gradient accumulator for this cell
-    #cell_gradient = zeros(Float64, 2)
-    
+    cell_gradient = eltype(scalar_variable).([0.0, 0.0])  # Gradient accumulator for this cell
+        
     #neighbor cells of the current cell
-    cellNeighbors = cellNeighbors_Dict[iCell]
+    cellNeighbors = my_mesh_2D.cellNeighbors_Dict[iCell]
     
     #number of nodes for the current cell
-    nNodes = cellNodesCount[iCell]
+    nNodes = my_mesh_2D.cellNodesCount[iCell]
     
-    cell_faces = cellFacesList[iCell,:]
+    cell_faces = my_mesh_2D.cellFacesList[iCell,:]
     
     #loop over all faces of the current cell
     for iFace in 1:nNodes
@@ -54,13 +53,13 @@ function compute_cell_gradient(iCell, cell_areas, cell_normals, face_lengths, ce
         variable_f = (variable_c + variable_n) / 2.0
         
         # Compute flux contribution
-        flux_temp = cell_normals[iCell][iFace] * variable_f * face_lengths[abs(faceID)]
+        flux_temp = my_mesh_2D.cell_normals[iCell][iFace] * variable_f * my_mesh_2D.face_lengths[abs(faceID)]
         
         cell_gradient = cell_gradient + flux_temp
 
     end
     
-    return cell_gradient / cell_areas[iCell]
+    return cell_gradient / my_mesh_2D.cell_areas[iCell]
 end
 
 function compute_scalar_gradients_old!(numOfCells, cell_areas, cell_normals, face_lengths, cellNodesCount, cellFacesList, cellNeighbors_Dict, scalar_variable, grad_scalar_variable)
@@ -117,30 +116,16 @@ function compute_scalar_gradients_old!(numOfCells, cell_areas, cell_normals, fac
 end
 
 # interpolate a scalar field from cell centers to face centers
-function cells_to_faces_scalar(numOfFaces, faceCells_Dict, scalar_variable_c)
-    # Use map to create array without mutations
-    scalar_variable_f = map(1:numOfFaces) do iFace
-        facecells = faceCells_Dict[iFace]
-        
-        if length(facecells) == 2
-            (scalar_variable_c[facecells[1]] + scalar_variable_c[facecells[2]]) / 2.0
-        else
-            scalar_variable_c[facecells[1]]
-        end
-    end
-
-    return scalar_variable_f
-end
-
-function cells_to_faces_scalar_old(numOfFaces, faceCells_Dict, scalar_variable_c)
+# The boundary condition is not considered here.
+function cells_to_faces_scalar(my_mesh_2D, scalar_variable_c)
 
     # Create new array instead of modifying in-place
-    scalar_variable_f = zeros(Float64, numOfFaces)
+    scalar_variable_f = zeros(eltype(scalar_variable_c), my_mesh_2D.numOfFaces)
     
     #loop through faces  
-    @inbounds for iFace in 1:numOfFaces
+    @inbounds for iFace in 1:my_mesh_2D.numOfFaces
         #get current face's cells
-        facecells = faceCells_Dict[iFace]
+        facecells = my_mesh_2D.faceCells_Dict[iFace]
         
         if length(facecells) == 2   #internal face
             scalar_variable_f[iFace] = (scalar_variable_c[facecells[1]] + scalar_variable_c[facecells[2]]) / 2.0    

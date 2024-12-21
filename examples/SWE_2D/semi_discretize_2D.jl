@@ -8,7 +8,7 @@
 
 
 # In this case, we will invert para = [zb_cells].
-function swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
     swe_2d_constants, ManningN_cells, ManningN_ghostCells,
     nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
@@ -21,183 +21,114 @@ function swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_f
     symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
     )
 
-    h_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)            #water depth at ghost cells 
-    q_x_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)          #q_x=hu at ghost cells 
-    q_y_ghostCells = zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghost cells 
-
-    Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell values of Q
-    
-    #mesh data
-    numOfCells = my_mesh_2D.numOfCells
-    numOfFaces = my_mesh_2D.numOfFaces
-    maxNumOfCellFaces = my_mesh_2D.maxNumOfCellFaces
-    
-    cell_areas = my_mesh_2D.cell_areas
-    cell_normals = my_mesh_2D.cell_normals
-    #face_normals = my_mesh_2D.face_normals  
-    face_lengths = my_mesh_2D.face_lengths
-    
-    #faceLeftCellID_Dict = my_mesh_2D.faceLeftCellID_Dict
-    #faceRightCellID_Dict = my_mesh_2D.faceRightCellID_Dict
-
-    #get cell neightbors
-    cellNeighbors_Dict = my_mesh_2D.cellNeighbors_Dict
-    
-    g = swe_2d_constants.g
-    h_small = swe_2d_constants.h_small
-    RiemannSolver = swe_2d_constants.RiemannSolver
-    
-    h = @view Q[:,1]
-    q_x = @view Q[:,2]
-    q_y = @view Q[:,3]
-    
-    #fluxes on faces: 
-    #fluxes = zeros(Float64, numOfCells, maxNumOfCellFaces, 3)
-    #flux = zeros(Float64, 3)
-    fluxes = zeros(eltype(Q), numOfCells, maxNumOfCellFaces, 3)
-    flux = zeros(eltype(Q), 3)
-    
-    #zb at faces and slope at cells 
-    #zb_faces = zeros(Float64, numOfFaces)
-    #S0 = zeros(Float64, numOfCells, 2)
-    
-    #println("time t = ", t)
-    
-    #set the parameter values 
-    zb_cells = para
-
-    #interpolate zb from cell to face and compute the bed slope at cells
-    #interploate_zb_from_cell_to_face_and_compute_S0!(my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0)
-    zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells)
-    
-    #Process the boundaries: update ghost cells
-    process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-    inletQ_TotalA, inletQ_DryWet, Q, Q_ghost, swe_2D_constants)
-    
-    process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-    exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE, Q, Q_ghost, swe_2D_constants)
-    
-    process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, Q, Q_ghost)
-    
-    process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, Q, Q_ghost)
-    
-    #loop through all celss to calculate the fluxes on faces
-    for iCell in 1:numOfCells
-
-        # if iCell==5 && abs(t-5.0)<0.0001
-        #     println("iCell = ", iCell)
-        #     println("h = ", h[iCell])
-        #     println("q_x = ", q_x[iCell])
-        #     println("q_y = ", q_y[iCell])
-        #     println("S0 = ", S0[iCell,:])
-        # end
-
-        #loop through all faces of the cell
-        for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
-            faceID = abs(my_mesh_2D.cellFacesList[iCell,:][iFace])
-            left_cellID = iCell          #left cell is the current cell
-            
-            right_cellID = abs(cellNeighbors_Dict[iCell][iFace]) #right cell is the neighbor cell (if neighbor cell is negative, it is a ghost cell)
-
-            faceBoundaryID = my_mesh_2D.faceBoundaryID_Dict[faceID]
-                        
-            #currnet face's normal vector
-            face_normal = cell_normals[iCell][iFace]
-
-            if faceBoundaryID==0 #internal face
-                hL = h[left_cellID]
-                huL = q_x[left_cellID]
-                hvL = q_y[left_cellID]
-                
-                hR = h[right_cellID]
-                huR = q_x[right_cellID]
-                hvR = q_y[right_cellID]
-            else #boundary face
-                hL = h[left_cellID]
-                huL = q_x[left_cellID]
-                hvL = q_y[left_cellID]
-                
-                hR = Q_ghost[right_cellID, 1]
-                huR = Q_ghost[right_cellID, 2]
-                hvR = Q_ghost[right_cellID, 3]
-            end
-            
-            if (RiemannSolver == "Roe")
-                Riemann_2D_Roe!(flux, hL, huL, hvL, hR, huR, hvR, g, face_normal; hmin=h_small)
-                #Riemann_2D_Roe!(flux, h[left_cellID], q_x[left_cellID], q_y[left_cellID], h[right_cellID], q_x[right_cellID], q_y[right_cellID], g, face_normal; hmin=h_small)
-                
-                #println("Not implemented yet")
-                #exit(-1)  #exit with an error code of -1
-            elseif (RiemannSolver == "HLL")
-                #Riemann_2D_hll!(flux, g, h_face, q_x_face, q_y_face, bcType, h_small)
-            elseif (RiemannSolver == "HLLC")
-                println("Not implemented yet")
-                readline()
-                exit(-1)  #exit with an error code of -1
-            else
-                println("Wrong choice of RiemannSolver")
-                readline()
-                exit(-1)  #exit with an error code of -1
-            end
-            
-            fluxes[iCell, iFace, 1] = flux[1]
-            fluxes[iCell, iFace, 2] = flux[2]
-            fluxes[iCell, iFace, 3] = flux[3]
-
-            # if (iCell==5 || iCell==8) && abs(t-5.0)<0.0001
-            #     println("iCell = ", iCell, "iFace = ", iFace, "faceID = ", faceID)   
-            #     println("h = ", h[iCell])
-            #     println("q_x = ", q_x[iCell])
-            #     println("q_y = ", q_y[iCell])
-            #     println("S0 = ", S0[iCell,:])
-
-            #     println("fluxes = ", fluxes[iCell, iFace, :])
-            # end
-        end
-
-    end
-    
-    #initialize the RHS of the ODEs to be zero
-    dQdt .*= 0.0
-    
-    #loop through all cells to calculate the RHS of the ODEs
-    for iCell in 1:numOfCells
-        
-        #get cell area
-        cell_area = cell_areas[iCell]
-        
-        #loop through all faces of the cell
-        for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
-            faceID = abs(my_mesh_2D.cellFacesList[iCell,:][iFace])
-            
-            #get face length 
-            face_lenght = face_lengths[faceID]
-            
-            dQdt[iCell,1] -= fluxes[iCell, iFace, 1] * face_lenght 
-            dQdt[iCell,2] -= fluxes[iCell, iFace, 2] * face_lenght
-            dQdt[iCell,3] -= fluxes[iCell, iFace, 3] * face_lenght
-        end
-        
-        #add flow resistance term and gravity/bed slope term
-        if (h[iCell] <= h_small) #if a dry cell, no flow resistance term
-            dQdt[iCell,2] += g * h[iCell] * S0[iCell,1] * cell_area
-            dQdt[iCell,3] += g * h[iCell] * S0[iCell,2] * cell_area
-        else
-            u_temp = q_x[iCell] / h[iCell]
-            v_temp = q_y[iCell] / h[iCell]
-            u_mag = sqrt(u_temp^2 + v_temp^2)
-
-            dQdt[iCell,2] += (g * h[iCell] * S0[iCell,1] - g*ManningN_cells[iCell]^2/h[iCell]^(1.0/3.0)*u_mag*u_temp) * cell_area
-            dQdt[iCell,3] += (g * h[iCell] * S0[iCell,2] - g*ManningN_cells[iCell]^2/h[iCell]^(1.0/3.0)*u_mag*v_temp) * cell_area
-        end
-        
-        #divide by cell area
-        dQdt[iCell,1] /= cell_area
-        dQdt[iCell,2] /= cell_area
-        dQdt[iCell,3] /= cell_area
-    end 
-    
+     # Mesh data
+     numOfCells = my_mesh_2D.numOfCells
+     maxNumOfCellFaces = my_mesh_2D.maxNumOfCellFaces
+     
+     cell_areas = my_mesh_2D.cell_areas
+     cell_normals = my_mesh_2D.cell_normals
+     face_lengths = my_mesh_2D.face_lengths
+     cellNeighbors_Dict = my_mesh_2D.cellNeighbors_Dict
+     
+     g = swe_2d_constants.g
+     h_small = swe_2d_constants.h_small
+     RiemannSolver = swe_2d_constants.RiemannSolver
+     
+     h = @view Q[:, 1]  # water depth
+     q_x = @view Q[:, 2]  # discharge in x
+     q_y = @view Q[:, 3]  # discharge in y
+ 
+     # Set parameter values
+     zb_cells_current = para  # para.clone()
+     
+     # Interpolate zb from cell to face and compute bed slope at cells
+     zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
+ 
+     # Process boundaries: update ghost cells
+     # Each boundary treatment function works on different part of Q_ghost. So it is not necessary to create Q_ghost in each of the 
+     # boundary treatment function. We can create Q_ghost once and pass it to each of the boundary treatment functions.
+     #Q_ghost = zeros(eltype(Q), size(Q))
+     Q_ghost = process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs,
+                                          inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals,
+                                          inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+                                          inletQ_TotalA, inletQ_DryWet, Q, Q_ghost, ManningN_cells, swe_2d_constants)
+     
+     Q_ghost = process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs,
+                                         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+                                         Q, Q_ghost, swe_2d_constants)
+     
+     Q_ghost = process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
+                                       wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+                                       Q, Q_ghost)
+     
+     Q_ghost = process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
+                                           symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals,
+                                           Q, Q_ghost)
+     
+     # Initialize fluxes
+     #dQdt = zeros(eltype(Q), size(Q))
+ 
+     # Loop through all cells to calculate the fluxes on faces
+     for iCell in 1:numOfCells
+         cell_area = cell_areas[iCell]
+ 
+         # Initialize flux accumulation
+         flux_sum = zeros(eltype(Q), 3)
+         
+         for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
+             faceID = abs(my_mesh_2D.cellFacesList[iCell,:][iFace])
+             left_cellID = iCell
+             right_cellID = abs(cellNeighbors_Dict[iCell][iFace])
+             
+             faceBoundaryID = my_mesh_2D.faceBoundaryID_Dict[faceID]
+             face_normal = cell_normals[iCell][iFace]
+             
+             if faceBoundaryID == -1  # internal face
+                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
+                 hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
+             else  # boundary face
+                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
+                 hR = Q_ghost[right_cellID, 1]
+                 huR = Q_ghost[right_cellID, 2]
+                 hvR = Q_ghost[right_cellID, 3]
+             end
+             
+             if RiemannSolver == "Roe"
+                 flux = Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
+             elseif RiemannSolver == "HLL"
+                 error("HLL solver not implemented yet")
+             elseif RiemannSolver == "HLLC"
+                 error("HLLC solver not implemented yet")
+             else
+                 error("Wrong choice of RiemannSolver")
+             end
+             
+             # Accumulate flux contribution
+             flux_sum .= flux_sum .+ flux .* face_lengths[faceID]
+         end
+ 
+         # Source terms
+         source_terms = zeros(eltype(Q), 3)
+         if h[iCell] <= h_small
+             source_terms .= [eltype(Q)(0.0), 
+                              g * h[iCell] * S0[iCell, 1] * cell_area, 
+                              g * h[iCell] * S0[iCell, 2] * cell_area]
+         else
+             u_temp = q_x[iCell] / h[iCell]
+             v_temp = q_y[iCell] / h[iCell]
+             u_mag = sqrt(u_temp^2 + v_temp^2)
+             
+             friction_x = g * ManningN_cells[iCell]^2 / h[iCell]^(1/3) * u_mag * u_temp
+             friction_y = g * ManningN_cells[iCell]^2 / h[iCell]^(1/3) * u_mag * v_temp
+ 
+             source_terms .= [0.0, 
+                              (g * h[iCell] * S0[iCell, 1] - friction_x) * cell_area,
+                              (g * h[iCell] * S0[iCell, 2] - friction_y) * cell_area]
+         end
+ 
+         # Compute final contribution to dQdt (combine flux and source terms)
+         dQdt[iCell, :] .= (-flux_sum .+ source_terms) ./ cell_area
+     end
+ 
+     return dQdt
 end

@@ -52,32 +52,32 @@ CELL_TYPES 12
 CELL_DATA 12
 SCALARS eta double 1
 LOOKUP_TABLE default
-0.5
-0.5
-0.5
-0.5
-0.5
-0.5
-0.33
-0.33
-0.33
-0.33
-0.33
-0.33
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
 SCALARS h double 1
 LOOKUP_TABLE default
-0.5
-0.5
-0.5
-0.5
-0.5
-0.5
-0.33
-0.33
-0.33
-0.33
-0.33
-0.33
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
+1.0
 SCALARS zb_cell double 1
 LOOKUP_TABLE default
 0.0

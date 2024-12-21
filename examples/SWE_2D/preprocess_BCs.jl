@@ -331,105 +331,84 @@ end
 #process inlet-q boundaries: called every time step to update the boundary condition
 function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-    inletQ_TotalA, inletQ_DryWet, Q_cells, Q_ghostCells, swe_2D_constants)
+    inletQ_TotalA, inletQ_DryWet, Q_cells, Q_ghostCells, ManningN_cells, swe_2D_constants)
     
 
-    h = @view Q_cells[:,1]
+    h = @view Q_cells[:,1]         #view just creates a reference to the data, not a copy
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = Q_ghostCells[:,1]
+    h_ghost = Q_ghostCells[:,1]    #matrix slice will create a copy: h_ghost
     q_x_ghost = Q_ghostCells[:,2]
     q_y_ghost = Q_ghostCells[:,3]
-
-    # Create new TotalA tensor
-    #new_TotalA = zeros(eltype(Q_cells), size(inletQ_TotalA))
-        
-    #loop through all inlet-q boundaries
+    
+    # Loop through all inlet-q boundaries
     for iInletQ in 1:nInletQ_BCs
-        iBoundary = inletQ_BC_indices[iInletQ]
+        #iBoundary = inletQ_BC_indices[iInletQ]
         
-        #println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+        current_boundaryFaceIDs = inletQ_faceIDs[iInletQ]
+        current_ghostCellIDs = inletQ_ghostCellIDs[iInletQ]
+        current_internalCellIDs = inletQ_internalCellIDs[iInletQ]
         
-        #get the boundary face IDs of the current inlet-q boundary
-        
-        current_boundaryFaceIDs = inletQ_faceIDs[iInletQ]          #the face ID of the current inlet-q boundary
-        current_ghostCellIDs = inletQ_ghostCellIDs[iInletQ]        #the ghost cell ID of the current inlet-q boundary
-        current_internalCellIDs = inletQ_internalCellIDs[iInletQ]  #the internal cell ID of the current inlet-q boundary    
-        
-        
-        #number of bounary faces for the current inlet-q boundary
         nBoundaryFaces = length(current_boundaryFaceIDs)
-
-        #current_inletQ_H = inletQ_H[iInletQ]   #inlet water depth for each face in the current inlet-q boundary
-        current_inletQ_A = inletQ_A[iInletQ]   #area for each face in the current inlet-q boundary
-        current_inletQ_ManningN = inletQ_ManningN[iInletQ]   #Manning's n for each face in the current inlet-q boundary
-        current_inletQ_Length = inletQ_Length[iInletQ]   #length for each face in the current inlet-q boundary
-        current_inletQ_DryWet = inletQ_DryWet[iInletQ]   #dry(=0)/wet(=1) flag for each face in the current inlet-q boundary    
-
-        current_inletQ_faceCentroids = inletQ_faceCentroids[iInletQ]  #face centroids of the current inlet-q boundary
-
-        #get current total discharge for the current inlet-q boundary
-        current_inletQ_TotalQ = inletQ_TotalQ[iInletQ] 
-
-        inletQ_TotalA[iInletQ] = 0.0   #total cross-sectional area for the current inlet-q boundary
         
-        #loop through all faces in the current inlet-q boundary and compute the total area (only account for the wet cells)
+        current_inletQ_A = zeros(eltype(Q_cells), size(inletQ_A[iInletQ]))  # clone to avoid breaking computational graph
+
+        #current_inletQ_ManningN = inletQ_ManningN[iInletQ]  
+        current_inletQ_Length = inletQ_Length[iInletQ]  
+
+        current_inletQ_DryWet = deepcopy(inletQ_DryWet[iInletQ])  # clone to avoid breaking computational graph
+        
+        current_inletQ_TotalQ = inletQ_TotalQ[iInletQ]
+        total_A = zero(eltype(Q_cells))
+        
+        # Process each face
         for iFace in 1:nBoundaryFaces
-            faceID = current_boundaryFaceIDs[iFace]
-            ghostCellID = current_ghostCellIDs[iFace]
+            #ghostCellID = current_ghostCellIDs[iFace]
             internalCellID = current_internalCellIDs[iFace]
             
-            #get the face centroid of the current inlet-q boundary
-            faceCentroid = current_inletQ_faceCentroids[iFace, :]
-
-            #current_inletQ_H[iFace] = h[internalCellID]   #get the water depth of the internal Cell
-            current_inletQ_ManningN[iFace] = ManningN_cells[internalCellID]   #Manning's n for the current inlet-q boundary
-
-            #get the water depth of the internal Cell
-            if h[internalCellID] > swe_2D_constants.h_small
-                current_inletQ_DryWet[iFace] = 1   #wet cell
-                current_inletQ_A[iFace] = current_inletQ_Length[iFace]^(5/3) * h[internalCellID] / current_inletQ_ManningN[iFace]    #using conveyance method
-                inletQ_TotalA[iInletQ] += current_inletQ_A[iFace]   #accumulate the total cross-sectional wet area
+            #current_inletQ_ManningN[iFace] = ManningN_cells[internalCellID]  # update Manning's n
+            ManningN_face = ManningN_cells[internalCellID]
+            
+            if h[internalCellID] > swe_2D_constants.h_small  # check if the cell is wet
+                current_inletQ_DryWet[iFace] = 1  # mark as wet
+                current_inletQ_A[iFace] = current_inletQ_Length[iFace]^(5/3) * h[internalCellID] / ManningN_face  # calculate area
+                total_A += current_inletQ_A[iFace]  # accumulate total area
             else
-                current_inletQ_DryWet[iFace] = 0   #dry cell
+                current_inletQ_DryWet[iFace] = 0  # mark as dry
             end
         end
 
-        if inletQ_TotalA[iInletQ] <= 1e-10
-            error("Error: total cross-sectional conveyance for the current inlet-q boundary is not positive: $iInletQ, $(inletQ_TotalA[iInletQ])")
+        if total_A <= 1e-10  # check for valid total area
+            error("Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A")
         end
         
-        #loop through all faces in the current inlet-q boundary and update the boundary condition
+        # Update ghost cells
         for iFace in 1:nBoundaryFaces
-            faceID = current_boundaryFaceIDs[iFace]
             ghostCellID = current_ghostCellIDs[iFace]
             internalCellID = current_internalCellIDs[iFace]
 
-            h_ghost[ghostCellID] = h[internalCellID]   #update the ghost cell water depth. Use the internal cell value no matter dry or wet
-
-            if current_inletQ_DryWet[iFace] == 0   #dry cell
-                q_x_ghost[ghostCellID] = 0.0   #update the ghost cell discharge
-                q_y_ghost[ghostCellID] = 0.0   #update the ghost cell discharge
+            ManningN_face = ManningN_cells[internalCellID]
             
-            else   #wet cell
-                #face outward normal vector 
-                face_normal = inletQ_faceOutwardNormals[iInletQ][iFace, :]
+            h_ghost[ghostCellID] = h[internalCellID]  # set ghost depth to internal cell depth
+            
+            if current_inletQ_DryWet[iFace] == 0  # dry condition
+                q_x_ghost[ghostCellID] = zero(eltype(Q_cells))  # set x discharge to zero
+                q_y_ghost[ghostCellID] = zero(eltype(Q_cells))  # set y discharge to zero
+            else
+                face_normal = inletQ_faceOutwardNormals[iInletQ][iFace,:]  # outward normal for the face
+                velocity_normal = (current_inletQ_TotalQ / total_A * 
+                                  current_inletQ_Length[iFace]^(2/3) / ManningN_face)  # calculate normal velocity
                 
-                #normal velocity
-                velocity_normal = current_inletQ_TotalQ / inletQ_TotalA[iInletQ] * current_inletQ_Length[iFace]^(2/3) / current_inletQ_ManningN[iFace] 
-               
-                q_x_ghost[ghostCellID] = - h_ghost[ghostCellID] * velocity_normal * face_normal[1]   #update the ghost cell discharge
-                q_y_ghost[ghostCellID] = - h_ghost[ghostCellID] * velocity_normal * face_normal[2]   #update the ghost cell discharge
+                q_x_ghost[ghostCellID] = -h_ghost[ghostCellID] * velocity_normal * face_normal[1]  # x-discharge
+                q_y_ghost[ghostCellID] = -h_ghost[ghostCellID] * velocity_normal * face_normal[2]  # y-discharge
             end
         end
-
     end
 
-     # Stack the updated ghost cell values and return new Q_ghostCells
-     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
-     return new_Q_ghostCells
-    
+    # Stack the updated ghost cell values and return new Q_ghostCells
+    new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
+    return new_Q_ghostCells    
 end
 
 #process exit-h boundaries: called every time step to update the boundary condition
@@ -440,42 +419,30 @@ function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, 
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = @view Q_ghostCells[:,1]
-    q_x_ghost = @view Q_ghostCells[:,2]
-    q_y_ghost = @view Q_ghostCells[:,3]
+    h_ghost = Q_ghostCells[:,1]
+    q_x_ghost = Q_ghostCells[:,2]
+    q_y_ghost = Q_ghostCells[:,3]
     
     #loop through all exit-h boundaries
     for iExitH in 1:nExitH_BCs
-        iBoundary = exitH_BC_indices[iExitH]
+        #iBoundary = exitH_BC_indices[iExitH]
         
-        #println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
+        current_ghostCellIDs = exitH_ghostCellIDs[iExitH]  # ghost cell IDs for this boundary
+        current_internalCellIDs = exitH_internalCellIDs[iExitH]  # internal cell IDs for this boundary
+        current_faceCentroids = exitH_faceCentroids[iExitH]  # face centroids for this boundary
         
-        #get the boundary face IDs of the current exit-h boundary
-        current_boundaryFaceIDs = exitH_faceIDs[iExitH]         #the face ID of the current exit-h boundary
-        current_ghostCellIDs = exitH_ghostCellIDs[iExitH]       #the ghost cell ID of the current exit-h boundary
-        current_internalCellIDs = exitH_internalCellIDs[iExitH] #the internal cell ID of the current exit-h boundary    
+        # Calculate h_ghost using vectorized operations
+        h_ghost[current_ghostCellIDs] .= max.(swe_2D_constants.h_small, 
+                                              exitH_WSE[iExitH] .- current_faceCentroids[:, 3])
         
-        #number of bounary faces for the current exit-h boundary
-        nBoundaryFaces = length(current_boundaryFaceIDs)
-        
-        #loop through all faces in the current exit-h boundary
-        for iFace in 1:nBoundaryFaces
-            faceID = current_boundaryFaceIDs[iFace]
-            ghostCellID = current_ghostCellIDs[iFace]
-            internalCellID = current_internalCellIDs[iFace]
-            
-            #get the face centroid of the current exit-h boundary
-            faceCentroid = exitH_faceCentroids[iExitH][iFace, :]
-
-            #update the ghost cell water depth. Use the exit water surface elevation
-            h_ghost[ghostCellID] = max(swe_2D_constants.h_small, exitH_WSE[iExitH] - faceCentroid[3])  
-
-            #update the ghost cell discharge                
-            q_x_ghost[ghostCellID] = q_x[internalCellID]   #update the ghost cell discharge
-            q_y_ghost[ghostCellID] = q_y[internalCellID]   #update the ghost cell discharge
-        end
-
+        # Copy q_x and q_y from internal cells to ghost cells
+        q_x_ghost[current_ghostCellIDs] .= q_x[current_internalCellIDs]  # copy discharge in x
+        q_y_ghost[current_ghostCellIDs] .= q_y[current_internalCellIDs]  # copy discharge in y
     end
+    
+    # Stack the updated ghost cell values and return
+    new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values
+    return new_Q_ghostCells
     
 end
 
@@ -487,45 +454,26 @@ function process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = @view Q_ghostCells[:,1]
-    q_x_ghost = @view Q_ghostCells[:,2]
-    q_y_ghost = @view Q_ghostCells[:,3]
+    h_ghost = Q_ghostCells[:,1]
+    q_x_ghost = Q_ghostCells[:,2]
+    q_y_ghost = Q_ghostCells[:,3]
     
     #loop through all wall boundaries
     for iWall in 1:nWall_BCs
-        iBoundary = wall_BC_indices[iWall]
+        #iBoundary = wall_BC_indices[iWall]
         
-        #println("Prrocessing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+        current_ghostCellIDs = wall_ghostCellIDs[iWall]  # ghost cell IDs for this boundary
+        current_internalCellIDs = wall_internalCellIDs[iWall]  # internal cell IDs for this boundary
         
-        #get the boundary face IDs of the current wall boundary
-        current_boundaryFaceIDs = wall_faceIDs[iWall]       #the face ID of the current wall boundary
-        current_ghostCellIDs = wall_ghostCellIDs[iWall]     #the ghost cell ID of the current wall boundary
-        current_internalCellIDs = wall_internalCellIDs[iWall] #the internal cell ID of the current wall boundary    
-        
-        #number of bounary faces for the current wall boundary
-        nBoundaryFaces = length(current_boundaryFaceIDs)
-        
-        #loop through all faces in the current wall boundary
-        for iFace in 1:nBoundaryFaces
-            faceID = current_boundaryFaceIDs[iFace]
-            ghostCellID = current_ghostCellIDs[iFace]
-            internalCellID = current_internalCellIDs[iFace]
-            
-            #get the face centroid of the current wall boundary
-            faceCentroid = wall_faceCentroids[iWall][iFace, :]
-
-            #get the face outward normal of the current inlet-q boundary
-            face_normal = wall_outwardNormals[iWall][iFace, :]
-            
-            #update the ghost cell water depth. Use the internal cell value
-            h_ghost[ghostCellID] = h[internalCellID]   
-
-            #update the ghost cell discharge                
-            q_x_ghost[ghostCellID] = -q_x[internalCellID]   #update the ghost cell discharge
-            q_y_ghost[ghostCellID] = -q_y[internalCellID]   #update the ghost cell discharge            
-        end
-       
+        # Vectorized updates for all faces in current wall boundary
+        h_ghost[current_ghostCellIDs] .= h[current_internalCellIDs]  # update depth
+        q_x_ghost[current_ghostCellIDs] .= -q_x[current_internalCellIDs]  # negate and update x-discharge
+        q_y_ghost[current_ghostCellIDs] .= -q_y[current_internalCellIDs]  # negate and update y-discharge
     end
+    
+    # Stack the updated ghost cell values and return
+    new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values
+    return new_Q_ghostCells
     
 end
 
@@ -537,54 +485,32 @@ function process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, s
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = @view Q_ghostCells[:,1]
-    q_x_ghost = @view Q_ghostCells[:,2]
-    q_y_ghost = @view Q_ghostCells[:,3]
+    h_ghost = Q_ghostCells[:,1]
+    q_x_ghost = Q_ghostCells[:,2]
+    q_y_ghost = Q_ghostCells[:,3]
     
     #loop through all symmetry boundaries
     for iSymm in 1:nSymm_BCs
-        iBoundary = symm_BC_indices[iSymm]
+        #iBoundary = symm_BC_indices[iSymm]
         
-        #println("Prrocessing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+        current_ghostCellIDs = symm_ghostCellIDs[iSymm]  # ghost cell IDs for this boundary
+        current_internalCellIDs = symm_internalCellIDs[iSymm]  # internal cell IDs for this boundary
+        face_normals = symm_outwardNormals[iSymm]  # outward normals for this boundary
         
-        #get the boundary face IDs of the current symmetry boundary
-        current_boundaryFaceIDs = symm_faceIDs[iSymm]       #the face ID of the current symmetry boundary
-        current_ghostCellIDs = symm_ghostCellIDs[iSymm]     #the ghost cell ID of the current symmetry boundary
-        current_internalCellIDs = symm_internalCellIDs[iSymm] #the internal cell ID of the current symmetry boundary    
+        # Update ghost cell water depths (vectorized)
+        h_ghost[current_ghostCellIDs] .= h[current_internalCellIDs]  # update depth
         
-        #number of bounary faces for the current symmetry boundary
-        nBoundaryFaces = length(current_boundaryFaceIDs)
+        # Compute v·n (dot product of velocity and face normal) for all faces at once
+        v_dot_n = q_x[current_internalCellIDs] .* face_normals[:, 1] .+ 
+                  q_y[current_internalCellIDs] .* face_normals[:, 2]
         
-        #loop through all faces in the current symmetry boundary
-        for iFace in 1:nBoundaryFaces
-            faceID = current_boundaryFaceIDs[iFace]
-            ghostCellID = current_ghostCellIDs[iFace]
-            internalCellID = current_internalCellIDs[iFace]
-            
-            #get the face centroid of the current symmetry boundary
-            faceCentroid = symm_faceCentroids[iSymm][iFace, :]
-
-            #get the face outward normal of the current symmetry boundary
-            face_normal = symm_outwardNormals[iSymm][iFace, :]
-            
-            #update the ghost cell water depth. Use the internal cell value
-            h_ghost[ghostCellID] = h[internalCellID]   
-
-            #update the ghost cell discharge: symmetry about the face
-            #Get internal cell velocity vector
-            v_internal = [q_x[internalCellID], q_y[internalCellID]]
-            
-            #Compute reflection of velocity vector about face normal
-            #v_reflected = v - 2(v·n)n where n is unit normal
-            v_dot_n = dot(v_internal, face_normal)
-            v_reflected = v_internal - 2 * v_dot_n * face_normal
-            
-            #Update ghost cell velocity components
-            q_x_ghost[ghostCellID] = v_reflected[1]
-            q_y_ghost[ghostCellID] = v_reflected[2]
-
-        end
-       
+        # Update ghost cell velocities (vectorized)
+        q_x_ghost[current_ghostCellIDs] .= q_x[current_internalCellIDs] .- 2.0 .* v_dot_n .* face_normals[:, 1]
+        q_y_ghost[current_ghostCellIDs] .= q_y[current_internalCellIDs] .- 2.0 .* v_dot_n .* face_normals[:, 2]
     end
+    
+    # Stack the updated ghost cell values and return
+    new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values
+    return new_Q_ghostCells
     
 end

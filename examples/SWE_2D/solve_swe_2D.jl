@@ -58,9 +58,9 @@ include("misc_utilities_2D.jl")
 println("Solving 2D SWE...")
 
 #define control variables
-bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
+bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
 bPlot_Simulation_Results = false   #whether to plot simulation results
-bPerform_Inversion = true           #whether to do inversion 
+bPerform_Inversion = false           #whether to do inversion 
 bPlot_Inversion_Results = false     #whehter to plot the inversion results
 
 #options for inversion 
@@ -79,7 +79,7 @@ srhhydro_file_name = "simple.srhhydro"
 #srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
 #srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
 
-srh_all_Dict = process_SRH_2D_input!(srhhydro_file_name)
+srh_all_Dict = process_SRH_2D_input(srhhydro_file_name)
 
 #update swe_2D_constants based on the SRH-2D data
 update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
@@ -88,10 +88,10 @@ update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
 #  setup bed elevation 
-zb_faces = zeros(Float64, my_mesh_2D.numOfFaces)      #zb at faces 
-zb_cells = zeros(Float64, my_mesh_2D.numOfCells)      #zb at cell centers 
-zb_ghostCells = zeros(Float64, my_mesh_2D.numOfAllBounaryFaces)   #zb at ghost cell centers 
-S0 = zeros(Float64, my_mesh_2D.numOfCells, 2)          #bed slope at cell centers 
+#zb_faces = zeros(Float64, my_mesh_2D.numOfFaces)      #zb at faces 
+#zb_cells = zeros(Float64, my_mesh_2D.numOfCells)      #zb at cell centers 
+#zb_ghostCells = zeros(Float64, my_mesh_2D.numOfAllBounaryFaces)   #zb at ghost cell centers 
+#S0 = zeros(Float64, my_mesh_2D.numOfCells, 2)          #bed slope at cell centers 
 
 #If performing inversion, set the bed elevation to zero
 if bPerform_Inversion
@@ -99,17 +99,13 @@ if bPerform_Inversion
 end
 
 #setup bed elevation: computer zb at cell centers from nodes, then interpolate zb from cell to face and compute the bed slope at cells
-setup_bed!(my_mesh_2D.numOfCells, my_mesh_2D.numOfNodes, my_mesh_2D.nodeCoordinates, 
-my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, my_mesh_2D.cell_centroids, zb_cells, zb_ghostCells, zb_faces, S0, true)
+zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, true)
 
 #make a copy of the bathymetry truth: zb_cell_truth
 zb_cells_truth = deepcopy(zb_cells)
 
 #setup Manning's n 
-ManningN_cells = zeros(my_mesh_2D.numOfCells)                    #Manning's n at cells 
-ManningN_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)    #Manning's n at ghost cells
-
-setup_ManningN!(ManningN_cells, ManningN_ghostCells, my_mesh_2D, srh_all_Dict)
+ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
 
 # setup initial conditions 
 eta = zeros(my_mesh_2D.numOfCells)          #free surface elevation at cells 
@@ -125,12 +121,10 @@ q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghos
 total_water_volume = []   #total volume of water in the domain 
 
 #setup initial condition for eta, h, q_x, q_y
-setup_initial_eta!(my_mesh_2D.numOfCells, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, 
-my_mesh_2D.cellNodesCount, my_mesh_2D.cell_centroids, eta, zb_cells, h, true)
+setup_initial_condition!(my_mesh_2D, eta, zb_cells, h, q_x, q_y, true)
 
 #setup ghost cells for initial condition
-update_ghost_cells_eta_h_q!(my_mesh_2D.numOfAllBounaryFaces, my_mesh_2D.allBoundaryFacesIDs_List, my_mesh_2D.faceCells_Dict, 
-eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
 #preprocess boundary conditions 
 inletQ_BC_indices = Int[]   #indices of inlet-Q boundaries in the boundary list
@@ -230,16 +224,16 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 1.0)    #100.0
-dt = 0.01
+tspan = (0.0, 10.0)    #100.0
+dt = 0.1
 t = tspan[1]:dt:tspan[2]
 
 dt_save = (tspan[2] - tspan[1])/10.0
 t_save = tspan[1]:dt_save:tspan[2]
 
 # Define the ODE function with explicit types
-function swe_2d_ode!(dQdt::AbstractArray, Q::AbstractArray, para::AbstractArray, t::Real)
-    swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+function swe_2d_ode!(dQdt, Q, para, t)
+    swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
         swe_2D_constants, ManningN_cells, ManningN_ghostCells,
         nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
         inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
@@ -261,8 +255,8 @@ prob = ODEProblem(ode_f, Q0, tspan, para)
 
 if bSimulate_Synthetic_Data
 
-    solver_choice = "SciML"
-    #solver_choice = "MyOwn"
+    #solver_choice = "SciML"
+    solver_choice = "MyOwn"
 
     println("   Performing 2D SWE simulation ...")
 
@@ -307,18 +301,18 @@ if bSimulate_Synthetic_Data
         function update_cells!(dQdt, Q, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0, t, dt)
             
             # compute dQdt 
-            swe_2D_rhs!(dQdt, Q, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-            swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-            nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-            inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-            inletQ_TotalA, inletQ_DryWet,  
-            nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-            exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-            nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-            wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-            nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-            symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
-            )
+            swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+                swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+                nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+                inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
+                inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+                inletQ_TotalA, inletQ_DryWet,  
+                nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+                exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+                nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+                wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+                nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+                symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)
             
             for iCell in 1:my_mesh_2D.numOfCells
                 Q[iCell, :] += dt * dQdt[iCell, :]        

@@ -36,7 +36,7 @@ export swe_1D_make_animation
 export swe_2D_consts
 export mesh_2D
 export initialize_mesh_2D
-export Riemann_2D_Roe!
+export Riemann_2D_Roe
 
 export read_srhgeom
 export check_cell_nodes_counter_clockwise_srhgeom
