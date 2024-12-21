@@ -338,9 +338,12 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = @view Q_ghostCells[:,1]
-    q_x_ghost = @view Q_ghostCells[:,2]
-    q_y_ghost = @view Q_ghostCells[:,3]
+    h_ghost = Q_ghostCells[:,1]
+    q_x_ghost = Q_ghostCells[:,2]
+    q_y_ghost = Q_ghostCells[:,3]
+
+    # Create new TotalA tensor
+    #new_TotalA = zeros(eltype(Q_cells), size(inletQ_TotalA))
         
     #loop through all inlet-q boundaries
     for iInletQ in 1:nInletQ_BCs
@@ -358,7 +361,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         #number of bounary faces for the current inlet-q boundary
         nBoundaryFaces = length(current_boundaryFaceIDs)
 
-        current_inletQ_H = inletQ_H[iInletQ]   #inlet water depth for each face in the current inlet-q boundary
+        #current_inletQ_H = inletQ_H[iInletQ]   #inlet water depth for each face in the current inlet-q boundary
         current_inletQ_A = inletQ_A[iInletQ]   #area for each face in the current inlet-q boundary
         current_inletQ_ManningN = inletQ_ManningN[iInletQ]   #Manning's n for each face in the current inlet-q boundary
         current_inletQ_Length = inletQ_Length[iInletQ]   #length for each face in the current inlet-q boundary
@@ -380,7 +383,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
             #get the face centroid of the current inlet-q boundary
             faceCentroid = current_inletQ_faceCentroids[iFace, :]
 
-            current_inletQ_H[iFace] = h[internalCellID]   #get the water depth of the internal Cell
+            #current_inletQ_H[iFace] = h[internalCellID]   #get the water depth of the internal Cell
             current_inletQ_ManningN[iFace] = ManningN_cells[internalCellID]   #Manning's n for the current inlet-q boundary
 
             #get the water depth of the internal Cell
@@ -422,6 +425,10 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         end
 
     end
+
+     # Stack the updated ghost cell values and return new Q_ghostCells
+     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
+     return new_Q_ghostCells
     
 end
 
