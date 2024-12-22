@@ -12,8 +12,8 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
     return total_water_volume
 end
 
-#save results 
-function swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
+#save results (sol is a solution from SciML ODE solver)
+function swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
 
     #solution at the end of the simulation
     #Q_final = sol.u[end]
@@ -52,6 +52,45 @@ function swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cell, save_
         end
     end
 end
+
+#save results (sol is a solution from custom ODE solver)
+function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
+
+    #calculate total volume of water 
+    for index in 1:size(sol, 3)
+
+        Q = @view sol[:,:,index]  # Q will be a view of the 2D slice at timestep index
+
+        push!(total_water_volume, swe_2D_calc_total_water_volume(Q[:, 1], my_mesh_2D))
+
+        u_temp = Q[:,2] ./ Q[:,1]
+        v_temp = Q[:,3] ./ Q[:,1]
+        U_vector = hcat(u_temp, v_temp)
+                        
+        vector_data = [U_vector] 
+        vector_names = ["U"]
+
+        WSE = Q[:,1] + zb_cell
+            
+        scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cell, WSE]
+        scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
+
+        vtk_fileName = @sprintf("solution_%04d_AdHydraulics.vtk", index)
+            
+        file_path = joinpath(save_path, vtk_fileName ) 
+        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+    
+    end
+
+        
+    open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
+        println(fo, "total_water_volume")
+        for volume in total_water_volume
+            println(fo, volume)
+        end
+    end
+end
+
 
 function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)
     # Open the file for writing

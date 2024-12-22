@@ -2,7 +2,6 @@
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
 function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
-    #scalar_ghostCells = zeros(Float64, numOfAllBounaryFaces)
     scalar_ghostCells = zeros(eltype(scalar_cells), my_mesh_2D.numOfAllBounaryFaces)
 
     for iBoundaryFace in 1:my_mesh_2D.numOfAllBounaryFaces
@@ -21,7 +20,14 @@ end
 
 # computer gradient of a scalar field
 function compute_scalar_gradients(my_mesh_2D, scalar_variable)
-    return reduce(vcat, [compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)' for iCell in 1:my_mesh_2D.numOfCells])
+
+    grad_scalar_variable = zeros(eltype(scalar_variable), my_mesh_2D.numOfCells, 2)
+
+    for iCell in 1:my_mesh_2D.numOfCells
+        grad_scalar_variable[iCell, :] = compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
+    end 
+
+    return grad_scalar_variable
 end
 
 function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)

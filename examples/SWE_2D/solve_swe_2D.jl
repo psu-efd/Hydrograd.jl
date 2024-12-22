@@ -27,7 +27,7 @@ using OptimizationOptimisers
 #AD engines
 using Zygote
 using ForwardDiff
-#using ReverseDiff
+using ReverseDiff
 
 #for Bayesian estimation
 #using Turing
@@ -48,19 +48,19 @@ using InteractiveUtils
 start_time = now()  # Current date and time
 
 include("process_SRH_2D_input.jl")
-include("process_ManningN.jl")
-include("preprocess_BCs.jl")
+include("process_ManningN_2D.jl")
+include("process_BCs_2D.jl")
 include("process_bed_2D.jl")
-include("process_initial_condition_2D.jl")
+include("process_ICs_2D.jl")
 include("semi_discretize_2D.jl")
 include("misc_utilities_2D.jl")
-
+include("custom_ODE_solver.jl")
 println("Solving 2D SWE...")
 
 #define control variables
-bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
+bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
 bPlot_Simulation_Results = false   #whether to plot simulation results
-bPerform_Inversion = false           #whether to do inversion 
+bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = false     #whehter to plot the inversion results
 
 #options for inversion 
@@ -70,12 +70,12 @@ bInversion_include_u = false    #whehter to add velocity to the loss function (b
 #directory to save to (the same directory as the main file)
 save_path = dirname(@__FILE__)
 
-#define a swe_2D_const
+#define a swe_2D_constants object with some default values
 swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
 
 #read data from SRH-2D hydro, geom, and material files
-srhhydro_file_name = "simple.srhhydro"
-#srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
+#srhhydro_file_name = "simple.srhhydro"
+srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
 #srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
 #srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
 
@@ -224,27 +224,28 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 10.0)    #100.0
-dt = 0.1
+tspan = (0.0, 0.01)    #100.0
+dt = 0.01
 t = tspan[1]:dt:tspan[2]
 
-dt_save = (tspan[2] - tspan[1])/10.0
+dt_save = (tspan[2] - tspan[1])/1.0
 t_save = tspan[1]:dt_save:tspan[2]
+println("t_save = ", t_save)
 
 # Define the ODE function with explicit types
 function swe_2d_ode!(dQdt, Q, para, t)
     swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-        swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-        nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-        inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
-        inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-        inletQ_TotalA, inletQ_DryWet,  
-        nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-        exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-        nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-        wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-        nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-        symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)
+            swe_2D_constants, ManningN_cells, ManningN_ghostCells,
+            nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+            inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
+            inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+            inletQ_TotalA, inletQ_DryWet,  
+            nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+            exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+            nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+            wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+            nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+            symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)    
 end
 
 # Create the ODEFunction with the typed function
@@ -289,7 +290,7 @@ if bSimulate_Synthetic_Data
         # #save the simulation solution results
         jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
 
-        swe_2D_save_results(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+        swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
     end
 
     #My own ODE Solver
@@ -297,95 +298,18 @@ if bSimulate_Synthetic_Data
 
         println("   Performing 2D SWE simulation with MyOwn solver ...")
 
-        # Finite Volume Update
-        function update_cells!(dQdt, Q, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0, t, dt)
-            
-            # compute dQdt 
-            swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-                swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-                nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-                inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
-                inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-                inletQ_TotalA, inletQ_DryWet,  
-                nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-                exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-                nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-                wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-                nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-                symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)
-            
-            for iCell in 1:my_mesh_2D.numOfCells
-                Q[iCell, :] += dt * dQdt[iCell, :]        
-                
-                #update water depth in case of dry cells
-                if Q[iCell, 1] < swe_2D_constants.h_small
-                    Q[iCell, 1] = swe_2D_constants.h_small
-                    Q[iCell, 2] = 0.0
-                    Q[iCell, 3] = 0.0
-                end
-                
-                #update WSE
-                eta[iCell] = Q[iCell, 1] + zb_cells[iCell]
-            end
-                        
-        end
         
-        # Main Solver Function
-        function solve_shallow_water(my_mesh_2D, dQdt, Q, zb_cells, zb_ghostCells, zb_faces, S0, t_end, dt)
-            t = 0.0
-            iStep = 0
-            while t < t_end
-                println("t = ", t)
+        sol = my_solve(para, Q0, my_mesh_2D, tspan, dt)
+
+        # #save the results
+        # #save the simulation solution results
+        jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+
+        swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
                 
-                if iStep == 5000
-                    print("Here.")
-                end
-                
-                update_cells!(dQdt, Q, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0, t, dt)
-                
-                if iStep % 100 == 0
-                    #compute and record the total water volume
-                    push!(total_water_volume, [t, sum(Q[:,1] .* my_mesh_2D.cell_areas)])
-                end
-                
-                if true && iStep % 200 == 0
-                    
-                    u_temp = Q[:,2] ./ Q[:,1]
-                    v_temp = Q[:,3] ./ Q[:,1]
-                    U_vector = hcat(u_temp, v_temp)
-                    
-                    vector_data = [U_vector] 
-                    vector_names = ["U"]
-                    
-                    scalar_data = [Q[:,1], Q[:,2], Q[:,3], eta, zb_cells, ManningN_cells]
-                    scalar_names = ["h", "hu", "hv", "WSE", "zb_cell", "ManningN"]
-                    
-                    file_path = joinpath(save_path, "solution_$(iStep).vtk" ) 
-                    export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
-                end 
-                
-                t += dt
-                iStep += 1
-            end
-            
-        end
-        
-        t_end = 200.0
-        dt = 0.05
-        
-        dQdt = zeros(Float64, my_mesh_2D.numOfCells, 3)
-        
-        solve_shallow_water(my_mesh_2D, dQdt, Q0, zb_cells, zb_ghostCells, zb_faces, S0, t_end, dt)
-        
-        #save total water volume to file 
-        open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
-            println(fo, "time, total_water_volume")
-            for time_volume in total_water_volume
-                println(fo, time_volume[1], ",", time_volume[2])
-            end
-        end
-        
     end
+
+    
 
 end
 
@@ -421,66 +345,84 @@ if bPerform_Inversion
 
     #inversion parameters: zb_cell
     # initial guess for the parameters
-    ps = zeros(Float64, my_mesh_2D.numOfCells)
-
+    ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
+    
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
 
-        if !SciMLBase.successful_retcode(sol)
-            @warn "ODE solve failed!"
-            return NaN
-        end
+        #solve the ODE with my own solver
+        sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
 
+        #if !SciMLBase.successful_retcode(sol)
+        #    # Return a high cost instead of NaN
+        #    return fill(convert(eltype(θ), Inf), size(sol[1]))
+        #end
+        
         return sol
     end
 
+    #my_loss for debugging
     function my_loss(θ)
         # Add debug prints
-        Zygote.ignore() do
-            println("Current parameters: ", ForwardDiff.value.(θ))
-        end
+        #Zygote.ignore() do
+            #println("Current parameters: ", ForwardDiff.value.(θ))
+        #end
 
-        sol = predict(θ)            #Forward prediction with current θ (=zb at cells)
+        sol = Array(predict(θ))            #Forward prediction with current θ (=zb at cells)
         l = sol[:,1,end] .- 0.5  #loss = free surface elevation mismatch
         loss = sum(abs2, l)
 
-        Zygote.ignore() do
-            #println("loss value = ", ForwardDiff.value(loss))
-            #println("dloss/dθ = ", ForwardDiff.partials(loss))
-            println("loss = ", loss)
-        end
+        #Zygote.ignore() do
+        #    println("loss value = ", ForwardDiff.value(loss))
+        #    println("dloss/dθ = ", ForwardDiff.partials(loss))
+        #    #println("loss = ", loss)
+        #end
 
         #pred_real = ForwardDiff.value.(sol)
-        pred_real = sol
+        #pred_real = sol
         
         #println("size of pred_real", size(pred_real))
         #println("size of h_truth", size(h_truth))
         #println("pred = ", pred_real[:,1,end])
         #println("h_truth = ", h_truth)
 
-        Zygote.ignore() do
-            plt = plot(pred_real[:,1,end], 
-                label="Predicted",
-                #ylim=(0, 10),
-                xlabel="x",
-                ylabel="h",
-                linestyle=:solid)
+        #Zygote.ignore() do
+            # plt = plot(pred_real[:,1,end], 
+            #     label="Predicted",
+            #     #ylim=(0, 10),
+            #     xlabel="x",
+            #     ylabel="h",
+            #     linestyle=:solid)
 
-            plot!(h_truth, label="True", linestyle=:dash)
+            # plot!(h_truth, label="True", linestyle=:dash)
 
-            display(plt)
-        end
+            # display(plt)
+        #end
 
         return loss
     end
+
+    #test predict
+    #sol_value = predict(ps)
+    #@show sol_value
+    #println("sol_value = ", sol_value)
+
+    #loss_value = my_loss(ps)
+    #println("loss_value = ", loss_value)
 
     # Add this before gradient computation
     #@code_warntype(my_loss(ps))
 
     #SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
     #grad = ForwardDiff.gradient(my_loss, ps)
-    grad = Zygote.gradient(my_loss, ps)
+    grad = Zygote.gradient(my_loss, ps)[1]
+    #tape = ReverseDiff.GradientTape(my_loss, ps)
+    #ReverseDiff.compile!(tape)  # Optionally compile the tape for better performance
+    #grad = zeros(length(ps))  # Preallocate gradient array
+    #grad = ReverseDiff.gradient(my_loss, ps)
+
     #jac = Zygote.jacobian(predict, ps)
     #jac = ReverseDiff.jacobian(predict, ps)
     @show grad
@@ -494,38 +436,48 @@ if bPerform_Inversion
 
     function loss(θ)
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred[:,1,end] - h_truth  #loss = free surface elevation mismatch
+        l = pred[:,1,end] - 0.5 #h_truth  #loss = free surface elevation mismatch
         loss_pred_eta = sum(abs2, l)
 
-        loss_pred_uv = 0.0
+        # loss_pred_uv = zero(eltype(θ))
 
-        if bInversion_include_u      #if also include u in the loss 
-            l_u = pred[:,2,end]./pred[:,1,end] .- u_truth
-            l_v = pred[:,3,end]./pred[:,1,end] .- v_truth
+        #  # Add small epsilon to prevent division by zero
+        # ϵ = sqrt(eps(eltype(θ)))
+        
+        # if bInversion_include_u      #if also include u in the loss 
+        #     l_u = pred[:,2,end]./(pred[:,1,end] .+ ϵ) .- u_truth
+        #     l_v = pred[:,3,end]./(pred[:,1,end] .+ ϵ) .- v_truth
 
-            loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
-        end 
+        #     loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
+        # end 
 
-        loss_pred = loss_pred_eta + loss_pred_uv
+        # loss_pred = loss_pred_eta + loss_pred_uv
 
-        loss_slope = 0.0
+        # loss_slope = zero(eltype(θ))
 
-        if bInversion_slope_loss    #if bed slope is included in the loss 
-            loss_slope = calc_slope_loss(θ, my_mesh_2D)
-        end 
+        # if bInversion_slope_loss    #if bed slope is included in the loss 
+        #     loss_slope = calc_slope_loss(θ, my_mesh_2D)
+        # end 
 
-        loss_total = loss_pred + loss_slope
+        # loss_total = loss_pred + loss_slope
 
-        return loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred
+        # #return loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred
+        # return loss_total
+
+        Zygote.ignore() do
+            println("loss_pred_eta = ", loss_pred_eta)
+        end
+
+        return loss_pred_eta
     end
 
-    #grad = Zygote.gradient(loss, ps)
+    grad = Zygote.gradient(loss, ps)
     #grad = ForwardDiff.gradient(loss, ps)
     #grad = ForwardDiff.gradient(predict, θ)
-    #@show grad
+    @show grad
     #println("grad = ", grad)
     #readline()
-    #exit()
+    throw("stop here")
 
 
     LOSS = []                              # Loss accumulator

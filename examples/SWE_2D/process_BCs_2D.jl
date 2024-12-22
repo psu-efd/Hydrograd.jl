@@ -2,6 +2,8 @@
 #These functions are supposed to be called only once before the time loop
 
 using LinearAlgebra
+using ForwardDiff
+using Zygote
 
 function compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices)
 
@@ -329,7 +331,7 @@ function preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, 
 end
 
 #process inlet-q boundaries: called every time step to update the boundary condition
-function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
+function process_inlet_q_boundaries!(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
     inletQ_TotalA, inletQ_DryWet, Q_cells, Q_ghostCells, ManningN_cells, swe_2D_constants)
     
@@ -352,7 +354,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         
         nBoundaryFaces = length(current_boundaryFaceIDs)
         
-        current_inletQ_A = zeros(eltype(Q_cells), size(inletQ_A[iInletQ]))  # clone to avoid breaking computational graph
+        #current_inletQ_A = zeros(eltype(Q_cells), size(inletQ_A[iInletQ]))  # clone to avoid breaking computational graph
 
         #current_inletQ_ManningN = inletQ_ManningN[iInletQ]  
         current_inletQ_Length = inletQ_Length[iInletQ]  
@@ -372,8 +374,9 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
             
             if h[internalCellID] > swe_2D_constants.h_small  # check if the cell is wet
                 current_inletQ_DryWet[iFace] = 1  # mark as wet
-                current_inletQ_A[iFace] = current_inletQ_Length[iFace]^(5/3) * h[internalCellID] / ManningN_face  # calculate area
-                total_A += current_inletQ_A[iFace]  # accumulate total area
+                #current_inletQ_A[iFace] = current_inletQ_Length[iFace]^(5/3) * h[internalCellID] / ManningN_face  # calculate area
+                #total_A = total_A + current_inletQ_A[iFace]  # accumulate total area
+                total_A = total_A + current_inletQ_Length[iFace]^(5.0/3.0) * h[internalCellID] / ManningN_face
             else
                 current_inletQ_DryWet[iFace] = 0  # mark as dry
             end
@@ -398,7 +401,7 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
             else
                 face_normal = inletQ_faceOutwardNormals[iInletQ][iFace,:]  # outward normal for the face
                 velocity_normal = (current_inletQ_TotalQ / total_A * 
-                                  current_inletQ_Length[iFace]^(2/3) / ManningN_face)  # calculate normal velocity
+                                  current_inletQ_Length[iFace]^(2.0/3.0) / ManningN_face)  # calculate normal velocity
                 
                 q_x_ghost[ghostCellID] = -h_ghost[ghostCellID] * velocity_normal * face_normal[1]  # x-discharge
                 q_y_ghost[ghostCellID] = -h_ghost[ghostCellID] * velocity_normal * face_normal[2]  # y-discharge
@@ -406,22 +409,33 @@ function process_inlet_q_boundaries(nInletQ_BCs, inletQ_BC_indices, inletQ_faceI
         end
     end
 
+    #println("process_inlet_q_boundaries")
+    #println("Q_ghost value = ", ForwardDiff.value.(Q_ghostCells))
+    #println("Q_ghost partials = ", ForwardDiff.partials.(Q_ghostCells))
+
     # Stack the updated ghost cell values and return new Q_ghostCells
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
     return new_Q_ghostCells    
 end
 
 #process exit-h boundaries: called every time step to update the boundary condition
-function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
+function process_exit_h_boundaries!(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
     exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE, Q_cells, Q_ghostCells, swe_2D_constants)
 
     h = @view Q_cells[:,1]
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = Q_ghostCells[:,1]
+    h_ghost = Q_ghostCells[:,1]    #matrix slice will create a copy: h_ghost
     q_x_ghost = Q_ghostCells[:,2]
     q_y_ghost = Q_ghostCells[:,3]
+
+    #println("before process_exit_h_boundaries")
+    #println("Q_ghost value = ", ForwardDiff.value.(Q_ghostCells))
+    #println("Q_ghost partials = ", ForwardDiff.partials.(Q_ghostCells))
+
+    #println("Q_cells value = ", ForwardDiff.value.(Q_cells))
+    #println("Q_cells partials = ", ForwardDiff.partials.(Q_cells))
     
     #loop through all exit-h boundaries
     for iExitH in 1:nExitH_BCs
@@ -432,13 +446,17 @@ function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, 
         current_faceCentroids = exitH_faceCentroids[iExitH]  # face centroids for this boundary
         
         # Calculate h_ghost using vectorized operations
-        h_ghost[current_ghostCellIDs] .= max.(swe_2D_constants.h_small, 
-                                              exitH_WSE[iExitH] .- current_faceCentroids[:, 3])
+        h_ghost[current_ghostCellIDs] .= convert.(eltype(Q_cells), max.(swe_2D_constants.h_small, 
+                                              exitH_WSE[iExitH] .- current_faceCentroids[:, 3]))
         
         # Copy q_x and q_y from internal cells to ghost cells
         q_x_ghost[current_ghostCellIDs] .= q_x[current_internalCellIDs]  # copy discharge in x
         q_y_ghost[current_ghostCellIDs] .= q_y[current_internalCellIDs]  # copy discharge in y
     end
+
+    #println("after process_exit_h_boundaries")
+    #println("Q_ghost value = ", ForwardDiff.value.(Q_ghostCells))
+    #println("Q_ghost partials = ", ForwardDiff.partials.(Q_ghostCells))
     
     # Stack the updated ghost cell values and return
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values
@@ -447,45 +465,52 @@ function process_exit_h_boundaries(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, 
 end
 
 #process wall boundaries: called every time step to update the boundary condition
-function process_wall_boundaries(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
+function process_wall_boundaries!(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
     wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, Q_cells, Q_ghostCells)
 
     h = @view Q_cells[:,1]
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = Q_ghostCells[:,1]
-    q_x_ghost = Q_ghostCells[:,2]
-    q_y_ghost = Q_ghostCells[:,3]
+    h_ghost = Q_ghostCells[:,1].clone()  #clone to avoid breaking computational graph
+    q_x_ghost = Q_ghostCells[:,2].clone()
+    q_y_ghost = Q_ghostCells[:,3].clone()
     
-    #loop through all wall boundaries
     for iWall in 1:nWall_BCs
-        #iBoundary = wall_BC_indices[iWall]
+        # Get indices
+        current_ghostCellIDs = wall_ghostCellIDs[iWall]
+        current_internalCellIDs = wall_internalCellIDs[iWall]
         
-        current_ghostCellIDs = wall_ghostCellIDs[iWall]  # ghost cell IDs for this boundary
-        current_internalCellIDs = wall_internalCellIDs[iWall]  # internal cell IDs for this boundary
-        
-        # Vectorized updates for all faces in current wall boundary
-        h_ghost[current_ghostCellIDs] .= h[current_internalCellIDs]  # update depth
-        q_x_ghost[current_ghostCellIDs] .= -q_x[current_internalCellIDs]  # negate and update x-discharge
-        q_y_ghost[current_ghostCellIDs] .= -q_y[current_internalCellIDs]  # negate and update y-discharge
+        # Create updates (without in-place mutation)
+        h_ghost = h_ghost + sparse_update(my_mesh_2D, current_ghostCellIDs, h[current_internalCellIDs])
+        q_x_ghost = q_x_ghost + sparse_update(my_mesh_2D, current_ghostCellIDs, -q_x[current_internalCellIDs])
+        q_y_ghost = q_y_ghost + sparse_update(my_mesh_2D, current_ghostCellIDs, -q_y[current_internalCellIDs])
     end
     
-    # Stack the updated ghost cell values and return
-    new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values
-    return new_Q_ghostCells
-    
+    # Return new array
+    return hcat(h_ghost, q_x_ghost, q_y_ghost)
+end
+
+# Helper function to create sparse updates
+function sparse_update(indices, values)
+    map(1:my_mesh_2D.numOfAllBounaryFaces) do i
+        if i ∈ indices
+            values[findfirst(==(i), indices)]
+        else
+            zero(eltype(values))
+        end
+    end
 end
 
 #process symmetry boundaries: called every time step to update the boundary condition
-function process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
+function process_symmetry_boundaries!(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
     symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, Q_cells, Q_ghostCells)
 
     h = @view Q_cells[:,1]
     q_x = @view Q_cells[:,2]
     q_y = @view Q_cells[:,3]
 
-    h_ghost = Q_ghostCells[:,1]
+    h_ghost = Q_ghostCells[:,1]    #matrix slice will create a copy: h_ghost
     q_x_ghost = Q_ghostCells[:,2]
     q_y_ghost = Q_ghostCells[:,3]
     
@@ -508,6 +533,10 @@ function process_symmetry_boundaries(nSymm_BCs, symm_BC_indices, symm_faceIDs, s
         q_x_ghost[current_ghostCellIDs] .= q_x[current_internalCellIDs] .- 2.0 .* v_dot_n .* face_normals[:, 1]
         q_y_ghost[current_ghostCellIDs] .= q_y[current_internalCellIDs] .- 2.0 .* v_dot_n .* face_normals[:, 2]
     end
+    
+    #println("process_symmetry_boundaries")
+    #println("Q_ghost value = ", ForwardDiff.value.(Q_ghostCells))
+    #println("Q_ghost partials = ", ForwardDiff.partials.(Q_ghostCells))
     
     # Stack the updated ghost cell values and return
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)  # combine updated ghost cell values

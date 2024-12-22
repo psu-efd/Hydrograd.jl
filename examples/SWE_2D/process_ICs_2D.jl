@@ -14,9 +14,9 @@ function setup_initial_condition!(my_mesh_2D, eta, zb_cell, h, q_x, q_y, bPlot::
     #loop over cells
     @inbounds for i in 1:my_mesh_2D.numOfCells
         if my_mesh_2D.cell_centroids[i,1] < bump_center_x
-            eta[i] = 1.0 #0.5     #0.33   #1.0 for simple.srhhydro
+            eta[i] = 0.5     #0.33   #1.0 for simple.srhhydro
         else
-            eta[i] = 1.0 #0.5 #0.33    #0.5
+            eta[i] = 0.33    #0.5   #1.0 for simple.srhhydro
         end
     end
     

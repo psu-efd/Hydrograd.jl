@@ -48,7 +48,8 @@ export compute_mesh_properties
 
 export export_to_vtk_2D
 export swe_2D_calc_total_water_volume
-export swe_2D_save_results
+export swe_2D_save_results_SciML
+export swe_2D_save_results_custom
 
 export SRH2D
 

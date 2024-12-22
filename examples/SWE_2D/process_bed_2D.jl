@@ -88,12 +88,9 @@ function interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells)
      # Interpolate zb from cell to face
      zb_faces = cells_to_faces_scalar(my_mesh_2D, zb_cells)
      
-     # Compute bed slope at cell centers
-     S0 = compute_scalar_gradients(my_mesh_2D, zb_cells)
-     
-     # Bed slope is the negative of zb gradient
-     S0 .= -1.0 .* S0
-     
+     # Compute bed slope at cell centers (Bed slope is the negative of zb gradient)
+     S0 = -1.0 * compute_scalar_gradients(my_mesh_2D, zb_cells)
+          
      return zb_ghostCells, zb_faces, S0
     
 end
