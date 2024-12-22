@@ -10,6 +10,7 @@ include("util/swe_1D_tools.jl")
 
 #swe_2D
 include("constants/swe_2D_constants.jl")
+include("boundary_conditions/bc_2D.jl")
 include("solver/swe_2D_solvers.jl")
 include("mesh/mesh_2D.jl")
 include("mesh/mesh_SRHGEOM.jl")
@@ -36,9 +37,14 @@ export swe_1D_make_animation
 
 #swe_2D
 export swe_2D_consts
+
 export mesh_2D
 export initialize_mesh_2D
+
 export Riemann_2D_Roe
+
+export BoundaryConditions2D
+export initialize_boundary_conditions_2D
 
 export read_srhgeom
 export check_cell_nodes_counter_clockwise_srhgeom

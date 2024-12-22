@@ -88,12 +88,7 @@ update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
 #  setup bed elevation 
-#zb_faces = zeros(Float64, my_mesh_2D.numOfFaces)      #zb at faces 
-#zb_cells = zeros(Float64, my_mesh_2D.numOfCells)      #zb at cell centers 
-#zb_ghostCells = zeros(Float64, my_mesh_2D.numOfAllBounaryFaces)   #zb at ghost cell centers 
-#S0 = zeros(Float64, my_mesh_2D.numOfCells, 2)          #bed slope at cell centers 
-
-#If performing inversion, set the bed elevation to zero
+#If performing inversion, set the bed elevation to zero to start with
 if bPerform_Inversion
     my_mesh_2D.nodeCoordinates[:,3] .= 0.0
 end
@@ -126,95 +121,10 @@ setup_initial_condition!(my_mesh_2D, eta, zb_cells, h, q_x, q_y, true)
 #setup ghost cells for initial condition
 setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
-#preprocess boundary conditions 
-inletQ_BC_indices = Int[]   #indices of inlet-Q boundaries in the boundary list
-exitH_BC_indices = Int[]    #indices of exit-H boundaries in the boundary list
-wall_BC_indices = Int[]     #indices of wall boundaries in the boundary list
-symm_BC_indices = Int[]     #indices of symmetry (no slip) boundaries in the boundary list
-
-#compute the indices of each boundary in the global boundary list (nWall_BCs and nSymm_BCs are updated in this function)
-compute_boundary_indices!(my_mesh_2D, srh_all_Dict, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices)
-
-nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]   #number of inlet-Q boundaries
-nExitH_BCs = srh_all_Dict["nExitH_BCs"]     #number of exit-H boundaries
-nWall_BCs = srh_all_Dict["nWall_BCs"]       #number of wall boundaries
-nSymm_BCs = srh_all_Dict["nSymm_BCs"]       #number of symmetry boundaries
-
-#some data arrays for inlet-q bounaries:
-inletQ_faceIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #face IDs of the inlet-q boundaries
-inletQ_ghostCellIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #ghost cell IDs of the inlet-q boundaries
-inletQ_internalCellIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #internal cell IDs of the inlet-q boundaries
-
-inletQ_faceCentroids = Vector{Matrix{Float64}}(undef, nInletQ_BCs)   #face centroids of the inlet-q boundaries
-inletQ_faceOutwardNormals = Vector{Matrix{Float64}}(undef, nInletQ_BCs)   #face outward normals of the inlet-q boundaries
-
-inletQ_TotalQ = zeros(Float64, nInletQ_BCs)   #total discharge for each inlet-q boundary
-inletQ_H = Array{Array{Float64}}(undef, nInletQ_BCs)   #inlet water depth for each face in each inlet-q boundary
-inletQ_A = Array{Array{Float64}}(undef, nInletQ_BCs)   #area for each face in each inlet-q boundary
-inletQ_ManningN = Array{Array{Float64}}(undef, nInletQ_BCs)   #Manning's n for each face in each inlet-q boundary
-inletQ_Length = Array{Array{Float64}}(undef, nInletQ_BCs)   #length for each face in each inlet-q boundary
-inletQ_TotalA = zeros(Float64, nInletQ_BCs)   #total cross-sectional area for each inlet-q boundary
-inletQ_DryWet = Array{Array{Int}}(undef, nInletQ_BCs)   #dry(=0)/wet(=1) flag for each inlet-q boundary
-
-#preprocess inlet-q boundaries
-preprocess_inlet_q_boundaries(my_mesh_2D, nInletQ_BCs, srh_all_Dict["srhhydro_IQParams"], inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-    inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, 
-    inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet)
-
-#some data arrays for exit-h bounaries:
-exitH_faceIDs = Array{Array{Int}}(undef, nExitH_BCs)   #face IDs of the exit-h boundaries
-exitH_ghostCellIDs = Array{Array{Int}}(undef, nExitH_BCs)   #ghost cell IDs of the exit-h boundaries
-exitH_internalCellIDs = Array{Array{Int}}(undef, nExitH_BCs)   #internal cell IDs of the exit-h boundaries
-
-exitH_faceCentroids = Vector{Matrix{Float64}}(undef, nExitH_BCs)   #face centroids of the exit-h boundaries
-exitH_faceOutwardNormals = Vector{Matrix{Float64}}(undef, nExitH_BCs)   #face outward normals of the exit-h boundaries
-
-exitH_WSE = Array{Float64}(undef, nExitH_BCs)   #WSE for each exit-h boundary
-
-exitH_H = Array{Array{Float64}}(undef, nExitH_BCs)   #inlet water depth for each exit-h boundary
-exitH_A = Array{Array{Float64}}(undef, nExitH_BCs)   #inlet cross-sectional area for each exit-h boundary
-
-#preprocess exit-h boundaries
-preprocess_exit_h_boundaries(my_mesh_2D, nExitH_BCs, srh_all_Dict["srhhydro_EWSParamsC"], exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-    exitH_internalCellIDs, exitH_faceCentroids, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A)
-
-#some data arrays for wall bounaries:
-wall_faceIDs = Array{Array{Int}}(undef, nWall_BCs)   #face IDs of the wall boundaries
-wall_ghostCellIDs = Array{Array{Int}}(undef, nWall_BCs)   #ghost cell IDs of the wall boundaries
-wall_internalCellIDs = Array{Array{Int}}(undef, nWall_BCs)   #internal cell IDs of the wall boundaries
-
-wall_faceCentroids = Vector{Matrix{Float64}}(undef, nWall_BCs)   #face centroids of the wall boundaries
-wall_outwardNormals = Vector{Matrix{Float64}}(undef, nWall_BCs)   #face outward normals of the wall boundaries
-
-wall_H = Array{Array{Float64}}(undef, nWall_BCs)   #water depth for each wall boundary
-wall_A = Array{Array{Float64}}(undef, nWall_BCs)   #cross-sectional area for each wall boundary
-
-#index array for each wall boundary: if the index is in the wall boundary, the value is 1.0, otherwise 0.0
-#wall_idx = Array{Array{Float64}}(undef, nWall_BCs)   
-
-#preprocess wall boundaries
-preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
-    wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A)
-
-#some data arrays for symmetry boundaries:
-symm_faceIDs = Array{Array{Int}}(undef, nSymm_BCs)
-symm_ghostCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
-symm_internalCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
-
-symm_faceCentroids = Vector{Matrix{Float64}}(undef, nSymm_BCs)
-symm_outwardNormals = Vector{Matrix{Float64}}(undef, nSymm_BCs)
-
-symm_H = Array{Array{Float64}}(undef, nSymm_BCs)
-symm_A = Array{Array{Float64}}(undef, nSymm_BCs)
-
-#preprocess symmetry boundaries
-preprocess_symmetry_boundaries(my_mesh_2D, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
-    symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A)
-
-#println("inletQ_faceIDs: ", inletQ_faceIDs)
-#println("exitH_faceIDs: ", exitH_faceIDs)
-#println("wall_faceIDs: ", wall_faceIDs)
-#println("symm_faceIDs: ", symm_faceIDs)
+#create and preprocess boundary conditions 
+boundary_conditions = initialize_boundary_conditions_2D(srh_all_Dict)
+println("boundary_conditions = ", boundary_conditions)
+throw(ErrorException("stop here"))
 
 #set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
 para = zb_cells
@@ -238,17 +148,7 @@ println("t_save = ", t_save)
 # Define the ODE function with explicit types
 function swe_2d_ode(Q, para, t)
     dQdt = swe_2d_rhs(Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-            swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-            nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
-            inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
-            inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-            inletQ_TotalA, inletQ_DryWet,  
-            nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, 
-            exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-            nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, 
-            wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-            nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
-            symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)    
+            swe_2D_constants, ManningN_cells, ManningN_ghostCells, boundary_conditions)    
 
     return dQdt
 end
