@@ -10,7 +10,7 @@ using ForwardDiff
 using Zygote
 
 # In this case, we will invert para = [zb_cells].
-function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+function swe_2d_rhs(Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
     swe_2d_constants, ManningN_cells, ManningN_ghostCells,
     nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
     inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
@@ -23,9 +23,9 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
     symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals
     )
 
-    Zygote.ignore() do  
-        println("within swe_2D_rhs, t =", t)
-    end
+    #Zygote.ignore() do  
+    #    println("within swe_2D_rhs, t =", t)
+    #end
 
      # Mesh data
      numOfCells = my_mesh_2D.numOfCells
@@ -52,38 +52,42 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
      #println("zb_ghostCells = ", zb_ghostCells.values)
      #println("S0 = ", S0)
  
-     # Process boundaries: update ghost cells
+     # Process boundaries: update ghost cells values
      # Each boundary treatment function works on different part of Q_ghost. So it is not necessary to create Q_ghost in each of the 
      # boundary treatment function. We can create Q_ghost once and pass it to each of the boundary treatment functions.
-     Q_ghost = zeros(eltype(para), my_mesh_2D.numOfAllBounaryFaces, 3)
+     #Q_ghost = zeros(eltype(para), my_mesh_2D.numOfAllBounaryFaces, 3)
 
      #or write a function to update Q_ghost for all boundaries at once to reduce memory usage
+     Q_ghost = process_all_boundaries(Q, my_mesh_2D, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices,
+        inletQ_faceIDs, exitH_faceIDs, wall_faceIDs, symm_faceIDs, inletQ_ghostCellIDs, exitH_ghostCellIDs, wall_ghostCellIDs, symm_ghostCellIDs,
+        inletQ_internalCellIDs, exitH_internalCellIDs, wall_internalCellIDs, symm_internalCellIDs, inletQ_faceCentroids, exitH_faceCentroids, wall_faceCentroids, symm_faceCentroids,
+        inletQ_faceOutwardNormals, exitH_faceOutwardNormals, wall_outwardNormals, symm_outwardNormals, inletQ_TotalQ, exitH_WSE, wall_H, symm_H,
+        inletQ_A, exitH_A, wall_A, symm_A, ManningN_cells, swe_2d_constants)
 
-     if nInletQ_BCs > 0
-        Q_ghost = process_inlet_q_boundaries!(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs,
-                                          inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals,
-                                          inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
-                                          inletQ_TotalA, inletQ_DryWet, Q, Q_ghost, ManningN_cells, swe_2d_constants)
-     
-     end    
+    #  if nInletQ_BCs > 0
+    #     Q_ghost = process_inlet_q_boundaries!(nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs,
+    #                                       inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals,
+    #                                       inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length,
+    #                                       inletQ_TotalA, inletQ_DryWet, Q, Q_ghost, ManningN_cells, swe_2d_constants)
+    #  end    
 
-     if nExitH_BCs > 0
-        Q_ghost = process_exit_h_boundaries!(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs,
-                                         exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
-                                         Q, Q_ghost, swe_2d_constants)
-     end
+    #  if nExitH_BCs > 0
+    #     Q_ghost = process_exit_h_boundaries!(nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs,
+    #                                      exitH_internalCellIDs, exitH_faceCentroids, exitH_WSE,
+    #                                      Q, Q_ghost, swe_2d_constants)
+    #  end
 
-     if nWall_BCs > 0
-        Q_ghost = process_wall_boundaries!(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
-                                          wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
-                                          Q, Q_ghost)
-     end
+    #  if nWall_BCs > 0
+    #     Q_ghost = process_wall_boundaries!(nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
+    #                                       wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
+    #                                       Q, Q_ghost)
+    #  end
 
-     if nSymm_BCs > 0
-        Q_ghost = process_symmetry_boundaries!(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
-                                          symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals,
-                                          Q, Q_ghost)
-     end
+    #  if nSymm_BCs > 0
+    #     Q_ghost = process_symmetry_boundaries!(nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs,
+    #                                       symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals,
+    #                                       Q, Q_ghost)
+    #  end
      
      #println("within swe_2D_rhs!")
      #println("Q_cells value = ", ForwardDiff.value.(Q))
@@ -97,7 +101,7 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
      #dQdt = zeros(eltype(Q), size(Q))
  
      # Loop through all cells to calculate the fluxes on faces
-     updates = map(1:numOfCells) do iCell
+     updates = map(1:numOfCells) do iCell           # .= is in-place mutation!
          cell_area = cell_areas[iCell]
  
          # Initialize flux accumulation
@@ -186,8 +190,10 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
          (-flux_sum .+ source_terms) ./ cell_area
      end
 
-     # Create final dQdt array
-     dQdt = reduce(vcat, updates)
+     #convert updates to a 2D array: vcat organizes vectors as rows
+     # Stacks vectors vertically, treating each vector as a row of the resulting matrix.
+     # The transpose (') ensures the vectors are treated as rows when concatenated.
+     dQdt = vcat(updates'...)
 
      #println("dQdt value = ", ForwardDiff.value.(dQdt))
      #println("dQdt partials = ", ForwardDiff.partials.(dQdt))
@@ -195,5 +201,5 @@ function swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCe
      #println("dQ/dpara = ", ForwardDiff.partials(Q))
      #throw("stop here")
  
-     #return dQdt
+     return dQdt
 end

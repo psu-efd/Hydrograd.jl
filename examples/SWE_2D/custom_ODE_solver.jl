@@ -4,10 +4,11 @@
 # Finite Volume Update
 function my_update_cells(Q, para, t)
 
-    dQdt = zeros(eltype(para), my_mesh_2D.numOfCells, 3)
+    #dQdt = zeros(eltype(para), my_mesh_2D.numOfCells, 3)
     
     # compute dQdt 
-    swe_2d_ode!(dQdt, Q, para, t)
+    #swe_2d_ode!(dQdt, Q, para, t)
+    dQdt = swe_2d_ode(Q, para, t)
     
      # Vectorized update of Q
     Q_new = Q + dt * dQdt

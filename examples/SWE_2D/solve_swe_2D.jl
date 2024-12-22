@@ -58,9 +58,9 @@ include("custom_ODE_solver.jl")
 println("Solving 2D SWE...")
 
 #define control variables
-bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
+bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
 bPlot_Simulation_Results = false   #whether to plot simulation results
-bPerform_Inversion = true           #whether to do inversion 
+bPerform_Inversion = false           #whether to do inversion 
 bPlot_Inversion_Results = false     #whehter to plot the inversion results
 
 #options for inversion 
@@ -189,6 +189,9 @@ wall_outwardNormals = Vector{Matrix{Float64}}(undef, nWall_BCs)   #face outward 
 wall_H = Array{Array{Float64}}(undef, nWall_BCs)   #water depth for each wall boundary
 wall_A = Array{Array{Float64}}(undef, nWall_BCs)   #cross-sectional area for each wall boundary
 
+#index array for each wall boundary: if the index is in the wall boundary, the value is 1.0, otherwise 0.0
+#wall_idx = Array{Array{Float64}}(undef, nWall_BCs)   
+
 #preprocess wall boundaries
 preprocess_wall_boundaries(my_mesh_2D, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs,
     wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A)
@@ -224,17 +227,17 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 0.01)    #100.0
-dt = 0.01
+tspan = (0.0, 1.0)    #100.0
+dt = 0.1
 t = tspan[1]:dt:tspan[2]
 
-dt_save = (tspan[2] - tspan[1])/1.0
+dt_save = (tspan[2] - tspan[1])/10.0
 t_save = tspan[1]:dt_save:tspan[2]
 println("t_save = ", t_save)
 
 # Define the ODE function with explicit types
-function swe_2d_ode!(dQdt, Q, para, t)
-    swe_2D_rhs!(dQdt, Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
+function swe_2d_ode(Q, para, t)
+    dQdt = swe_2d_rhs(Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
             swe_2D_constants, ManningN_cells, ManningN_ghostCells,
             nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, 
             inletQ_internalCellIDs, inletQ_faceCentroids, inletQ_faceOutwardNormals, inletQ_TotalQ, 
@@ -246,18 +249,20 @@ function swe_2d_ode!(dQdt, Q, para, t)
             wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals,
             nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, 
             symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals)    
+
+    return dQdt
 end
 
 # Create the ODEFunction with the typed function
-ode_f = ODEFunction(swe_2d_ode!;
+ode_f = ODEFunction(swe_2d_ode;
     jac_prototype=nothing)
 
 prob = ODEProblem(ode_f, Q0, tspan, para)
 
 if bSimulate_Synthetic_Data
 
-    #solver_choice = "SciML"
-    solver_choice = "MyOwn"
+    solver_choice = "SciML"
+    #solver_choice = "MyOwn"
 
     println("   Performing 2D SWE simulation ...")
 
@@ -349,11 +354,11 @@ if bPerform_Inversion
     
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
         #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
 
         #solve the ODE with my own solver
-        sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
+        #sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
 
         #if !SciMLBase.successful_retcode(sol)
         #    # Return a high cost instead of NaN

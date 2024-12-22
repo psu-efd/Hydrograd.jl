@@ -18,6 +18,8 @@ include("util/swe_2D_tools.jl")
 
 include("mesh/SRH_2D_Data.jl")
 
+include("util/misc_tools.jl")
+
 export greet_your_package_name
 
 #swe_1D
@@ -53,5 +55,5 @@ export swe_2D_save_results_custom
 
 export SRH2D
 
-
+export update_1d_array
 end
