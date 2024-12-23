@@ -1,37 +1,15 @@
-mutable struct BoundaryConditions
-    nInletQ::Int
-    inletQ_BC_indices::Vector{Int}
-    inletQ_faceCentroids::Vector{Matrix{Float64}}
+using Zygote
 
-    ## Inner constructor with keyword arguments
-    function BoundaryConditions(;
-        nInletQ::Int=0,
-        inletQ_BC_indices::Vector{Int}=Int[],
-        inletQ_faceCentroids::Vector{Matrix{Float64}}=Matrix{Float64}[]
-    )
-        return new(nInletQ, inletQ_BC_indices, inletQ_faceCentroids)
-    end
+list_of_vectors = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]  # List of vectors
 
-end
+# Create a matrix from the list of vectors
+matrix = [list_of_vectors[i][j] for i in 1:length(list_of_vectors), j in 1:length(list_of_vectors[1])]
 
-function create_boundary_conditions(srh_all_Dict)
-    # Example fields
-    nInletQ = srh_all_Dict["nInletQ_BCs"]
-    inletQ_BC_indices = Int[]  # Initialize empty vector
-    inletQ_faceCentroids = Vector{Matrix{Float64}}(undef, nInletQ)  # Pre-allocate
+display(matrix)
 
-    #create an empty BoundaryConditions object
-    boundary_conditions = BoundaryConditions()
+# Test with Zygote gradient
+grad = Zygote.gradient(x -> sum([x[i][j] for i in 1:length(x), j in 1:length(x[1])]), list_of_vectors)
 
-    #modify the BoundaryConditions object
-    boundary_conditions.nInletQ = nInletQ
-    boundary_conditions.inletQ_BC_indices = inletQ_BC_indices
-    boundary_conditions.inletQ_faceCentroids = inletQ_faceCentroids
+println(grad)
 
-    return boundary_conditions
-end
 
-srh_all_Dict = Dict("nInletQ_BCs" => 3)
-boundary_conditions = create_boundary_conditions(srh_all_Dict)
-
-println(boundary_conditions)

@@ -28,6 +28,7 @@ using OptimizationOptimisers
 using Zygote
 using ForwardDiff
 using ReverseDiff
+using Enzyme
 
 #for Bayesian estimation
 #using Turing
@@ -58,9 +59,9 @@ include("custom_ODE_solver.jl")
 println("Solving 2D SWE...")
 
 #define control variables
-bSimulate_Synthetic_Data = true    #whether to do the 1D SWE simulation to create synthetic data 
+bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
 bPlot_Simulation_Results = false   #whether to plot simulation results
-bPerform_Inversion = false           #whether to do inversion 
+bPerform_Inversion = true           #whether to do inversion 
 bPlot_Inversion_Results = false     #whehter to plot the inversion results
 
 #options for inversion 
@@ -123,8 +124,8 @@ setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCell
 
 #create and preprocess boundary conditions 
 boundary_conditions = initialize_boundary_conditions_2D(srh_all_Dict)
-println("boundary_conditions = ", boundary_conditions)
-throw(ErrorException("stop here"))
+#println("boundary_conditions = ", boundary_conditions)
+#throw(ErrorException("stop here"))
 
 #set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
 para = zb_cells
@@ -147,8 +148,7 @@ println("t_save = ", t_save)
 
 # Define the ODE function with explicit types
 function swe_2d_ode(Q, para, t)
-    dQdt = swe_2d_rhs(Q, Q_ghost, para, t, my_mesh_2D, zb_cells, zb_ghostCells, zb_faces, S0,
-            swe_2D_constants, ManningN_cells, ManningN_ghostCells, boundary_conditions)    
+    dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells)    
 
     return dQdt
 end
@@ -158,6 +158,23 @@ ode_f = ODEFunction(swe_2d_ode;
     jac_prototype=nothing)
 
 prob = ODEProblem(ode_f, Q0, tspan, para)
+
+#use Enzyme to test the gradient of the ODE and identify the source of the error
+#See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
+SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+p = prob.p
+y = prob.u0
+f = prob.f
+λ = zero(prob.u0)
+_dy, back = Zygote.pullback(y, p) do u, p
+    vec(f(u, p, t))
+end
+tmp1, tmp2 = back(λ)
+
+@show tmp1
+@show tmp2
+
+throw("stop here")
 
 if bSimulate_Synthetic_Data
 
@@ -251,6 +268,7 @@ if bPerform_Inversion
     #inversion parameters: zb_cell
     # initial guess for the parameters
     ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
+    #ps = zeros(Float64, my_mesh_2D.numOfCells) 
     
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
@@ -320,7 +338,7 @@ if bPerform_Inversion
     # Add this before gradient computation
     #@code_warntype(my_loss(ps))
 
-    #SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
     #grad = ForwardDiff.gradient(my_loss, ps)
     grad = Zygote.gradient(my_loss, ps)[1]
     #tape = ReverseDiff.GradientTape(my_loss, ps)
