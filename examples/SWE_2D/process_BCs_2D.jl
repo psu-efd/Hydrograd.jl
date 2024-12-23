@@ -7,7 +7,7 @@ using Zygote
 
 #process all boundaries in just one function call to update Q_ghostCells: called every time step to update the boundary condition
 #return a new Q_ghostCells
-function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, swe_2D_constants)
+function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
     h = copy(Q_cells[:, 1])         
     q_x = copy(Q_cells[:, 2])
@@ -23,8 +23,9 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
         current_boundaryFaceIDs = boundary_conditions.inletQ_faceIDs[iInletQ]
         current_ghostCellIDs = boundary_conditions.inletQ_ghostCellIDs[iInletQ]
         current_internalCellIDs = boundary_conditions.inletQ_internalCellIDs[iInletQ]
-        current_inletQ_Length = boundary_conditions.inletQ_Length[iInletQ]
-        current_inletQ_TotalQ = boundary_conditions.inletQ_TotalQ[iInletQ]
+
+        current_inletQ_Length = inletQ_Length[iInletQ]
+        current_inletQ_TotalQ = inletQ_TotalQ[iInletQ]
 
         # Create new arrays for this boundary's updates
         h_new = zeros(eltype(Q_cells), length(current_ghostCellIDs))
@@ -73,11 +74,11 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
         #     end
         # end
 
-        Zygote.ignore() do  
-            println(typeof(h))
-            println(typeof(current_internalCellIDs))
-            println(typeof(current_internalCellIDs[1]))
-        end
+        #Zygote.ignore() do  
+        #    println(typeof(h))
+        #    println(typeof(current_internalCellIDs))
+        #    println(typeof(current_internalCellIDs[1]))
+        #end
 
         #h_new = [h[internalCellID] for internalCellID in current_internalCellIDs]
         h_new = map(internalCellID -> h[internalCellID], current_internalCellIDs)
@@ -136,7 +137,7 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
 
         # Calculate new h_ghost values
         h_new = convert.(eltype(Q_cells), max.(swe_2D_constants.h_small,
-            boundary_conditions.exitH_WSE[iExitH] .- current_faceCentroids[:, 3]))
+            exitH_WSE[iExitH] .- current_faceCentroids[:, 3]))
 
         # Update arrays using update_1d_array
         h_ghost = update_1d_array(h_ghost, current_ghostCellIDs, h_new)

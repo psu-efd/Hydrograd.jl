@@ -85,17 +85,24 @@ srh_all_Dict = process_SRH_2D_input(srhhydro_file_name)
 #update swe_2D_constants based on the SRH-2D data
 update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
 
-#get the 2D mesh 
+#create the 2D mesh 
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
+
+#mesh related variables which might be mutable (not in struct mesh_2D)
+#nodeCoordinates::Array{Float64,2}  # Node coordinates: Float64 2D array [numOfNodes, 3]
+nodeCoordinates = srh_all_Dict["srhgeom_obj"].nodeCoordinates
+
+#cellBedElevation::Vector{Float64}  # Element bed elevation: Float64 1D array [numOfCells]
+cellBedElevation = srh_all_Dict["srhgeom_obj"].elementBedElevation
 
 #  setup bed elevation 
 #If performing inversion, set the bed elevation to zero to start with
 if bPerform_Inversion
-    my_mesh_2D.nodeCoordinates[:,3] .= 0.0
+    nodeCoordinates[:,3] .= 0.0
 end
 
 #setup bed elevation: computer zb at cell centers from nodes, then interpolate zb from cell to face and compute the bed slope at cells
-zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, true)
+zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, nodeCoordinates, true)
 
 #make a copy of the bathymetry truth: zb_cell_truth
 zb_cells_truth = deepcopy(zb_cells)
@@ -117,13 +124,13 @@ q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghos
 total_water_volume = []   #total volume of water in the domain 
 
 #setup initial condition for eta, h, q_x, q_y
-setup_initial_condition!(my_mesh_2D, eta, zb_cells, h, q_x, q_y, true)
+setup_initial_condition!(my_mesh_2D, nodeCoordinates, eta, zb_cells, h, q_x, q_y, true)
 
 #setup ghost cells for initial condition
 setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
-#create and preprocess boundary conditions 
-boundary_conditions = initialize_boundary_conditions_2D(srh_all_Dict)
+#create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
+boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet, exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
 #println("boundary_conditions = ", boundary_conditions)
 #throw(ErrorException("stop here"))
 
@@ -148,7 +155,7 @@ println("t_save = ", t_save)
 
 # Define the ODE function with explicit types
 function swe_2d_ode(Q, para, t)
-    dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells)    
+    dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)    
 
     return dQdt
 end
@@ -161,20 +168,20 @@ prob = ODEProblem(ode_f, Q0, tspan, para)
 
 #use Enzyme to test the gradient of the ODE and identify the source of the error
 #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
-SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-p = prob.p
-y = prob.u0
-f = prob.f
-λ = zero(prob.u0)
-_dy, back = Zygote.pullback(y, p) do u, p
-    vec(f(u, p, t))
-end
-tmp1, tmp2 = back(λ)
+# SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+# p = prob.p
+# y = prob.u0
+# f = prob.f
+# λ = zero(prob.u0)
+# _dy, back = Zygote.pullback(y, p) do u, p
+#     vec(f(u, p, t))
+# end
+# tmp1, tmp2 = back(λ)
 
-@show tmp1
-@show tmp2
+# @show tmp1
+# @show tmp2
 
-throw("stop here")
+# throw("stop here")
 
 if bSimulate_Synthetic_Data
 
@@ -212,7 +219,7 @@ if bSimulate_Synthetic_Data
         # #save the simulation solution results
         jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
 
-        swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+        swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, nodeCoordinates, zb_cells, save_path)
     end
 
     #My own ODE Solver
@@ -265,6 +272,8 @@ if bPerform_Inversion
     v_truth = Array(sol)[:,3,end]./Array(sol)[:,1,end]
     #@show sol
 
+    WSE_truth = h_truth .+ zb_cells_truth
+
     #inversion parameters: zb_cell
     # initial guess for the parameters
     ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
@@ -272,7 +281,8 @@ if bPerform_Inversion
     
     function predict(θ)
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
         #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
 
         #solve the ODE with my own solver
@@ -294,7 +304,8 @@ if bPerform_Inversion
         #end
 
         sol = Array(predict(θ))            #Forward prediction with current θ (=zb at cells)
-        l = sol[:,1,end] .- 0.5  #loss = free surface elevation mismatch
+        #l = sol[:,1,end] .- 0.5  #loss = free surface elevation mismatch
+        l = sol[:,1,end] .- h_truth
         loss = sum(abs2, l)
 
         #Zygote.ignore() do
@@ -335,12 +346,23 @@ if bPerform_Inversion
     #loss_value = my_loss(ps)
     #println("loss_value = ", loss_value)
 
+    #function test_ode_gradient(θ)
+    #    sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
+    #    h_pred = Array(sol)[:,1,end]
+    #    return sum(abs2, h_pred)
+    #end
+    
+    #grads = Zygote.gradient(test_ode_gradient, ps)
+    #println(grads)
+
+    #throw("stop here")
+
     # Add this before gradient computation
     #@code_warntype(my_loss(ps))
 
     SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
     #grad = ForwardDiff.gradient(my_loss, ps)
-    grad = Zygote.gradient(my_loss, ps)[1]
+    #grad = Zygote.gradient(my_loss, ps)
     #tape = ReverseDiff.GradientTape(my_loss, ps)
     #ReverseDiff.compile!(tape)  # Optionally compile the tape for better performance
     #grad = zeros(length(ps))  # Preallocate gradient array
@@ -348,21 +370,24 @@ if bPerform_Inversion
 
     #jac = Zygote.jacobian(predict, ps)
     #jac = ReverseDiff.jacobian(predict, ps)
-    @show grad
+    #@show grad
     #plot(jac)
     #readline()
     #exit()
-    throw("stop here")
+    #throw("stop here")
 
     ## Defining Loss function
     #zb_cell_local = zeros(Number, mesh.nCells)
 
     function loss(θ)
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        l = pred[:,1,end] - 0.5 #h_truth  #loss = free surface elevation mismatch
+        #l = pred[:,1,end] - 0.5 #h_truth  #loss = free surface elevation mismatch
+        
+        l = pred[:,1,end] .+ zb_cells_truth .- WSE_truth  #loss = free surface elevation mismatch
+
         loss_pred_eta = sum(abs2, l)
 
-        # loss_pred_uv = zero(eltype(θ))
+        loss_pred_uv = zero(eltype(θ))
 
         #  # Add small epsilon to prevent division by zero
         # ϵ = sqrt(eps(eltype(θ)))
@@ -374,33 +399,33 @@ if bPerform_Inversion
         #     loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
         # end 
 
-        # loss_pred = loss_pred_eta + loss_pred_uv
+        loss_pred = loss_pred_eta + loss_pred_uv
 
-        # loss_slope = zero(eltype(θ))
+        loss_slope = zero(eltype(θ))
 
         # if bInversion_slope_loss    #if bed slope is included in the loss 
         #     loss_slope = calc_slope_loss(θ, my_mesh_2D)
         # end 
 
-        # loss_total = loss_pred + loss_slope
+        loss_total = loss_pred + loss_slope
 
-        # #return loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred
+        return loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred
         # return loss_total
 
-        Zygote.ignore() do
-            println("loss_pred_eta = ", loss_pred_eta)
-        end
+        #Zygote.ignore() do
+        #    println("loss_pred_eta = ", loss_pred_eta)
+        #end
 
-        return loss_pred_eta
+        #return loss_pred_eta
     end
 
-    grad = Zygote.gradient(loss, ps)
+    #grad = Zygote.gradient(loss, ps)
     #grad = ForwardDiff.gradient(loss, ps)
     #grad = ForwardDiff.gradient(predict, θ)
-    @show grad
+    #@show grad
     #println("grad = ", grad)
     #readline()
-    throw("stop here")
+    #throw("stop here")
 
 
     LOSS = []                              # Loss accumulator
@@ -450,7 +475,23 @@ if bPerform_Inversion
     #adtype = Optimization.AutoReverseDiff()
     #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
 
-    optf = Optimization.OptimizationFunction((θ, p) -> loss(θ), adtype)
+    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_function/
+    # OptimizationFunction{iip}(f, adtype::AbstractADType = NoAD();
+    #                       grad = nothing, hess = nothing, hv = nothing,
+    #                       cons = nothing, cons_j = nothing, cons_jvp = nothing,
+    #                       cons_vjp = nothing, cons_h = nothing,
+    #                       hess_prototype = nothing,
+    #                       cons_jac_prototype = nothing,
+    #                       cons_hess_prototype = nothing,
+    #                       observed = __has_observed(f) ? f.observed : DEFAULT_OBSERVED_NO_TIME,
+    #                       lag_h = nothing,
+    #                       hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+    #                       cons_jac_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+    #                       cons_hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+    #                       lag_hess_colorvec = nothing,
+    #                       sys = __has_sys(f) ? f.sys : nothing)
+
+    optf = Optimization.OptimizationFunction((θ, p) -> loss(θ), adtype)   #\theta is the parameter to be optimized; p is not used.
 
     #setup the bounds for the bathymetry
     lb_p = zeros(my_mesh_2D.numOfCells)
@@ -459,9 +500,28 @@ if bPerform_Inversion
     ub_p = zeros(my_mesh_2D.numOfCells)
     ub_p .= 0.3 
 
+    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_problem/
+    #OptimizationProblem{iip}(f, u0, p = SciMLBase.NullParameters(),;
+    #                          lb = nothing,
+    #                          ub = nothing,
+    #                          lcons = nothing,
+    #                          ucons = nothing,
+    #                          sense = nothing,
+    #                          kwargs...)
+
     #optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
     optprob = Optimization.OptimizationProblem(optf, ps)
 
+    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
+    #Returned optimization solution Fields:
+    # u: the representation of the optimization's solution.
+    # cache::AbstractOptimizationCache: the optimization cache` that was solved.
+    # alg: the algorithm type used by the solver.
+    # objective: Objective value of the solution
+    # retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether it exited due to an error. For more details, see the return code documentation.
+    # original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
+    # stats: statistics of the solver, such as the number of function evaluations required.
+    
     #res = Optimization.solve(optprob, PolyOpt(), callback = callback)  #PolyOpt does not support lb and ub 
     #res = Optimization.solve(optprob, NLopt.LD_LBFGS(), callback = callback)   #very fast 
     #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback; iterations=30, maxiters=40, f_calls_limit=20, show_trace=true)
@@ -469,10 +529,10 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
+    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=10)
     
-    @show res
-    @show res.original
+    #@show res
+    
 
     #save the inversion results
     #@show PARS 

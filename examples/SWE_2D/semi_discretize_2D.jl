@@ -10,7 +10,7 @@ using ForwardDiff
 using Zygote
 
 # In this case, we will invert para = [zb_cells].
-function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells)
+function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
     #Zygote.ignore() do  
     #    println("within swe_2D_rhs, t =", t)
@@ -37,7 +37,7 @@ function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constant
     #println("S0 = ", S0)
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
-    Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, swe_2D_constants)
+    Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
     # Loop through all cells to calculate the fluxes on faces
     updates = map(1:my_mesh_2D.numOfCells) do iCell           # .= is in-place mutation!

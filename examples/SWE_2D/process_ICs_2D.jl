@@ -2,10 +2,10 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(my_mesh_2D, eta, zb_cell, h, q_x, q_y, bPlot::Bool=false)
+function setup_initial_condition!(my_mesh_2D, nodeCoordinates, eta, zb_cell, h, q_x, q_y, bPlot::Bool=false)
     # parameters for initial free surface profile setup
     
-    xMid = (minimum(my_mesh_2D.nodeCoordinates[:,1])+maximum(my_mesh_2D.nodeCoordinates[:,1])) / 2.0   #mid point of the domain
+    xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0   #mid point of the domain
     
     bump_center_x = xMid  # center of the bump
     
@@ -47,7 +47,7 @@ function setup_initial_condition!(my_mesh_2D, eta, zb_cell, h, q_x, q_y, bPlot::
         scalar_names = ["eta", "h", "zb_cell"]
         
         file_path = joinpath(@__DIR__, "eta_h_zb.vtk" ) 
-        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
+        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
         println("eta, h, and zb are saved to ", file_path)
         #exit(0)

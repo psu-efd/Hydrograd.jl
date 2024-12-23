@@ -1,149 +1,69 @@
-#2D mesh struct: only non-mutable variables such as node coordinates
-mutable struct mesh_2D
-    numOfCells::Int64     # Number of cells
-    numOfFaces::Int64     # Number of faces 
-    numOfNodes::Int64     # Number of nodes
+#2D mesh struct: only non-mutable variables 
+Base.@kwdef struct mesh_2D
+    numOfCells::Int64 = 0     # Number of cells
+    numOfFaces::Int64 = 0     # Number of faces 
+    numOfNodes::Int64 = 0     # Number of nodes
 
-    maxNumOfCellFaces::Int64  # Maximum number of faces for each cell
+    maxNumOfCellFaces::Int64 = 0  # Maximum number of faces for each cell
     
-    numOfNodeStrings::Int64  # Number of node strings (number of boundaries; it does not include the default boundary)
+    numOfNodeStrings::Int64 = 0  # Number of node strings (number of boundaries; it does not include the default boundary)
     
-    numOfBoundaries::Int64  # Number of boundaries including the default wall if any.
+    numOfBoundaries::Int64 = 0  # Number of boundaries including the default wall if any.
 
-    numOfTotalCells::Int64  # Total number of cells (including ghost cells)
+    numOfTotalCells::Int64 = 0  # Total number of cells (including ghost cells)
     
-    cellNodesList::Array{Int64,2}  # List of cell's nodes  (2D Int array: [cellID, gMax_Nodes_per_Cell])
-    cellNodesCount::Vector{Int64}  # Count of cell's nodes: how many nodes for each cell (1D Int array: [numOfCells])
+    cellNodesList::Array{Int64,2} = zeros(Int64, 0, 0)  # List of cell's nodes  (2D Int array: [cellID, gMax_Nodes_per_Cell])
+    cellNodesCount::Vector{Int64} = zeros(Int64, 0)      # Count of cell's nodes: how many nodes for each cell (1D Int array: [numOfCells])
     
-    cellFacesList::Array{Int64,2}  # List of cell's faces  (2D Int array: [cellID, gMax_Nodes_per_Cell]). The numbers of nodes and faces are the same for each cell.
+    cellFacesList::Array{Int64,2} = zeros(Int64, 0, 0)  # List of cell's faces  (2D Int array: [cellID, gMax_Nodes_per_Cell]). The numbers of nodes and faces are the same for each cell.
     
-    nodeCoordinates::Array{Float64,2}  # Node coordinates: Float64 2D array [numOfNodes, 3]
+    #nodeCoordinates::Array{Float64,2}  # Node coordinates: Float64 2D array [numOfNodes, 3]
     
-    twoDMeshBoundingbox::Array{Float64,1}  # 2D mesh bounding box: array [xmin, ymin, zmin, xmax, ymax, zmax]
+    twoDMeshBoundingbox::Array{Float64,1} = zeros(Float64, 6)  # 2D mesh bounding box: array [xmin, ymin, zmin, xmax, ymax, zmax]
     
-    cellBedElevation::Vector{Float64}  # Element bed elevation: Float64 1D array [numOfCells]
+    #cellBedElevation::Vector{Float64}  # Element bed elevation: Float64 1D array [numOfCells]
     
-    nodeStringsDict::Dict{Int64, Vector{Int64}}  #Dictionary of node strings: key: node string ID, value: node string nodes
+    nodeStringsDict::Dict{Int64, Vector{Int64}} = Dict{Int64, Vector{Int64}}()  #Dictionary of node strings: key: node string ID, value: node string nodes
     
-    nodeCellsList::Vector{Vector{Int64}}  # List of node's cells: list of list. Each list contains the cells for each node.
+    nodeCellsList::Vector{Vector{Int64}} = Vector{Vector{Int64}}()  # List of node's cells: list of list. Each list contains the cells for each node.
     
-    nodeCellsCount::Vector{Int64}  # Count of node's cells: how many cells for each node. 1D Int array: [numOfNodes]
+    nodeCellsCount::Vector{Int64} = zeros(Int64, 0)  # Count of node's cells: how many cells for each node. 1D Int array: [numOfNodes]
     
-    faceNodes_Dict::Dict{Tuple{Int, Int}, Int}  #faceNodes_Dict: key: (node1, node2), value: face ID
+    faceNodes_Dict::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int, Int}, Int}()  #faceNodes_Dict: key: (node1, node2), value: face ID
     
-    faceNodes_r_Dict::Dict{Int, Tuple{Int, Int}}  #faceNodes_r_Dict (reverse of faceNodes_Dict): key: face ID, value: (node1, node2)
+    faceNodes_r_Dict::Dict{Int, Tuple{Int, Int}} = Dict{Int, Tuple{Int, Int}}()  #faceNodes_r_Dict (reverse of faceNodes_Dict): key: face ID, value: (node1, node2)
     
-    faceCells_Dict::Dict{Int, Vector{Int}}  #faceCells_Dict: key: face ID, value: cell ID list 
+    faceCells_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}()  #faceCells_Dict: key: face ID, value: cell ID list 
 
-    faceLeftCellID_Dict::Dict{Int, Int}  #faceLeftCellID_Dict: key: face ID, value: left cell ID
+    faceLeftCellID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #faceLeftCellID_Dict: key: face ID, value: left cell ID
 
-    faceRightCellID_Dict::Dict{Int, Int}  #faceRightCellID_Dict: key: face ID, value: right cell ID
+    faceRightCellID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #faceRightCellID_Dict: key: face ID, value: right cell ID
 
-    faceBoundaryID_Dict::Dict{Int, Int}  #faceBoundaryID_Dict: key: face ID, value: boundary ID
+    faceBoundaryID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #faceBoundaryID_Dict: key: face ID, value: boundary ID
     
-    boundaryFaces_Dict::Dict{Int, Vector{Int}}  #Dictionary for the List of boundary faces: dictionary: {boundaryID: [list of face IDs]}. It also has the default boundary (default: wall)
+    boundaryFaces_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}()  #Dictionary for the List of boundary faces: dictionary: {boundaryID: [list of face IDs]}. It also has the default boundary (default: wall)
     
-    allBoundaryFacesIDs_List::Vector{Int}  # List of all boundary faces IDs: all lumped to one list
+    allBoundaryFacesIDs_List::Vector{Int} = zeros(Int64, 0)  # List of all boundary faces IDs: all lumped to one list
     
-    numOfAllBounaryFaces::Int64  # Number of all boundary faces
+    numOfAllBounaryFaces::Int64 = 0  # Number of all boundary faces
     
-    boundaryFaces_direction_Dict::Dict{Int, Vector{Int}}  #Dictionary for the direction of boundary faces: {boundaryFaceID: direction}. direction = 1: normal is pointing outward; direction = -1: normal is pointing inward
+    boundaryFaces_direction_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}()  #Dictionary for the direction of boundary faces: {boundaryFaceID: direction}. direction = 1: normal is pointing outward; direction = -1: normal is pointing inward
     
-    ghostCellIDs::Vector{Int}  #ghost cell IDs: ghost cells have their own IDs starting from 1
+    ghostCellIDs::Vector{Int} = zeros(Int64, 0)  #ghost cell IDs: ghost cells have their own IDs starting from 1
     
-    boundaryFaceID_to_ghostCellID_Dict::Dict{Int, Int}  #boundary face ID to ghost cell ID: key: boundary face ID, value: ghost cell ID
+    boundaryFaceID_to_ghostCellID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #boundary face ID to ghost cell ID: key: boundary face ID, value: ghost cell ID
     
-    boundaryFaceID_to_internalCellID_Dict::Dict{Int, Int}  #boundary face ID to internal cell ID: key: boundary face ID, value: internal cell ID
+    boundaryFaceID_to_internalCellID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #boundary face ID to internal cell ID: key: boundary face ID, value: internal cell ID
     
-    ghostCellID_to_boundaryFaceID_Dict::Dict{Int, Int}  #ghost cell ID to boundary face ID: key: ghost cell ID, value: boundary face ID
+    ghostCellID_to_boundaryFaceID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #ghost cell ID to boundary face ID: key: ghost cell ID, value: boundary face ID
     
-    cellNeighbors_Dict::Dict{Int, Vector{Int}}  #cell's neighbors: key: cell ID, value: list of neighbor cell IDs
+    cellNeighbors_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}()  #cell's neighbors: key: cell ID, value: list of neighbor cell IDs
 
-    cell_areas::Vector{Float64}  #cell areas
-    cell_centroids::Array{Float64, 2}  #cell centroids
-    cell_normals::Vector{Vector{Vector{Float64}}}  #cell normals
-    face_normals::Vector{Vector{Float64}}  #face normals
-    face_lengths::Vector{Float64}  #face lengths
-    
-    
-    # Inner constructor with keyword arguments
-    function mesh_2D(; 
-        numOfCells::Int64=0,
-        numOfFaces::Int64=0,
-        numOfNodes::Int64=0,
-        maxNumOfCellFaces::Int64=0,
-        numOfNodeStrings::Int64=0,
-        numOfBoundaries::Int64=0,
-        numOfTotalCells::Int64=0,
-        cellNodesList::Array{Int64, 2} = Array{Int64}(undef, 0, 0),  # Default to an empty 2D array
-        cellNodesCount::Vector{Int64} = Int64[],  # Default to an empty 1D array
-        cellFacesList::Array{Int64, 2} = Array{Int64}(undef, 0, 0),  # Default to an empty 2D array
-        nodeCoordinates::Array{Float64, 2} = Array{Float64, 2}(undef, 0, 0),  # Default to an uninitialized 3D array with no elements
-        twoDMeshBoundingbox::Array{Float64, 1} = Float64[],  # Default to an empty 1D array
-        cellBedElevation::Vector{Float64} = Float64[],  # Default to an empty 1D array
-        nodeStringsDict::Dict{Int64, Vector{Int64}} = Dict{Int64, Vector{Int64}}(),  # Default to an empty dictionary
-        nodeCellsList::Vector{Vector{Int64}} = Vector{Vector{Int64}}(),  # Default to an empty list of lists
-        nodeCellsCount::Vector{Int64} = Int64[],  # Default to an empty 1D array
-        faceNodes_Dict::Dict{Tuple{Int, Int}, Int} = Dict{Tuple{Int64, Int64}, Int64}(),  # Default to an empty dictionary
-        faceNodes_r_Dict::Dict{Int, Tuple{Int, Int}} = Dict{Int, Tuple{Int, Int}}(),  # Default to an empty dictionary
-        faceCells_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),  # Default to an empty dictionary
-        faceLeftCellID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        faceRightCellID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        faceBoundaryID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        boundaryFaces_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),  # Default to an empty dictionary
-        allBoundaryFacesIDs_List::Vector{Int} = Int64[],  # Default to an empty 1D array
-        numOfAllBounaryFaces::Int64 = 0,  # Default to 0
-        boundaryFaces_direction_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),  # Default to an empty dictionary
-        ghostCellIDs::Vector{Int} = Int64[],  # Default to an empty 1D array
-        boundaryFaceID_to_ghostCellID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        boundaryFaceID_to_internalCellID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        ghostCellID_to_boundaryFaceID_Dict::Dict{Int, Int} = Dict{Int, Int}(),  # Default to an empty dictionary
-        cellNeighbors_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}(),  # Default to an empty dictionary
-        cell_areas::Vector{Float64} = Float64[],  # Default to an empty 1D array
-        cell_centroids::Array{Float64, 2} = Array{Float64, 2}(undef, 0, 0),  # Default to an uninitialized 2D array with no elements
-        cell_normals::Vector{Vector{Vector{Float64}}} = Vector{Vector{Vector{Float64}}}(undef, 0),  # Default to an uninitialized 1D array with no elements
-        face_normals::Vector{Vector{Float64}} = Vector{Vector{Float64}}(undef, 0),  # Default to an uninitialized 1D array with no elements
-        face_lengths::Vector{Float64} = Vector{Float64}(undef, 0)  # Default to an uninitialized 1D array with no elements
-        )
-        
-        return new(numOfCells,
-                numOfFaces,
-                numOfNodes,
-                maxNumOfCellFaces,
-                numOfNodeStrings,
-                numOfBoundaries,
-                numOfTotalCells,
-                cellNodesList,
-                cellNodesCount,
-                cellFacesList,
-                nodeCoordinates,
-                twoDMeshBoundingbox,
-                cellBedElevation,
-                nodeStringsDict,
-                nodeCellsList,
-                nodeCellsCount,
-                faceNodes_Dict,
-                faceNodes_r_Dict,
-                faceCells_Dict,
-                faceLeftCellID_Dict,
-                faceRightCellID_Dict,
-                faceBoundaryID_Dict,
-                boundaryFaces_Dict,
-                allBoundaryFacesIDs_List,
-                numOfAllBounaryFaces,
-                boundaryFaces_direction_Dict,
-                ghostCellIDs,
-                boundaryFaceID_to_ghostCellID_Dict,
-                boundaryFaceID_to_internalCellID_Dict,
-                ghostCellID_to_boundaryFaceID_Dict,
-                cellNeighbors_Dict,
-                cell_areas,
-                cell_centroids,
-                cell_normals,
-                face_normals,
-                face_lengths
-        )
-    end
+    cell_areas::Vector{Float64} = zeros(Float64, 0)  #cell areas
+    cell_centroids::Array{Float64, 2} = zeros(Float64, 0, 0)  #cell centroids
+    cell_normals::Vector{Vector{Vector{Float64}}} = Vector{Vector{Vector{Float64}}}()  #cell normals
+    face_normals::Vector{Vector{Float64}} = Vector{Vector{Float64}}()  #face normals
+    face_lengths::Vector{Float64} = zeros(Float64, 0)  #face lengths
     
 end
 
@@ -454,45 +374,44 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     #println("faceBoundaryID_Dict: ", faceBoundaryID_Dict)
 
     #create an empty mesh_2D object
-    my_mesh_2D = mesh_2D()
-
-    #modify the mesh_2D object
-    my_mesh_2D.numOfCells = numOfCells
-    my_mesh_2D.numOfFaces = numOfFaces
-    my_mesh_2D.numOfNodes = numOfNodes
-    my_mesh_2D.maxNumOfCellFaces = maxNumOfCellFaces
-    my_mesh_2D.numOfNodeStrings = numOfNodeStrings
-    my_mesh_2D.numOfBoundaries = numOfBoundaries
-    my_mesh_2D.numOfTotalCells = numOfTotalCells
-    my_mesh_2D.cellNodesList = cellNodesList
-    my_mesh_2D.cellNodesCount = cellNodesCount
-    my_mesh_2D.cellFacesList = cellFacesList
-    my_mesh_2D.nodeCoordinates = nodeCoordinates
-    my_mesh_2D.twoDMeshBoundingbox = twoDMeshBoundingbox
-    my_mesh_2D.cellBedElevation = cellBedElevation
-    my_mesh_2D.nodeStringsDict = nodeStringsDict
-    my_mesh_2D.nodeCellsList = nodeCellsList
-    my_mesh_2D.nodeCellsCount = nodeCellsCount
-    my_mesh_2D.faceNodes_Dict = faceNodes_Dict
-    my_mesh_2D.faceNodes_r_Dict = faceNodes_r_Dict
-    my_mesh_2D.faceCells_Dict = faceCells_Dict
-    my_mesh_2D.faceLeftCellID_Dict = faceLeftCellID_Dict
-    my_mesh_2D.faceRightCellID_Dict = faceRightCellID_Dict
-    my_mesh_2D.faceBoundaryID_Dict = faceBoundaryID_Dict
-    my_mesh_2D.boundaryFaces_Dict = boundaryFaces_Dict
-    my_mesh_2D.allBoundaryFacesIDs_List = allBoundaryFacesIDs_List
-    my_mesh_2D.numOfAllBounaryFaces = numOfAllBounaryFaces
-    my_mesh_2D.boundaryFaces_direction_Dict = boundaryFaces_direction_Dict
-    my_mesh_2D.ghostCellIDs = ghostCellIDs
-    my_mesh_2D.boundaryFaceID_to_ghostCellID_Dict = boundaryFaceID_to_ghostCellID_Dict
-    my_mesh_2D.boundaryFaceID_to_internalCellID_Dict = boundaryFaceID_to_internalCellID_Dict
-    my_mesh_2D.ghostCellID_to_boundaryFaceID_Dict = ghostCellID_to_boundaryFaceID_Dict
-    my_mesh_2D.cellNeighbors_Dict = cellNeighbors_Dict
-    my_mesh_2D.cell_areas = cell_areas
-    my_mesh_2D.cell_centroids = cell_centroids
-    my_mesh_2D.cell_normals = cell_normals
-    my_mesh_2D.face_normals = face_normals
-    my_mesh_2D.face_lengths = face_lengths
+    my_mesh_2D = mesh_2D(
+        numOfCells = numOfCells,
+        numOfFaces = numOfFaces,
+        numOfNodes = numOfNodes,
+        maxNumOfCellFaces = maxNumOfCellFaces,
+        numOfNodeStrings = numOfNodeStrings,
+        numOfBoundaries = numOfBoundaries,
+        numOfTotalCells = numOfTotalCells,
+        cellNodesList = cellNodesList,
+        cellNodesCount = cellNodesCount,
+        cellFacesList = cellFacesList,
+        #nodeCoordinates = nodeCoordinates,
+        twoDMeshBoundingbox = twoDMeshBoundingbox,
+        #cellBedElevation = cellBedElevation,
+        nodeStringsDict = nodeStringsDict,
+        nodeCellsList = nodeCellsList,
+        nodeCellsCount = nodeCellsCount,
+        faceNodes_Dict = faceNodes_Dict,
+        faceNodes_r_Dict = faceNodes_r_Dict,
+        faceCells_Dict = faceCells_Dict,
+        faceLeftCellID_Dict = faceLeftCellID_Dict,
+        faceRightCellID_Dict = faceRightCellID_Dict,
+        faceBoundaryID_Dict = faceBoundaryID_Dict,
+        boundaryFaces_Dict = boundaryFaces_Dict,
+        allBoundaryFacesIDs_List = allBoundaryFacesIDs_List,
+        numOfAllBounaryFaces = numOfAllBounaryFaces,
+        boundaryFaces_direction_Dict = boundaryFaces_direction_Dict,
+        ghostCellIDs = ghostCellIDs,
+        boundaryFaceID_to_ghostCellID_Dict = boundaryFaceID_to_ghostCellID_Dict,
+        boundaryFaceID_to_internalCellID_Dict = boundaryFaceID_to_internalCellID_Dict,
+        ghostCellID_to_boundaryFaceID_Dict = ghostCellID_to_boundaryFaceID_Dict,
+        cellNeighbors_Dict = cellNeighbors_Dict,
+        cell_areas = cell_areas,
+        cell_centroids = cell_centroids,
+        cell_normals = cell_normals,
+        face_normals = face_normals,
+        face_lengths = face_lengths
+    )
         
     return my_mesh_2D
 end
