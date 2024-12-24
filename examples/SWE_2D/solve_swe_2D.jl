@@ -56,13 +56,14 @@ include("process_ICs_2D.jl")
 include("semi_discretize_2D.jl")
 include("misc_utilities_2D.jl")
 include("custom_ODE_solver.jl")
+include("process_inversion_results_2D.jl")
+
 println("Solving 2D SWE...")
 
 #define control variables
 bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
-bPlot_Simulation_Results = false   #whether to plot simulation results
 bPerform_Inversion = true           #whether to do inversion 
-bPlot_Inversion_Results = false     #whehter to plot the inversion results
+bPlot_Inversion_Results = true     #whehter to plot the inversion results
 
 #options for inversion 
 bInversion_slope_loss = false   #whether to include slope loss 
@@ -145,11 +146,11 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 #dt = swe_2D_constants.dt
 #t = tspan[1]:dt:tspan[2]
 
-tspan = (0.0, 1.0)    #100.0
+tspan = (0.0, 100.0)    #100.0
 dt = 0.1
 t = tspan[1]:dt:tspan[2]
 
-dt_save = (tspan[2] - tspan[1])/10.0
+dt_save = (tspan[2] - tspan[1])/100.0
 t_save = tspan[1]:dt_save:tspan[2]
 println("t_save = ", t_save)
 
@@ -218,6 +219,7 @@ if bSimulate_Synthetic_Data
         # #save the results
         # #save the simulation solution results
         jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+        jldsave(joinpath(save_path, "zb_cells_truth.jld2"); zb_cells_truth)
 
         swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, nodeCoordinates, zb_cells, save_path)
     end
@@ -242,20 +244,6 @@ if bSimulate_Synthetic_Data
 
 end
 
-if bPlot_Simulation_Results
-
-    println("   Plotting 2D SWE simulation results ...")
-
-    #open the simulation result
-    sol = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
-
-    #plot the results at tEnd
-    #swe_1D_make_plots(save_path)
-
-    #make an animation of the simulation as a function of time 
-    #swe_1D_make_animation(sol, mesh, zb_cell, save_path)
-end
-
 
 ################
 #Inversion part# 
@@ -272,18 +260,39 @@ if bPerform_Inversion
     v_truth = Array(sol)[:,3,end]./Array(sol)[:,1,end]
     #@show sol
 
+    zb_cells_truth = load(joinpath(save_path, "zb_cells_truth.jld2"))["zb_cells_truth"]
+
     WSE_truth = h_truth .+ zb_cells_truth
 
     #inversion parameters: zb_cell
     # initial guess for the parameters
-    ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
-    #ps = zeros(Float64, my_mesh_2D.numOfCells) 
+    #ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
+    ps = zeros(Float64, my_mesh_2D.numOfCells) 
     
     function predict(θ)
+        Zygote.ignore() do
+            println("Current parameters: ", ForwardDiff.value.(θ))
+        end
+
+        #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
+        #If not specified, the default is a smart polyalgorithm is used to automatically determine the most appropriate method for a given equation.
+        #Some options are:
+        # 1. BacksolveAdjoint(autojacvec=ZygoteVJP())
+        # 2. InterpolatingAdjoint(autojacvec=ZygoteVJP())
+        # 3. ReverseDiffAdjoint(autojacvec=ZygoteVJP())
+        # 4. TrackerAdjoint(autojacvec=ZygoteVJP())
+        # 5. ZygoteVJP()
+        # 6. TrackerVJP()
+        # 7. ReverseDiffVJP()
+        # 8. InterpolatingVJP()
+        # 9. BacksolveVJP()
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
         #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
-        sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
         #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+
+        #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #only works for short time span
+        #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=ForwardDiffSensitivity())   #runs, but very slow
+        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
 
         #solve the ODE with my own solver
         #sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
@@ -383,7 +392,8 @@ if bPerform_Inversion
         pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
         #l = pred[:,1,end] - 0.5 #h_truth  #loss = free surface elevation mismatch
         
-        l = pred[:,1,end] .+ zb_cells_truth .- WSE_truth  #loss = free surface elevation mismatch
+        #\theta is the current bed elevation at cells
+        l = pred[:,1,end] .+ θ .- WSE_truth  #loss = free surface elevation mismatch
 
         loss_pred_eta = sum(abs2, l)
 
@@ -529,16 +539,36 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=10)
+    res = Optimization.solve(optprob, Adam(0.001), callback=callback, maxiters=10)
     
     #@show res
     
 
     #save the inversion results
     #@show PARS 
-    jldsave(joinpath(save_path, "inversion_results.jld2"); LOSS, PRED, PARS, sol)
+    jldsave(joinpath(save_path, "inversion_results.jld2"); LOSS, PRED, PARS)
 
 end
+
+if bPlot_Inversion_Results
+
+    println("   Processing inversion results ...")
+
+    #open the simulation result (as the ground truth)
+    sol_truth = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
+    h_truth = Array(sol_truth)[:,1,end]
+    u_truth = Array(sol_truth)[:,2,end]./Array(sol_truth)[:,1,end]
+    v_truth = Array(sol_truth)[:,3,end]./Array(sol_truth)[:,1,end]
+
+    zb_cells_truth = load(joinpath(save_path, "zb_cells_truth.jld2"))["zb_cells_truth"]
+
+    WSE_truth = h_truth .+ zb_cells_truth
+
+    #process inversion results
+    inversion_results_file_name = joinpath(save_path, "inversion_results.jld2")
+    process_inversion_results(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+end 
+
 
 #Timing 
 end_time = now()  # Current date and time

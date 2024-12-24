@@ -2,6 +2,7 @@ import numpy as np
 import meshio
 import vtk
 from vtk.util import numpy_support as VN
+import h5py
 
 import matplotlib.pyplot as plt
 
