@@ -8,9 +8,13 @@ using IterTools
 
 using PyCall
 
+using Profile
+
 using AdHydraulics
 
 using OrdinaryDiffEq
+
+using SparseArrays
 
 #SciML
 using SciMLSensitivity
@@ -90,11 +94,8 @@ update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
 #mesh related variables which might be mutable (not in struct mesh_2D)
-#nodeCoordinates::Array{Float64,2}  # Node coordinates: Float64 2D array [numOfNodes, 3]
+#nodeCoordinates::Array{Float64,3}  # Node coordinates: Float64 2D array [numOfNodes, 3]
 nodeCoordinates = srh_all_Dict["srhgeom_obj"].nodeCoordinates
-
-#cellBedElevation::Vector{Float64}  # Element bed elevation: Float64 1D array [numOfCells]
-cellBedElevation = srh_all_Dict["srhgeom_obj"].elementBedElevation
 
 #  setup bed elevation 
 #If performing inversion, set the bed elevation to zero to start with
@@ -102,11 +103,17 @@ if bPerform_Inversion
     nodeCoordinates[:,3] .= 0.0
 end
 
-#setup bed elevation: computer zb at cell centers from nodes, then interpolate zb from cell to face and compute the bed slope at cells
+#setup bed elevation: computer zb at cell centers (zb_cells) from nodes, 
+#then interpolate zb from cell to face (zb_faces) and ghost cells (zb_ghostCells),
+#and compute the bed slope at cells (S0)
 zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, nodeCoordinates, true)
 
-#make a copy of the bathymetry truth: zb_cell_truth
-zb_cells_truth = deepcopy(zb_cells)
+zb_cells_truth = zeros(size(zb_cells))
+
+#If simulating synthetic data, make a copy of the bathymetry truth: zb_cell_truth
+if bSimulate_Synthetic_Data
+    zb_cells_truth = deepcopy(zb_cells)
+end
 
 #setup Manning's n 
 ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
@@ -131,7 +138,8 @@ setup_initial_condition!(my_mesh_2D, nodeCoordinates, eta, zb_cells, h, q_x, q_y
 setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
 #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
-boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet, exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
+boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet, 
+exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
 #println("boundary_conditions = ", boundary_conditions)
 #throw(ErrorException("stop here"))
 
@@ -154,6 +162,36 @@ dt_save = (tspan[2] - tspan[1])/100.0
 t_save = tspan[1]:dt_save:tspan[2]
 println("t_save = ", t_save)
 
+# Populate the Jacobian sparsity pattern
+# Assume each variable depends on itself and its neighbors
+# we have 3 variables (h, q_x, q_y) for each cell
+jac_sparsity = spzeros(3*my_mesh_2D.numOfCells, 3*my_mesh_2D.numOfCells)
+
+println("my_mesh_2D.cellNeighbors_Dict = ", my_mesh_2D.cellNeighbors_Dict)
+
+for cellID in 1:my_mesh_2D.numOfCells
+    # Self-dependence (diagonal entries)
+    jac_sparsity[3*(cellID-1)+1, 3*(cellID-1)+1] = 1.0  # h -> h
+    jac_sparsity[3*(cellID-1)+2, 3*(cellID-1)+2] = 1.0  # hu -> hu
+    jac_sparsity[3*(cellID-1)+3, 3*(cellID-1)+3] = 1.0  # hv -> hv
+    
+    # Neighbor-dependence
+    for neighbor in my_mesh_2D.cellNeighbors_Dict[cellID]
+
+        #only need interior neighbors
+        if neighbor > 0
+            jac_sparsity[3*(cellID-1)+1, 3*(neighbor-1)+1] = 1.0  # h -> h (neighbor)
+            jac_sparsity[3*(cellID-1)+2, 3*(neighbor-1)+2] = 1.0  # hu -> hu (neighbor)
+            jac_sparsity[3*(cellID-1)+3, 3*(neighbor-1)+3] = 1.0  # hv -> hv (neighbor)
+        end
+    end
+end
+
+#println("jac_sparsity = ", jac_sparsity)
+#println("size of jac_sparsity = ", size(jac_sparsity))
+#println("nnz of jac_sparsity = ", nnz(jac_sparsity))
+#throw("stop here")
+
 # Define the ODE function with explicit types
 function swe_2d_ode(Q, para, t)
     dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)    
@@ -162,8 +200,8 @@ function swe_2d_ode(Q, para, t)
 end
 
 # Create the ODEFunction with the typed function
-ode_f = ODEFunction(swe_2d_ode;
-    jac_prototype=nothing)
+#ode_f = ODEFunction(swe_2d_ode; jac_prototype=nothing)
+ode_f = ODEFunction(swe_2d_ode; jac_prototype=jac_sparsity)
 
 prob = ODEProblem(ode_f, Q0, tspan, para)
 
@@ -270,9 +308,9 @@ if bPerform_Inversion
     ps = zeros(Float64, my_mesh_2D.numOfCells) 
     
     function predict(θ)
-        Zygote.ignore() do
-            println("Current parameters: ", ForwardDiff.value.(θ))
-        end
+        #Zygote.ignore() do
+        #    println("Current parameters: ", ForwardDiff.value.(θ))
+        #end
 
         #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
         #If not specified, the default is a smart polyalgorithm is used to automatically determine the most appropriate method for a given equation.
@@ -287,12 +325,13 @@ if bPerform_Inversion
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]  #not working for long time span
         #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
 
         #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #only works for short time span
         #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=ForwardDiffSensitivity())   #runs, but very slow
-        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
+        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=GaussAdjoint(autojacvec=ZygoteVJP()))
 
         #solve the ODE with my own solver
         #sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
@@ -539,7 +578,11 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Adam(0.001), callback=callback, maxiters=10)
+    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
+    #@time res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
+    #@profile res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
+    #Profile.print()
+
     
     #@show res
     
