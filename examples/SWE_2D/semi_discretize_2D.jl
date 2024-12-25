@@ -9,7 +9,7 @@
 using ForwardDiff
 using Zygote
 
-# In this case, we will invert para = [zb_cells].
+
 function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
     #Zygote.ignore() do  

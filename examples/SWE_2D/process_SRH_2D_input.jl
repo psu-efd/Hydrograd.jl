@@ -121,7 +121,8 @@ function process_SRH_2D_input(srhhydro_file_name::String)
 
         if !bFound
             println("Cell ", iCell, " is not found in any material zone. Assign it to the default material zone 0.")
-            matID_cells[iCell] = 0
+            matID_cells[iCell] = -1     #-1 means the cell is not in any material zone, i.e., it is in the default material zone
+            push!(srhmat_matZoneCells[-1], iCell)
         end
     end
     

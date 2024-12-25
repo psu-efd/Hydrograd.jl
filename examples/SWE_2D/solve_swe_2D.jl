@@ -115,7 +115,24 @@ if bSimulate_Synthetic_Data
     zb_cells_truth = deepcopy(zb_cells)
 end
 
-#setup Manning's n 
+#define active parameters
+active_param_names = ["zb"]
+
+#define the parameter array
+zb_cells_param = zb_cells
+
+#create the parameter Manning's n list with initial values
+srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
+ManningN_list_param = ones(Float64, srhmat_numOfMaterials) .* 0.03
+
+#create the inlet discharges with initial values
+nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
+inlet_discharges_param = ones(Float64, nInletQ_BCs) .* 1.0
+
+#preprocess: create a ComponentArray for the model parameters for 2D shallow water equations
+params_array, active_params = preprocess_model_parameters_2D(zb_cells_param, ManningN_list_param, inlet_discharges_param, active_param_names)
+
+#Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
 ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
 
 # setup initial conditions 
@@ -143,8 +160,7 @@ exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundar
 #println("boundary_conditions = ", boundary_conditions)
 #throw(ErrorException("stop here"))
 
-#set up ODE parameters. In this problem, the "parameter" is para=zb_cells.
-para = zb_cells
+#set up ODE parameters. 
 Q0 = hcat(h, q_x, q_y)   #initial condition: Q = [h q_x q_y]
 
 Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell values of Q
@@ -192,8 +208,9 @@ end
 #println("nnz of jac_sparsity = ", nnz(jac_sparsity))
 #throw("stop here")
 
-# Define the ODE function with explicit types
+# Define the ODE function 
 function swe_2d_ode(Q, para, t)
+    
     dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)    
 
     return dQdt
@@ -266,7 +283,6 @@ if bSimulate_Synthetic_Data
     if solver_choice == "MyOwn"
 
         println("   Performing 2D SWE simulation with MyOwn solver ...")
-
         
         sol = my_solve(para, Q0, my_mesh_2D, tspan, dt)
 
@@ -313,7 +329,7 @@ if bPerform_Inversion
         #end
 
         #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
-        #If not specified, the default is a smart polyalgorithm is used to automatically determine the most appropriate method for a given equation.
+        #If not specified, the default is a smart polyalgorithm used to automatically determine the most appropriate method for a given equation.
         #Some options are:
         # 1. BacksolveAdjoint(autojacvec=ZygoteVJP())
         # 2. InterpolatingAdjoint(autojacvec=ZygoteVJP())
@@ -325,13 +341,14 @@ if bPerform_Inversion
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
         #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]  #not working for long time span
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]  #works, but takes a long time (10x slower than with sensealg=ForwardDiffSensitivity()). Due to adaptive=false?
+        sol = solve(prob, Tsit5(), adaptive=true, p=θ, dt=dt, saveat=t_save) #adaptive=true is default. This is 10x faster than with adaptive=false.
         #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
 
         #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #only works for short time span
         #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=ForwardDiffSensitivity())   #runs, but very slow
         #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
-        sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=GaussAdjoint(autojacvec=ZygoteVJP()))
+        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=GaussAdjoint(autojacvec=ZygoteVJP()))  #not working
 
         #solve the ODE with my own solver
         #sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
