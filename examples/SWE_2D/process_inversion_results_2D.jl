@@ -19,7 +19,7 @@ plot_font = "sans-serif"
 #         legendfont=font(10, plot_font))  #for legend
 
 
-function  process_inversion_results(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+function  process_inversion_results_2D(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
 
     inversion_results = load(inversion_results_file_name)
     
@@ -58,7 +58,7 @@ function  process_inversion_results(inversion_results_file_name, my_mesh_2D, nod
     for (i, (curPred, curPars)) in enumerate(zip(PRED, PARS))
         h_i = curPred
         
-        zb_i = curPars
+        zb_i = curPars.zb
 
         WSE_i = h_i .+ zb_i
 

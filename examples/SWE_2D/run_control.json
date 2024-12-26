@@ -4,8 +4,8 @@
     "control_variables": {
         "srhhydro_file_name": "oneD_channel_with_bump.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": true,
-        "bPerform_Inversion": false,
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": true,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
@@ -52,8 +52,10 @@
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
-            "ode_solver_b_jac_sparsity": true
-        }
+            "ode_solver_b_jac_sparsity": true,
+            "ode_solver_nSave": 10
+        },
+        "inversion_save_file_name": "inversion_results.jld2"
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. zb_initial_values_options is the option for the zb initial values: zero, from_file.",

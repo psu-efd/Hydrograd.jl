@@ -31,8 +31,8 @@ function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_In
     q_x = @view Q[:, 2]  # discharge in x
     q_y = @view Q[:, 3]  # discharge in y
 
-    # Set parameter values
-    zb_cells_current = params_array.zb_cells_param  # para.clone()
+    # Get parameter values
+    zb_cells_current = params_array.zb_cells_param  
     ManningN_list_current = params_array.ManningN_list_param
     inlet_discharges_current = params_array.inlet_discharges_param
 
@@ -45,15 +45,15 @@ function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_In
     end
 
     #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
-    # we need to update ManningN at ghost cells
+    # we need to update ManningN at cells and ghost cells
     if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "ManningN" in active_params_names
         ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, ManningN_list_current)
     end
 
     #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
-    # we need to update inletQ_TotalQ based on the provided ManningN_cells
+    # we need to update inletQ_TotalQ based on the provided inlet_discharges_current
     if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "Q" in active_params_names
-        inletQ_TotalQ = update_inletQ_TotalQ(inletQ_TotalQ, ManningN_cells)
+        inletQ_TotalQ = update_inletQ_TotalQ(inlet_discharges_current)
     end
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 

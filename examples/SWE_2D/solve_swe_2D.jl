@@ -158,14 +158,16 @@ inversion_forward_simulation_initial_condition_values_from_file = nothing
 inversion_ode_solver = ""
 inversion_ode_solver_adaptive = false
 inversion_ode_solver_b_jac_sparsity = false
+inversion_ode_solver_nSave = 1
+inversion_save_file_name = ""
 
 if bPerform_Inversion
-    active_param_names = control_dict["inversion_options"]["active_param_names"]::Vector{String}
+    active_param_names = String.(control_dict["inversion_options"]["active_param_names"])
     inversion_parameter_initial_values_options = control_dict["inversion_options"]["inversion_parameter_initial_values_options"]::String
     inversion_parameter_initial_values_file_name = control_dict["inversion_options"]["inversion_parameter_initial_values_file_name"]::String
-    inversion_zb_initial_values = control_dict["inversion_options"]["inversion_zb_initial_values"]::Vector{Float64}
-    inversion_ManningN_initial_values = control_dict["inversion_options"]["inversion_ManningN_initial_values"]::Vector{Float64}
-    inversion_inlet_discharge_initial_values = control_dict["inversion_options"]["inversion_inlet_discharge_initial_values"]::Vector{Float64}
+    inversion_zb_initial_values = Float64.(control_dict["inversion_options"]["inversion_zb_initial_values"])
+    inversion_ManningN_initial_values = Float64.(control_dict["inversion_options"]["inversion_ManningN_initial_values"])
+    inversion_inlet_discharge_initial_values = Float64.(control_dict["inversion_options"]["inversion_inlet_discharge_initial_values"])
     inversion_bInversion_slope_loss = control_dict["inversion_options"]["inversion_bInversion_slope_loss"]::Bool
     inversion_bInversion_u_loss = control_dict["inversion_options"]["inversion_bInversion_u_loss"]::Bool
     inversion_lower_bound_zb = control_dict["inversion_options"]["inversion_lower_bound_zb"]::Float64
@@ -177,9 +179,11 @@ if bPerform_Inversion
     inversion_forward_simulation_initial_condition_options = control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_options"]::String
     inversion_forward_simulation_initial_condition_file_name = control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_file_name"]::String
     inversion_forward_simulation_initial_condition_constant_values = Float64.(control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_constant_values"])
-    inversion_ode_solver = control_dict["inversion_options"]["ode_solver_options"]["ode_solver"]::String
-    inversion_ode_solver_adaptive = control_dict["inversion_options"]["ode_solver_options"]["ode_solver_adaptive"]::Bool
-    inversion_ode_solver_b_jac_sparsity = control_dict["inversion_options"]["ode_solver_options"]["ode_solver_b_jac_sparsity"]::Bool
+    inversion_ode_solver = control_dict["inversion_options"]["inversion_ode_solver_options"]["ode_solver"]::String
+    inversion_ode_solver_adaptive = control_dict["inversion_options"]["inversion_ode_solver_options"]["ode_solver_adaptive"]::Bool
+    inversion_ode_solver_b_jac_sparsity = control_dict["inversion_options"]["inversion_ode_solver_options"]["ode_solver_b_jac_sparsity"]::Bool
+    inversion_ode_solver_nSave = control_dict["inversion_options"]["inversion_ode_solver_options"]["ode_solver_nSave"]::Int
+    inversion_save_file_name = control_dict["inversion_options"]["inversion_save_file_name"]::String
 
     if inversion_parameter_initial_values_options == "from_file"
         inversion_parameter_initial_values_from_file = JSON3.read(open(joinpath(save_path, inversion_parameter_initial_values_file_name)), Dict)
@@ -225,19 +229,20 @@ if bVerbose
         if inversion_parameter_initial_values_options == "from_file"
             println("    inversion_parameter_initial_values_from_file = ", inversion_parameter_initial_values_from_file)
         elseif inversion_parameter_initial_values_options == "constant"
-            println("    zb_initial_values = ", zb_initial_values)
-            println("    ManningN_initial_values = ", ManningN_initial_values)
-            println("    inlet_discharge_initial_values = ", inlet_discharge_initial_values)
+            println("    inversion_zb_initial_values = ", inversion_zb_initial_values)
+            println("    inversion_ManningN_initial_values = ", inversion_ManningN_initial_values)
+            println("    inversion_inlet_discharge_initial_values = ", inversion_inlet_discharge_initial_values)
         else
             error("Invalid inversion_parameter_initial_values_options: $inversion_parameter_initial_values_options. Supported options: from_file, constant.")
         end
 
-        println("    slope_loss = ", bInversion_slope_loss)
-        println("    u_loss = ", bInversion_u_loss)
-        println("    zb_bounds = [", lower_bound_zb, ", ", upper_bound_zb, "]")
-        println("    optimizer = ", optimizer)
-        println("    learning_rate = ", learning_rate)
-        println("    max_iterations = ", max_iterations)
+        println("    inversion_bInversion_slope_loss = ", inversion_bInversion_slope_loss)
+        println("    inversion_bInversion_u_loss = ", inversion_bInversion_u_loss)
+        println("    inversion_lower_bound_zb = ", inversion_lower_bound_zb)
+        println("    inversion_upper_bound_zb = ", inversion_upper_bound_zb)
+        println("    optimizer = ", inversion_optimizer)
+        println("    learning_rate = ", inversion_learning_rate)
+        println("    max_iterations = ", inversion_max_iterations)
         println("    inversion_solution_truth_file_name = ", inversion_solution_truth_file_name)
         println("    ode_solver = ", inversion_ode_solver)
         println("    ode_solver_adaptive = ", inversion_ode_solver_adaptive)
@@ -317,13 +322,13 @@ inlet_discharges_param = nothing
 if bPerform_Inversion || bPerform_Sensitivity_Analysis
     if inversion_parameter_initial_values_options == "constant"
         #bed elevation
-        zb_cells_param = zeros(zb_initial_values[1], my_mesh_2D.numOfCells)  #only use the first value of zb_initial_values even it is a vector.
+        zb_cells_param = fill(inversion_zb_initial_values[1], my_mesh_2D.numOfCells)
 
         #Manning's n
-        ManningN_list_param = deepcopy(ManningN_initial_values)   
+        ManningN_list_param = deepcopy(inversion_ManningN_initial_values)   
         
         #inlet discharges
-        inlet_discharges_param = deepcopy(inlet_discharges_initial_values)  
+        inlet_discharges_param = deepcopy(inversion_inlet_discharge_initial_values)  
     elseif inversion_parameter_initial_values_options == "from_file"
         zb_cells_param = inversion_parameter_initial_values_from_file["zb_cells_param"]
         ManningN_list_param = inversion_parameter_initial_values_from_file["ManningN_list_param"]
@@ -448,8 +453,13 @@ if (bPerform_Forward_Simulation && forward_simulation_b_jac_sparsity) ||
     end
 end
 
+#define the ODE function
 ode_f = ODEFunction(swe_2d_ode; jac_prototype=jac_sparsity)
 
+# time information (the same for forward simulation, inversion, and sensitivity analysis)
+tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
+dt = swe_2D_constants.dt
+t = tspan[1]:dt:tspan[2]
 
 #########################
 #Forward Simulation part#
@@ -458,12 +468,7 @@ ode_f = ODEFunction(swe_2d_ode; jac_prototype=jac_sparsity)
 if bPerform_Forward_Simulation
     println("   Performing 2D SWE forward simulation ...")
 
-    # time information 
-    tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
-    dt = swe_2D_constants.dt
-    t = tspan[1]:dt:tspan[2]
-
-    #define the time for saving the results
+    #define the time for saving the results (for forward simulation, which may be different from the time for saving the results in inversion)
     dt_save = (tspan[2] - tspan[1])/forward_simulation_nSave
     t_save = tspan[1]:dt_save:tspan[2]
     println("t_save = ", t_save)
@@ -521,6 +526,11 @@ if bPerform_Inversion
 
     println("   Performing inversion ...")
 
+    #define the time for saving the results (for inversion, which may be different from the time for saving the results in forward simulation)
+    dt_save = (tspan[2] - tspan[1])/inversion_ode_solver_nSave
+    t_save = tspan[1]:dt_save:tspan[2]
+    println("t_save = ", t_save)
+
     #open the forward simulation result (as the ground truth)
     sol_truth = JSON3.read(open(joinpath(save_path, inversion_solution_truth_file_name)), Dict)
 
@@ -532,18 +542,17 @@ if bPerform_Inversion
     ManningN_values_truth = sol_truth["ManningN_values_truth"]
     inlet_discharges_truth = sol_truth["inlet_discharges_truth"]
 
-    #inversion parameters: 
-    # initial guess for the inversion parameters
-   
-    params_array_init = params_array
-    
-    
-    function predict(θ)
-        #Zygote.ignore() do
-        #    println("Current parameters: ", ForwardDiff.value.(θ))
-        #end
+    #combine the truth data into a dictionary
+    observed_data = Dict("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cells_truth" => zb_cells_truth, "ManningN_values_truth" => ManningN_values_truth, "inlet_discharges_truth" => inlet_discharges_truth)
 
-        #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
+    # Define the loss function
+    function compute_loss(p, Q0, tspan, observed_data)
+        # Create ODEProblem
+        #prob = ODEProblem(shallow_water_eq!, u0, tspan, p)
+        prob = ODEProblem(ode_f, Q0, tspan, p)
+        
+        # Solve the ODE (forward pass)
+        #For sensealg argument in ODE solve function: See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
         #If not specified, the default is a smart polyalgorithm used to automatically determine the most appropriate method for a given equation.
         #Some options are:
         # 1. BacksolveAdjoint(autojacvec=ZygoteVJP())
@@ -555,78 +564,157 @@ if bPerform_Inversion
         # 7. ReverseDiffVJP()
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
-        #Array(solve(prob, Heun(), adaptive=false, p=θ, dt=dt, saveat=t))[:,1,end]
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]  #works, but takes a long time (10x slower than with sensealg=ForwardDiffSensitivity()). Due to adaptive=false?
-        sol = solve(prob, Tsit5(), adaptive=true, p=θ, dt=dt, saveat=t_save) #adaptive=true is default. This is 10x faster than with adaptive=false.
-        #sol = solve(prob, Euler(), adaptive=false, p=θ, dt=dt, saveat=t_save)  #[:,1,end]
+        if inversion_ode_solver == "Tsit5()"
+            pred = solve(prob, Tsit5(), adaptive=inversion_ode_solver_adaptive, dt=dt, saveat=t_save)
+        else
+            pred = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
+        end
+        
+        #compute the loss
+        WSE_truth = observed_data["WSE_truth"]
+        h_truth = observed_data["h_truth"]
+        u_truth = observed_data["u_truth"]
+        v_truth = observed_data["v_truth"]
 
-        #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #only works for short time span
-        #sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=ForwardDiffSensitivity())   #runs, but very slow
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
-        #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=GaussAdjoint(autojacvec=ZygoteVJP()))  #not working
+        #p.zb is the current bed elevation at cells
+        l = pred[:,1,end] .+ p.zb .- WSE_truth  #loss = free surface elevation mismatch
 
-        #if !SciMLBase.successful_retcode(sol)
-        #    # Return a high cost instead of NaN
-        #    return fill(convert(eltype(θ), Inf), size(sol[1]))
-        #end
+        #loss for free surface elevation mismatch
+        loss_pred_WSE = sum(abs2, l)
+
+        #loss for velocity mismatch
+        loss_pred_uv = zero(eltype(θ))
+
+        # Add small epsilon to prevent division by zero
+        ϵ = sqrt(eps(eltype(θ)))
+        
+        if inversion_bInversion_u_loss      #if also include u in the loss 
+            l_u = pred[:,2,end]./(pred[:,1,end] .+ ϵ) .- u_truth
+            l_v = pred[:,3,end]./(pred[:,1,end] .+ ϵ) .- v_truth
+
+            loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
+        end 
+
+        #combined loss due to free surface elevation mismatch and velocity mismatch
+        loss_pred = loss_pred_WSE + loss_pred_uv
+
+        #loss for bed slope regularization
+        loss_slope = zero(eltype(θ))
+
+        if inversion_bInversion_slope_loss    #if bed slope is included in the loss 
+            loss_slope = calc_slope_loss(θ, my_mesh_2D)
+        end 
+
+        #combined loss due to free surface elevation mismatch, velocity mismatch, and bed slope regularization
+        loss_total = loss_pred + loss_slope
+       
+        return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
+    end
+
+    function optimize_parameters(Q0, tspan, observed_data, p_init, active_params)
+        # Loss function for optimization
+        function opt_loss(θ, p)  # Add p argument even if unused
+            # Create parameter set from optimization variables
+            new_params = Dict(zip(active_params, θ))
+            p_new = ComponentArray(
+                zb = haskey(new_params, :zb) ? new_params[:zb] : p_init.zb,
+                n = haskey(new_params, :n) ? new_params[:n] : p_init.n,
+                Q = haskey(new_params, :Q) ? new_params[:Q] : p_init.Q
+            )
+            return compute_loss(p_new, Q0, tspan, observed_data)
+        end
+    
+        # Initial values for optimization parameters
+        θ0 = [p_init[param] for param in active_params]
+
+        # Flatten array parameters for optimization (optimizers require a single array for parameters)
+        θ0 = [θ for param in active_params for θ in (param == :Q ? p_init.Q : [p_init[param]])]
+
+
+        # Define AD type choice for optimization's gradient computation
+        #The following is from SciMLSensitivity documentation regarding the choice of AD 
+        #  AutoForwardDiff(): The fastest choice for small optimizations
+        #  AutoReverseDiff(compile=false): A fast choice for large scalar optimizations
+        #  AutoTracker(): Like ReverseDiff but GPU-compatible
+        #  AutoZygote(): The fastest choice for non-mutating array-based (BLAS) functions
+        #  AutoFiniteDiff(): Finite differencing, not optimal but always applicable
+        #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
+        #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
+        adtype = Optimization.AutoZygote()
+    
+        # Define the optimization problem
+        #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_function/
+        # OptimizationFunction{iip}(f, adtype::AbstractADType = NoAD();
+        #                       grad = nothing, hess = nothing, hv = nothing,
+        #                       cons = nothing, cons_j = nothing, cons_jvp = nothing,
+        #                       cons_vjp = nothing, cons_h = nothing,
+        #                       hess_prototype = nothing,
+        #                       cons_jac_prototype = nothing,
+        #                       cons_hess_prototype = nothing,
+        #                       observed = __has_observed(f) ? f.observed : DEFAULT_OBSERVED_NO_TIME,
+        #                       lag_h = nothing,
+        #                       hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+        #                       cons_jac_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+        #                       cons_hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
+        #                       lag_hess_colorvec = nothing,
+        #                       sys = __has_sys(f) ? f.sys : nothing)
+        optf = OptimizationFunction(opt_loss, adtype)
+
+        #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_problem/
+        #OptimizationProblem{iip}(f, u0, p = SciMLBase.NullParameters(),;
+        #                          lb = nothing,
+        #                          ub = nothing,
+        #                          lcons = nothing,
+        #                          ucons = nothing,
+        #                          sense = nothing,
+        #                          kwargs...)
+        optprob = OptimizationProblem(optf, θ0)  # No parameters needed
+
+        # Define the bounds for the parameter (only applicable for some optimizers which support lb and ub)
+        lb_p = zeros(my_mesh_2D.numOfCells)
+        lb_p .= -0.1  
+
+        ub_p = zeros(my_mesh_2D.numOfCells)
+        ub_p .= 0.3 
+    
+        # Solve optimization problem
+        # From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
+        # Returned optimization solution Fields:
+        #   u: the representation of the optimization's solution.
+        #   cache::AbstractOptimizationCache: the optimization cache` that was solved.
+        #   alg: the algorithm type used by the solver.
+        #   objective: Objective value of the solution
+        #   retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether 
+        #            it exited due to an error. For more details, see the return code documentation.
+        #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
+        #   stats: statistics of the solver, such as the number of function evaluations required.
+        if inversion_optimizer == "Adam"
+            sol = solve(optprob, Adam(inversion_learning_rate), callback=callback, maxiters=inversion_max_iterations)
+        elseif inversion_optimizer == "LBFGS"   
+            sol = solve(optprob, LBFGS(), callback=callback, maxiters=inversion_max_iterations)
+        else
+            error("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed.")
+        end
+
+        #timing and profiling tools
+        #@time, #@profile and #Profile.print()
+        #@show sol
         
         return sol
     end
 
-
-    ## Define Loss function
-    function loss(θ)
-        pred = predict(θ)            #Forward prediction with current parameter θ 
-                
-        #\theta is the current bed elevation at cells
-        l = pred[:,1,end] .+ θ .- WSE_truth  #loss = free surface elevation mismatch
-
-        loss_pred_eta = sum(abs2, l)
-
-        loss_pred_uv = zero(eltype(θ))
-
-        #  # Add small epsilon to prevent division by zero
-        # ϵ = sqrt(eps(eltype(θ)))
-        
-        # if bInversion_include_u      #if also include u in the loss 
-        #     l_u = pred[:,2,end]./(pred[:,1,end] .+ ϵ) .- u_truth
-        #     l_v = pred[:,3,end]./(pred[:,1,end] .+ ϵ) .- v_truth
-
-        #     loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
-        # end 
-
-        loss_pred = loss_pred_eta + loss_pred_uv
-
-        loss_slope = zero(eltype(θ))
-
-        # if bInversion_slope_loss    #if bed slope is included in the loss 
-        #     loss_slope = calc_slope_loss(θ, my_mesh_2D)
-        # end 
-
-        loss_total = loss_pred + loss_slope
-
-        return loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred
-        # return loss_total
-
-        #Zygote.ignore() do
-        #    println("loss_pred_eta = ", loss_pred_eta)
-        #end
-
-        #return loss_pred_eta
-    end
-
-
+    #define the accumulators for the inversion results
     LOSS = []                              # Loss accumulator
     PRED = []                              # prediction accumulator
     PARS = []                              # parameters accumulator
 
-    callback = function (θ, loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred) #callback function to observe training
+    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred) #callback function to observe training
         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
-        println("      iter, loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope = ", iter, ", ", 
-                  loss_total, ", ", loss_pred, ", ", loss_pred_eta, ", ", loss_pred_uv, ", ", loss_slope)
+        println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ", 
+                  loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
 
         append!(PRED, [pred[:,1,end]])
-        append!(LOSS, [[loss_total, loss_pred, loss_pred_eta, loss_pred_uv, loss_slope, pred]])
+        append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred]])
 
         if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
             #println("theta.u = ", θ.u)
@@ -644,106 +732,22 @@ if bPerform_Inversion
         false
     end
 
-    # Define AD type choice for optimization's gradient computation
-    #The following is from SciMLSensitivity documentation regarding the choice of AD 
-    #  AutoForwardDiff(): The fastest choice for small optimizations
-    #  AutoReverseDiff(compile=false): A fast choice for large scalar optimizations
-    #  AutoTracker(): Like ReverseDiff but GPU-compatible
-    #  AutoZygote(): The fastest choice for non-mutating array-based (BLAS) functions
-    #  AutoFiniteDiff(): Finite differencing, not optimal but always applicable
-    #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
-    #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
+    #inversion parameters: 
+    # initial guess for the inversion parameters
+    params_array_init = params_array
 
-    adtype = Optimization.AutoZygote()         #
-    #adtype = Optimization.AutoForwardDiff()   #ForwardDiff.jl is not supported for this problem.
-    #adtype = Optimization.AutoReverseDiff()
-    #adtype = Optimization.AutoEnzyme()         #
-
-    # Define the optimization function
-    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_function/
-    # OptimizationFunction{iip}(f, adtype::AbstractADType = NoAD();
-    #                       grad = nothing, hess = nothing, hv = nothing,
-    #                       cons = nothing, cons_j = nothing, cons_jvp = nothing,
-    #                       cons_vjp = nothing, cons_h = nothing,
-    #                       hess_prototype = nothing,
-    #                       cons_jac_prototype = nothing,
-    #                       cons_hess_prototype = nothing,
-    #                       observed = __has_observed(f) ? f.observed : DEFAULT_OBSERVED_NO_TIME,
-    #                       lag_h = nothing,
-    #                       hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
-    #                       cons_jac_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
-    #                       cons_hess_colorvec = __has_colorvec(f) ? f.colorvec : nothing,
-    #                       lag_hess_colorvec = nothing,
-    #                       sys = __has_sys(f) ? f.sys : nothing)
-
-    optf = Optimization.OptimizationFunction((θ, p) -> loss(θ), adtype)   #\theta is the parameter to be optimized; p is not used.
-
-    # Define the bounds for the parameter (only applicable for some optimizers which support lb and ub)
-    lb_p = zeros(my_mesh_2D.numOfCells)
-    lb_p .= -0.1  
-
-    ub_p = zeros(my_mesh_2D.numOfCells)
-    ub_p .= 0.3 
-
-    # Define the optimization problem
-    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_problem/
-    #OptimizationProblem{iip}(f, u0, p = SciMLBase.NullParameters(),;
-    #                          lb = nothing,
-    #                          ub = nothing,
-    #                          lcons = nothing,
-    #                          ucons = nothing,
-    #                          sense = nothing,
-    #                          kwargs...)
-
-    #optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
-    optprob = Optimization.OptimizationProblem(optf, ps)
-
-    # Solve the optimization problem
-    #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
-    #Returned optimization solution Fields:
-    # u: the representation of the optimization's solution.
-    # cache::AbstractOptimizationCache: the optimization cache` that was solved.
-    # alg: the algorithm type used by the solver.
-    # objective: Objective value of the solution
-    # retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether it exited due to an error. For more details, see the return code documentation.
-    # original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
-    # stats: statistics of the solver, such as the number of function evaluations required.
+    #perform the inversion
+    sol = optimize_parameters(Q0, tspan, observed_data, params_array_init, active_params)
     
-    #res = Optimization.solve(optprob, PolyOpt(), callback = callback)  #PolyOpt does not support lb and ub 
-    #res = Optimization.solve(optprob, NLopt.LD_LBFGS(), callback = callback)   #very fast 
-    #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback; iterations=30, maxiters=40, f_calls_limit=20, show_trace=true)
-    #res = Optimization.solve(optprob, Optim.BFGS(), callback=callback, maxiters = 100; show_trace=false)  #f_tol=1e-3, iterations=10, local_maxiters = 10
-    #res = Optimization.solve(optprob, Optim.LBFGS(), callback=callback)  #oscilates around 1e-7
-    #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
-    #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
-    res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
-
-    #@time res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
-    #@profile res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
-    #Profile.print()
-    
-    #@show res
-    
-
     #save the inversion results
-    jldsave(joinpath(save_path, "inversion_results.jld2"); LOSS, PRED, PARS)
+    jldsave(joinpath(save_path, inversion_save_file_name); LOSS, PRED, PARS)
 
     #process the inversion results
-    println("   Processing inversion results ...")
-
-    #open the simulation result (as the ground truth)
-    sol_truth = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
-    h_truth = Array(sol_truth)[:,1,end]
-    u_truth = Array(sol_truth)[:,2,end]./Array(sol_truth)[:,1,end]
-    v_truth = Array(sol_truth)[:,3,end]./Array(sol_truth)[:,1,end]
-
-    zb_cells_truth = load(joinpath(save_path, "zb_cells_truth.jld2"))["zb_cells_truth"]
-
-    WSE_truth = h_truth .+ zb_cells_truth
+    println("   Post-processing inversion results ...")
 
     #process inversion results
-    inversion_results_file_name = joinpath(save_path, "inversion_results.jld2")
-    process_inversion_results(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+    inversion_results_file_name = joinpath(save_path, inversion_save_file_name)
+    process_inversion_results_2D(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
 end 
 
 

@@ -2,101 +2,87 @@ using Revise
 using DifferentialEquations
 using SciMLSensitivity
 using Zygote
-using ComponentArrays  # Add this
-using Optimization, OptimizationOptimisers  # Add these
+using ComponentArrays
+using Optimization, OptimizationOptimisers
 
-# Define the shallow water equations
-function shallow_water_eq!(du, u, p, t)
+# Define the shallow water equations (non-mutating version)
+function shallow_water_eq(u, p, t)
     # Extract parameters from ComponentArray
-    zb, n, Q = p.zb, p.n, p.Q
+    zb, n, Q = p.zb[1], p.n, p.Q
     h, hu, hv = u
     g = 9.81
 
-    # Compute derivatives
-    du[1] = Q - hu - hv - zb
-    du[2] = -g * h - n * hu
-    du[3] = -g * h - n * hv
+    Zygote.ignore() do
+        println("zb = ", zb)
+        println("n = ", n)
+        println("Q = ", Q)
+        println("sum(Q) = ", sum(Q))
+        println("h = ", h)
+        println("hu = ", hu)
+        println("hv = ", hv)
+    end
+
+    # Return derivatives without mutation
+    [
+        sum(Q) - hu - hv - zb,  # Example using Q as a spatial inflow array
+        -g * h - n * hu,
+        -g * h - n * hv
+    ]
 end
 
-# Define the loss function
+# Define the loss function (non-mutating version)
 function compute_loss(p, u0, tspan, observed_data)
-    # Create ODEProblem
-    prob = ODEProblem(shallow_water_eq!, u0, tspan, p)
+    # Create ODEProblem with non-mutating function
+    prob = ODEProblem(shallow_water_eq, u0, tspan, p)
     
     # Solve the ODE
     sol = solve(prob, Tsit5(), saveat=0.1)
     
     # Loss: Mean squared error between simulation and observation
     simulated = sol[end]
-    return sum((simulated .- observed_data).^2)
+    sum((simulated .- observed_data).^2)
 end
 
-# Example Usage
-u0 = [1.0, 0.1, 0.1]  # Initial conditions: [h, hu, hv]
-tspan = (0.0, 10.0)    # Time span
-observed_data = [0.9, 0.05, 0.05]  # Example observed data
-
-# Create ComponentArray for parameters
-p = ComponentArray(zb=0.5, n=0.03, Q=1.0)
-active_params = [:zb, :Q]  # Parameters to optimize
-
-# Compute gradients
-function compute_gradient(u0, tspan, observed_data, p, active_params)
-    # Create function that only depends on active parameters
-    function loss_active(active_vals)
-        # Create new parameter set without mutation
-        new_params = Dict(zip(active_params, active_vals))
-        p_new = ComponentArray(
-            zb = haskey(new_params, :zb) ? new_params[:zb] : p.zb,
-            n = haskey(new_params, :n) ? new_params[:n] : p.n,
-            Q = haskey(new_params, :Q) ? new_params[:Q] : p.Q
-        )
-        return compute_loss(p_new, u0, tspan, observed_data)
-    end
-    
-    # Extract active parameter values
-    active_vals = [p[param] for param in active_params]
-    
-    # Compute gradient
-    loss, back = Zygote.pullback(loss_active, active_vals)
-    gradient = back(1.0)[1]
-    
-    return loss, gradient
-end
-
-# Test the gradient computation
-loss, gradient = compute_gradient(u0, tspan, observed_data, p, active_params)
-println("Loss: ", loss)
-println("Gradient: ", gradient)
-
-# Setup optimization
+# Setup optimization (non-mutating version)
 function optimize_parameters(u0, tspan, observed_data, p_init, active_params; maxiters=100)
     # Loss function for optimization
-    function opt_loss(θ, p)  # Add p argument even if unused
-        # Create parameter set from optimization variables
-        new_params = Dict(zip(active_params, θ))
-        p_new = ComponentArray(
-            zb = haskey(new_params, :zb) ? new_params[:zb] : p_init.zb,
-            n = haskey(new_params, :n) ? new_params[:n] : p_init.n,
-            Q = haskey(new_params, :Q) ? new_params[:Q] : p_init.Q
-        )
-        return compute_loss(p_new, u0, tspan, observed_data)
+    function opt_loss(θ,p)
+        # Create new ComponentArray based on active parameters
+        if active_params == [:zb]
+            p_new = ComponentArray(zb=θ, n=p_init.n, Q=p_init.Q)
+        elseif active_params == [:n]
+            p_new = ComponentArray(zb=p_init.zb, n=θ, Q=p_init.Q)
+        elseif active_params == [:Q]
+            p_new = ComponentArray(zb=p_init.zb, n=p_init.n, Q=θ)
+        elseif active_params == [:zb, :Q]
+            p_new = ComponentArray(zb=θ[1:1], n=p_init.n, Q=θ[2:end])
+        else
+            error("Unsupported parameter combination")
+        end
+        
+        compute_loss(p_new, u0, tspan, observed_data)
     end
 
-    # Initial values for optimization
-    θ0 = [p_init[param] for param in active_params]
+    # Initial parameter values (flattened)
+    θ0 = vcat([param == :Q ? p_init.Q : [p_init[param]] for param in active_params]...)
 
     # Create optimization problem
     optf = OptimizationFunction(opt_loss, Optimization.AutoZygote())
-    optprob = OptimizationProblem(optf, θ0)  # No parameters needed
+    optprob = OptimizationProblem(optf, θ0)
 
     # Solve optimization problem
-    sol = solve(optprob, Adam(0.01), maxiters=maxiters)
-    
-    return sol
+    solve(optprob, Adam(0.01), maxiters=maxiters)
 end
 
 # Test the optimization
-p_init = ComponentArray(zb=0.0, n=0.03, Q=0.5)  # Initial guess
-sol = optimize_parameters(u0, tspan, observed_data, p_init, active_params)
-println("Optimized parameters: ", sol.u)
+u0 = [1.0, 0.1, 0.1]  # Initial conditions: [h, hu, hv]
+tspan = (0.0, 10.0)   # Time span
+observed_data = [0.9, 0.05, 0.05]  # Example observed data
+
+# Create initial parameters
+p_init = ComponentArray(zb=0.5, n=0.03, Q=[0.5, 0.6, 0.7])
+active_params = [:zb, :Q]  # Optimize both zb and Q
+
+# Optimize parameters
+p_optimized = optimize_parameters(u0, tspan, observed_data, p_init, active_params)
+println("Optimized Parameters: ", p_optimized)
