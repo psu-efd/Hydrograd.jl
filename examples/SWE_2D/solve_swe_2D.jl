@@ -2,6 +2,8 @@ using Revise
 
 using Dates
 
+using JSON3
+
 using JLD2
 
 using IterTools
@@ -18,6 +20,7 @@ using SparseArrays
 
 #SciML
 using SciMLSensitivity
+using ComponentArrays
 
 #Optimizers
 using Optimization
@@ -37,22 +40,22 @@ using Enzyme
 #for Bayesian estimation
 #using Turing
 
-# Load StatsPlots for visualizations and diagnostics.
-#using StatsPlots
-
 #using LinearAlgebra
-
-using Plots
 
 using InteractiveUtils
 
 #using Random
 #Random.seed!(1234)
 
+# Add some warnings/info for gradient computation
+#@code_warntype(my_loss(ps))
+SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+
 #Timing 
 start_time = now()  # Current date and time
 
 include("process_SRH_2D_input.jl")
+include("process_model_parameters_2D.jl")
 include("process_ManningN_2D.jl")
 include("process_BCs_2D.jl")
 include("process_bed_2D.jl")
@@ -62,39 +65,214 @@ include("misc_utilities_2D.jl")
 include("custom_ODE_solver.jl")
 include("process_inversion_results_2D.jl")
 
-println("Solving 2D SWE...")
+#print the banner
+print_banner()
 
-#define control variables
-bSimulate_Synthetic_Data = false    #whether to do the 1D SWE simulation to create synthetic data 
-bPerform_Inversion = true           #whether to do inversion 
-bPlot_Inversion_Results = true     #whehter to plot the inversion results
-
-#options for inversion 
-bInversion_slope_loss = false   #whether to include slope loss 
-bInversion_include_u = false    #whehter to add velocity to the loss function (by default, we already have water surface elevatino eta)
-
-#directory to save to (the same directory as the main file)
+#directory to read from/save to (the same directory as the main file)
 save_path = dirname(@__FILE__)
 
-#define a swe_2D_constants object with some default values
-swe_2D_constants = swe_2D_consts(t=0.0, dt=0.1, tStart=0.0, tEnd=1.0)
+#read the control file
+println("Reading control file...")
+control_file = joinpath(save_path, "run_control.json")
+control_dict = JSON3.read(open(control_file), Dict)
 
-#read data from SRH-2D hydro, geom, and material files
-#srhhydro_file_name = "simple.srhhydro"
-srhhydro_file_name = "oneD_channel_with_bump.srhhydro"
-#srhhydro_file_name = "oneD_channel_with_bump_all_walls.srhhydro"
-#srhhydro_file_name = "twoD_channel_with_bump.srhhydro"
+# Extract variables with their proper types
+bVerbose = control_dict["bVerbose"]::Bool
 
+# Control variables
+srhhydro_file_name = control_dict["control_variables"]["srhhydro_file_name"]::String
+bPerform_Forward_Simulation = control_dict["control_variables"]["bPerform_Forward_Simulation"]::Bool
+bPerform_Inversion = control_dict["control_variables"]["bPerform_Inversion"]::Bool
+bPerform_Sensitivity_Analysis = control_dict["control_variables"]["bPerform_Sensitivity_Analysis"]::Bool
+
+# Currently only support one at a time: forward simulation, inversion, or sensitivity analysis
+if bPerform_Forward_Simulation + bPerform_Inversion + bPerform_Sensitivity_Analysis != 1
+    println("bPerform_Forward_Simulation = ", bPerform_Forward_Simulation)
+    println("bPerform_Inversion = ", bPerform_Inversion)
+    println("bPerform_Sensitivity_Analysis = ", bPerform_Sensitivity_Analysis)
+    error("Currently only one at a time: forward simulation, inversion, or sensitivity analysis.")
+end
+
+# Time settings
+bUse_srhhydro_time_settings = control_dict["time_settings"]["bUse_srhhydro_time_settings"]::Bool
+tspan = Tuple(Float64.(control_dict["time_settings"]["tspan"]))  # Convert array to tuple
+dt = Float64(control_dict["time_settings"]["dt"])
+#dt_save = Float64(control_dict["time_settings"]["dt_save"])
+#nSave = Int(control_dict["time_settings"]["nSave"])
+
+# Forward simulation options
+forward_simulation_solver = ""
+forward_simulation_ode_solver = ""
+forward_simulation_adaptive = false
+forward_simulation_b_jac_sparsity = false
+forward_simulation_nSave = 1
+forward_simulation_initial_condition_options = ""
+forward_simulation_initial_condition_file_name = ""
+forward_simulation_initial_condition_values_from_file = nothing
+forward_simulation_initial_condition_constant_values = []
+forward_simulation_save_file_name = ""
+forward_simulation_save_solution_truth_file_name = ""
+    
+if bPerform_Forward_Simulation
+    forward_simulation_solver = control_dict["forward_simulation_options"]["forward_simulation_solver"]::String
+    forward_simulation_ode_solver = control_dict["forward_simulation_options"]["forward_simulation_ode_solver"]::String
+    forward_simulation_adaptive = control_dict["forward_simulation_options"]["forward_simulation_adaptive"]::Bool
+    forward_simulation_b_jac_sparsity = control_dict["forward_simulation_options"]["forward_simulation_b_jac_sparsity"]::Bool
+    forward_simulation_nSave = Int(control_dict["forward_simulation_options"]["forward_simulation_nSave"])
+    forward_simulation_initial_condition_options = control_dict["forward_simulation_options"]["forward_simulation_initial_condition_options"]::String
+    forward_simulation_initial_condition_file_name = control_dict["forward_simulation_options"]["forward_simulation_initial_condition_file_name"]::String
+    forward_simulation_initial_condition_constant_values = Float64.(control_dict["forward_simulation_options"]["forward_simulation_initial_condition_constant_values"])
+
+    if forward_simulation_initial_condition_options == "from_file"  #read the initial condition from a file
+        forward_simulation_initial_condition_values_from_file = JSON3.read(open(joinpath(save_path, forward_simulation_initial_condition_file_name)), Dict)
+    elseif forward_simulation_initial_condition_options == "constant"  #use constant initial condition
+        forward_simulation_initial_condition_values_from_file = nothing
+    else
+        error("Invalid forward_simulation_initial_condition_options: $forward_simulation_initial_condition_options. Supported options: from_file, constant.")
+    end
+
+    forward_simulation_save_file_name = control_dict["forward_simulation_options"]["forward_simulation_save_file_name"]::String
+    forward_simulation_save_solution_truth_file_name = control_dict["forward_simulation_options"]["forward_simulation_save_solution_truth_file_name"]::String
+end
+
+# Inversion options
+active_param_names = []
+inversion_parameter_initial_values_options = ""
+inversion_parameter_initial_values_file_name = ""
+inversion_parameter_initial_values_from_file = nothing
+inversion_zb_initial_values = []
+inversion_ManningN_initial_values = []
+inversion_inlet_discharge_initial_values = []
+inversion_bInversion_slope_loss = false
+inversion_bInversion_u_loss = false
+inversion_lower_bound_zb = 0.0
+inversion_upper_bound_zb = 0.0
+inversion_optimizer = ""
+inversion_learning_rate = 0.0
+inversion_max_iterations = 0
+inversion_solution_truth_file_name = ""
+inversion_forward_simulation_initial_condition_options = ""
+inversion_forward_simulation_initial_condition_file_name = ""
+inversion_forward_simulation_initial_condition_constant_values = []
+inversion_forward_simulation_initial_condition_values_from_file = nothing
+inversion_ode_solver = ""
+inversion_ode_solver_adaptive = false
+inversion_ode_solver_b_jac_sparsity = false
+
+if bPerform_Inversion
+    active_param_names = control_dict["inversion_options"]["active_param_names"]::Vector{String}
+    inversion_parameter_initial_values_options = control_dict["inversion_options"]["inversion_parameter_initial_values_options"]::String
+    inversion_parameter_initial_values_file_name = control_dict["inversion_options"]["inversion_parameter_initial_values_file_name"]::String
+    inversion_zb_initial_values = control_dict["inversion_options"]["inversion_zb_initial_values"]::Vector{Float64}
+    inversion_ManningN_initial_values = control_dict["inversion_options"]["inversion_ManningN_initial_values"]::Vector{Float64}
+    inversion_inlet_discharge_initial_values = control_dict["inversion_options"]["inversion_inlet_discharge_initial_values"]::Vector{Float64}
+    inversion_bInversion_slope_loss = control_dict["inversion_options"]["inversion_bInversion_slope_loss"]::Bool
+    inversion_bInversion_u_loss = control_dict["inversion_options"]["inversion_bInversion_u_loss"]::Bool
+    inversion_lower_bound_zb = control_dict["inversion_options"]["inversion_lower_bound_zb"]::Float64
+    inversion_upper_bound_zb = control_dict["inversion_options"]["inversion_upper_bound_zb"]::Float64
+    inversion_optimizer = control_dict["inversion_options"]["inversion_optimizer"]::String
+    inversion_learning_rate = control_dict["inversion_options"]["inversion_learning_rate"]::Float64
+    inversion_max_iterations = control_dict["inversion_options"]["inversion_max_iterations"]::Int
+    inversion_solution_truth_file_name = control_dict["inversion_options"]["inversion_solution_truth_file_name"]::String
+    inversion_forward_simulation_initial_condition_options = control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_options"]::String
+    inversion_forward_simulation_initial_condition_file_name = control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_file_name"]::String
+    inversion_forward_simulation_initial_condition_constant_values = Float64.(control_dict["inversion_options"]["inversion_forward_simulation_initial_condition_constant_values"])
+    inversion_ode_solver = control_dict["inversion_options"]["ode_solver_options"]["ode_solver"]::String
+    inversion_ode_solver_adaptive = control_dict["inversion_options"]["ode_solver_options"]["ode_solver_adaptive"]::Bool
+    inversion_ode_solver_b_jac_sparsity = control_dict["inversion_options"]["ode_solver_options"]["ode_solver_b_jac_sparsity"]::Bool
+
+    if inversion_parameter_initial_values_options == "from_file"
+        inversion_parameter_initial_values_from_file = JSON3.read(open(joinpath(save_path, inversion_parameter_initial_values_file_name)), Dict)
+    end
+end
+
+if bVerbose
+    #print the control variables
+    println("--------------------------------")
+
+    println("Control variables:")
+    println("   srhhydro_file_name = ", srhhydro_file_name)
+    println("   bPerform_Forward_Simulation = ", bPerform_Forward_Simulation)
+    println("   bPerform_Inversion = ", bPerform_Inversion)
+    println("   bPerform_Sensitivity_Analysis = ", bPerform_Sensitivity_Analysis)
+
+    println("Time settings (overwrite SRH-2D case if bUse_srhhydro_time_settings is false):")
+    println("    bUse_srhhydro_time_settings = ", bUse_srhhydro_time_settings)
+    println("    tspan = ", tspan)
+    println("    dt = ", dt)
+
+    if bPerform_Forward_Simulation
+        println("Forward simulation options:")
+        println("    solver = ", forward_simulation_solver)
+        println("    ode_solver = ", forward_simulation_ode_solver)
+        println("    adaptive = ", forward_simulation_adaptive)
+        println("    jac_sparsity = ", forward_simulation_b_jac_sparsity)
+        println("    nSave = ", forward_simulation_nSave)
+        println("    initial_condition_options = ", forward_simulation_initial_condition_options)
+        println("    initial_condition_file_name = ", forward_simulation_initial_condition_file_name)
+        println("    save_file_name = ", forward_simulation_save_file_name)
+        println("    save_solution_truth_file_name = ", forward_simulation_save_solution_truth_file_name)
+    else
+        println("No forward simulation is to be performed.")
+    end
+
+    if bPerform_Inversion
+        println("Inversion options:")
+        println("    active_params = ", active_param_names)
+        println("    inversion_parameter_initial_values_options = ", inversion_parameter_initial_values_options)
+        println("    inversion_parameter_initial_values_file_name = ", inversion_parameter_initial_values_file_name)
+
+        if inversion_parameter_initial_values_options == "from_file"
+            println("    inversion_parameter_initial_values_from_file = ", inversion_parameter_initial_values_from_file)
+        elseif inversion_parameter_initial_values_options == "constant"
+            println("    zb_initial_values = ", zb_initial_values)
+            println("    ManningN_initial_values = ", ManningN_initial_values)
+            println("    inlet_discharge_initial_values = ", inlet_discharge_initial_values)
+        else
+            error("Invalid inversion_parameter_initial_values_options: $inversion_parameter_initial_values_options. Supported options: from_file, constant.")
+        end
+
+        println("    slope_loss = ", bInversion_slope_loss)
+        println("    u_loss = ", bInversion_u_loss)
+        println("    zb_bounds = [", lower_bound_zb, ", ", upper_bound_zb, "]")
+        println("    optimizer = ", optimizer)
+        println("    learning_rate = ", learning_rate)
+        println("    max_iterations = ", max_iterations)
+        println("    inversion_solution_truth_file_name = ", inversion_solution_truth_file_name)
+        println("    ode_solver = ", inversion_ode_solver)
+        println("    ode_solver_adaptive = ", inversion_ode_solver_adaptive)
+        println("    ode_solver_b_jac_sparsity = ", inversion_ode_solver_b_jac_sparsity)
+    else
+        println("No inversion is to be performed.")
+    end
+
+    if bPerform_Sensitivity_Analysis
+        println("Sensitivity analysis is to be performed.")
+    else
+        println("No sensitivity analysis is to be performed.")
+    end
+
+    println("--------------------------------")
+end
+
+println("Finished reading control file.\n")
+
+#define a swe_2D_constants object with some values from the control file
+swe_2D_constants = swe_2D_consts(t=tspan[1], dt=dt, tStart=tspan[1], tEnd=tspan[2])
+
+#read data from SRH-2D hydro, geom, and material files; it aslo create the 2D mesh.
 srh_all_Dict = process_SRH_2D_input(srhhydro_file_name)
 
 #update swe_2D_constants based on the SRH-2D data
-update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
+if bUse_srhhydro_time_settings
+    update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
+end
 
-#create the 2D mesh 
+#Get the 2D mesh 
 my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
-#mesh related variables which might be mutable (not in struct mesh_2D)
-#nodeCoordinates::Array{Float64,3}  # Node coordinates: Float64 2D array [numOfNodes, 3]
+#mesh related variables which might be mutable (should not be in struct mesh_2D)
+#nodeCoordinates: Float64 2D array [numOfNodes, 3]
 nodeCoordinates = srh_all_Dict["srhgeom_obj"].nodeCoordinates
 
 #  setup bed elevation 
@@ -110,27 +288,71 @@ zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, nodeCoordinates, t
 
 zb_cells_truth = zeros(size(zb_cells))
 
-#If simulating synthetic data, make a copy of the bathymetry truth: zb_cell_truth
-if bSimulate_Synthetic_Data
+#If performing forward simulation, make a copy of the bathymetry truth: zb_cell_truth; otherwise, it is zero.
+if bPerform_Forward_Simulation
     zb_cells_truth = deepcopy(zb_cells)
 end
 
-#define active parameters
-active_param_names = ["zb"]
+#get the true Manning's n and inlet discharges
+srhhydro_ManningsN_Dict = srh_all_Dict["srhhydro_ManningsN"]
 
-#define the parameter array
-zb_cells_param = zb_cells
+ManningN_values_truth = Float64[srhhydro_ManningsN_Dict[i] for i in 0:(length(srhhydro_ManningsN_Dict)-1)]
 
-#create the parameter Manning's n list with initial values
-srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
-ManningN_list_param = ones(Float64, srhmat_numOfMaterials) .* 0.03
+#get the true inlet discharges
+srhhydro_inletQ_Dict = srh_all_Dict["srhhydro_IQParams"]
 
-#create the inlet discharges with initial values
-nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
-inlet_discharges_param = ones(Float64, nInletQ_BCs) .* 1.0
+inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[i][1]) for i in 1:(length(srhhydro_inletQ_Dict))]
+
+if bPerform_Forward_Simulation && bVerbose
+    println("True zb_cells = ", zb_cells_truth)
+    println("True Manning's n values = ", ManningN_values_truth)
+    println("True inlet discharges = ", inlet_discharges_truth)
+end
+
+#define the parameters array (nothing for forward simulation)
+zb_cells_param = nothing
+ManningN_list_param = nothing
+inlet_discharges_param = nothing
+
+if bPerform_Inversion || bPerform_Sensitivity_Analysis
+    if inversion_parameter_initial_values_options == "constant"
+        #bed elevation
+        zb_cells_param = zeros(zb_initial_values[1], my_mesh_2D.numOfCells)  #only use the first value of zb_initial_values even it is a vector.
+
+        #Manning's n
+        ManningN_list_param = deepcopy(ManningN_initial_values)   
+        
+        #inlet discharges
+        inlet_discharges_param = deepcopy(inlet_discharges_initial_values)  
+    elseif inversion_parameter_initial_values_options == "from_file"
+        zb_cells_param = inversion_parameter_initial_values_from_file["zb_cells_param"]
+        ManningN_list_param = inversion_parameter_initial_values_from_file["ManningN_list_param"]
+        inlet_discharges_param = inversion_parameter_initial_values_from_file["inlet_discharges_param"]
+    else
+        error("Invalid zb_initial_values_options: $zb_initial_values_options. Supported options: zero, from_file.")
+    end
+
+    #consistency check
+    #make sure the length of zb_cells_param is the same as the number of cells
+    if length(zb_cells_param) != my_mesh_2D.numOfCells
+        error("The length of zb_cells_param is not the same as the number of cells.")
+    end
+
+    #make sure the length of ManningN_list_param is the same as the number of materials
+    srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
+    if length(ManningN_list_param) != srhmat_numOfMaterials
+        error("The length of ManningN_list_param is not the same as the number of materials.")
+    end
+
+    #make sure the length of inlet_discharges_param is the same as the number of inletQ_BCs
+    nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
+    if length(inlet_discharges_param) != nInletQ_BCs
+        error("The length of inlet_discharges_param is not the same as the number of inletQ_BCs.")
+    end
+end
 
 #preprocess: create a ComponentArray for the model parameters for 2D shallow water equations
-params_array, active_params = preprocess_model_parameters_2D(zb_cells_param, ManningN_list_param, inlet_discharges_param, active_param_names)
+params_array, active_params = preprocess_model_parameters_2D(bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, zb_cells_param, ManningN_list_param, inlet_discharges_param, active_param_names)
 
 #Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
 ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
@@ -149,7 +371,26 @@ q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghos
 total_water_volume = []   #total volume of water in the domain 
 
 #setup initial condition for eta, h, q_x, q_y
-setup_initial_condition!(my_mesh_2D, nodeCoordinates, eta, zb_cells, h, q_x, q_y, true)
+initial_condition_options = nothing
+initial_condition_constant_values = nothing
+initial_condition_values_from_file = nothing
+
+if bPerform_Forward_Simulation
+    initial_condition_options = forward_simulation_initial_condition_options
+    initial_condition_constant_values = forward_simulation_initial_condition_constant_values
+    initial_condition_values_from_file = forward_simulation_initial_condition_values_from_file
+elseif bPerform_Inversion 
+    initial_condition_options = inversion_forward_simulation_initial_condition_options
+    initial_condition_constant_values = inversion_forward_simulation_initial_condition_constant_values
+    initial_condition_values_from_file = inversion_forward_simulation_initial_condition_values_from_file
+elseif bPerform_Sensitivity_Analysis
+    #not implemented yet
+    error("Sensitivity analysis is not implemented yet.")
+else
+    error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis. No initial condition is to be setup.")
+end 
+
+setup_initial_condition!(initial_condition_options, initial_condition_constant_values, initial_condition_values_from_file, my_mesh_2D, nodeCoordinates, eta, zb_cells, h, q_x, q_y, swe_2D_constants, true)
 
 #setup ghost cells for initial condition
 setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
@@ -157,130 +398,105 @@ setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCell
 #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
 boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet, 
 exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
-#println("boundary_conditions = ", boundary_conditions)
-#throw(ErrorException("stop here"))
 
-#set up ODE parameters. 
-Q0 = hcat(h, q_x, q_y)   #initial condition: Q = [h q_x q_y]
+#set up initial condition for ODE solver
+Q0 = hcat(h, q_x, q_y)  
 
 Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell values of Q
 
-# time information 
-#tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
-#dt = swe_2D_constants.dt
-#t = tspan[1]:dt:tspan[2]
-
-tspan = (0.0, 100.0)    #100.0
-dt = 0.1
-t = tspan[1]:dt:tspan[2]
-
-dt_save = (tspan[2] - tspan[1])/100.0
-t_save = tspan[1]:dt_save:tspan[2]
-println("t_save = ", t_save)
-
-# Populate the Jacobian sparsity pattern
-# Assume each variable depends on itself and its neighbors
-# we have 3 variables (h, q_x, q_y) for each cell
-jac_sparsity = spzeros(3*my_mesh_2D.numOfCells, 3*my_mesh_2D.numOfCells)
-
-println("my_mesh_2D.cellNeighbors_Dict = ", my_mesh_2D.cellNeighbors_Dict)
-
-for cellID in 1:my_mesh_2D.numOfCells
-    # Self-dependence (diagonal entries)
-    jac_sparsity[3*(cellID-1)+1, 3*(cellID-1)+1] = 1.0  # h -> h
-    jac_sparsity[3*(cellID-1)+2, 3*(cellID-1)+2] = 1.0  # hu -> hu
-    jac_sparsity[3*(cellID-1)+3, 3*(cellID-1)+3] = 1.0  # hv -> hv
-    
-    # Neighbor-dependence
-    for neighbor in my_mesh_2D.cellNeighbors_Dict[cellID]
-
-        #only need interior neighbors
-        if neighbor > 0
-            jac_sparsity[3*(cellID-1)+1, 3*(neighbor-1)+1] = 1.0  # h -> h (neighbor)
-            jac_sparsity[3*(cellID-1)+2, 3*(neighbor-1)+2] = 1.0  # hu -> hu (neighbor)
-            jac_sparsity[3*(cellID-1)+3, 3*(neighbor-1)+3] = 1.0  # hv -> hv (neighbor)
-        end
-    end
-end
-
-#println("jac_sparsity = ", jac_sparsity)
-#println("size of jac_sparsity = ", size(jac_sparsity))
-#println("nnz of jac_sparsity = ", nnz(jac_sparsity))
-#throw("stop here")
-
 # Define the ODE function 
-function swe_2d_ode(Q, para, t)
-    
-    dQdt = swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)    
+function swe_2d_ode(Q, params_array, t)
+
+    dQdt = swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, 
+                      my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+                      zb_cells, zb_ghostCells, zb_faces, S0,
+                      active_param_names)    
 
     return dQdt
 end
 
 # Create the ODEFunction with the typed function
-#ode_f = ODEFunction(swe_2d_ode; jac_prototype=nothing)
+ode_f = nothing
+
+jac_sparsity = nothing
+
+if (bPerform_Forward_Simulation && forward_simulation_b_jac_sparsity) || 
+    (bPerform_Inversion && inversion_ode_solver_b_jac_sparsity) ||
+    (bPerform_Sensitivity_Analysis && sensitivity_analysis_ode_solver_b_jac_sparsity)
+
+    # Populate the Jacobian sparsity pattern
+    # Assume each variable depends on itself and its neighbors
+    # we have 3 variables (h, q_x, q_y) for each cell
+    jac_sparsity = spzeros(3*my_mesh_2D.numOfCells, 3*my_mesh_2D.numOfCells)
+
+    for cellID in 1:my_mesh_2D.numOfCells
+        # Self-dependence (diagonal entries)
+        jac_sparsity[3*(cellID-1)+1, 3*(cellID-1)+1] = 1.0  # h -> h
+        jac_sparsity[3*(cellID-1)+2, 3*(cellID-1)+2] = 1.0  # hu -> hu
+        jac_sparsity[3*(cellID-1)+3, 3*(cellID-1)+3] = 1.0  # hv -> hv
+        
+        # Neighbor-dependence
+        for neighbor in my_mesh_2D.cellNeighbors_Dict[cellID]
+
+            #only need interior neighbors
+            if neighbor > 0
+                jac_sparsity[3*(cellID-1)+1, 3*(neighbor-1)+1] = 1.0  # h -> h (neighbor)
+                jac_sparsity[3*(cellID-1)+2, 3*(neighbor-1)+2] = 1.0  # hu -> hu (neighbor)
+                jac_sparsity[3*(cellID-1)+3, 3*(neighbor-1)+3] = 1.0  # hv -> hv (neighbor)
+            end
+        end
+    end
+end
+
 ode_f = ODEFunction(swe_2d_ode; jac_prototype=jac_sparsity)
 
-prob = ODEProblem(ode_f, Q0, tspan, para)
 
-#use Enzyme to test the gradient of the ODE and identify the source of the error
-#See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
-# SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-# p = prob.p
-# y = prob.u0
-# f = prob.f
-# λ = zero(prob.u0)
-# _dy, back = Zygote.pullback(y, p) do u, p
-#     vec(f(u, p, t))
-# end
-# tmp1, tmp2 = back(λ)
+#########################
+#Forward Simulation part#
+#########################
 
-# @show tmp1
-# @show tmp2
+if bPerform_Forward_Simulation
+    println("   Performing 2D SWE forward simulation ...")
 
-# throw("stop here")
+    # time information 
+    tspan = (swe_2D_constants.tStart, swe_2D_constants.tEnd)
+    dt = swe_2D_constants.dt
+    t = tspan[1]:dt:tspan[2]
 
-if bSimulate_Synthetic_Data
+    #define the time for saving the results
+    dt_save = (tspan[2] - tspan[1])/forward_simulation_nSave
+    t_save = tspan[1]:dt_save:tspan[2]
+    println("t_save = ", t_save)
 
-    solver_choice = "SciML"
-    #solver_choice = "MyOwn"
+    #define the ODE problem
+    prob = ODEProblem(ode_f, Q0, tspan, params_array)
+ 
+    if forward_simulation_solver == "SciML"
 
-    println("   Performing 2D SWE simulation ...")
-
-    #for direct sensivity analysis
-    #prob = ODEForwardSensitivityProblem((Q, p, t) -> swe_1D_rhs!(Q, p, t, 
-    #                          mesh, swe_1d_constants, left_bcType, right_bcType, S0), Q0, tspan, p)
-
-    # solve the ODE with a solver of your choice 
-    #bm = @benchmark solve(prob, Heun(), adaptive=false, dt=dt, saveat=t)
-    #@show bm 
-
-    if solver_choice == "SciML"
-
-        println("   Performing 2D SWE simulation with SciML solver ...")
+        println("       with SciML solver ...")
     
-        sol = solve(prob, Tsit5(), adaptive=false, dt=dt, saveat=t_save)
-        #sol = solve(prob, Heun(), adaptive=false, dt=dt, saveat=t)
-        #sol = solve(prob, AB3(), adaptive=false, dt=dt, saveat = t)
-        #sol = solve(prob, Rosenbrock23(), adaptive=false, dt=dt, saveat = t)  #implicit
+        if forward_simulation_ode_solver == "Tsit5()"
+            sol = solve(prob, Tsit5(), adaptive=forward_simulation_adaptive, dt=dt, saveat=t_save)
+        else
+            sol = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
+        end
 
-        #x, dp = extract_local_sensitivities(sol)
-        #da = dp[1]
-        #plot(sol.t, da', lw = 3)
-
-        #println("Press any key to exit ...")
-        #readline()
-        #exit()
-
-        # #save the results
         # #save the simulation solution results
-        jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
-        jldsave(joinpath(save_path, "zb_cells_truth.jld2"); zb_cells_truth)
+        jldsave(joinpath(save_path, forward_simulation_save_file_name); sol)
+
+        #save the simulation results (h, u, v) at the last time step to a json file (to be used as ground truth for inversion)
+        h_truth = Array(sol)[:,1,end]
+        eta_truth = h_truth .+ zb_cells_truth
+        u_truth = Array(sol)[:,2,end]./Array(sol)[:,1,end]
+        v_truth = Array(sol)[:,3,end]./Array(sol)[:,1,end]
+        open(joinpath(save_path, forward_simulation_save_solution_truth_file_name), "w") do io
+            JSON3.pretty(io, Dict("eta_truth" => eta_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cells_truth" => zb_cells_truth, "ManningN_values_truth" => ManningN_values_truth, "inlet_discharges_truth" => inlet_discharges_truth))
+            println(io)
+        end
 
         swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, nodeCoordinates, zb_cells, save_path)
-    end
-
-    #My own ODE Solver
-    if solver_choice == "MyOwn"
+    
+    elseif solver_choice == "customized"    #My own ODE Solver
 
         println("   Performing 2D SWE simulation with MyOwn solver ...")
         
@@ -291,37 +507,36 @@ if bSimulate_Synthetic_Data
         jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
 
         swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
-                
+    else
+        println("   Wrong solver choice. Supported solvers: SciML, customized. No forward simulation is performed.")
     end
-
-    
-
 end
 
 
-################
-#Inversion part# 
-################
+#########################
+#Inversion part         # 
+#########################
 
 if bPerform_Inversion
 
     println("   Performing inversion ...")
 
-    #open the simulation result (as the ground truth)
-    sol = load(joinpath(save_path, "simulation_solution.jld2"))["sol"]
-    h_truth = Array(sol)[:,1,end]
-    u_truth = Array(sol)[:,2,end]./Array(sol)[:,1,end]
-    v_truth = Array(sol)[:,3,end]./Array(sol)[:,1,end]
-    #@show sol
+    #open the forward simulation result (as the ground truth)
+    sol_truth = JSON3.read(open(joinpath(save_path, inversion_solution_truth_file_name)), Dict)
 
-    zb_cells_truth = load(joinpath(save_path, "zb_cells_truth.jld2"))["zb_cells_truth"]
+    WSE_truth = sol_truth["eta_truth"]
+    h_truth = sol_truth["h_truth"]
+    u_truth = sol_truth["u_truth"]
+    v_truth = sol_truth["v_truth"]
+    zb_cells_truth = sol_truth["zb_cells_truth"]
+    ManningN_values_truth = sol_truth["ManningN_values_truth"]
+    inlet_discharges_truth = sol_truth["inlet_discharges_truth"]
 
-    WSE_truth = h_truth .+ zb_cells_truth
-
-    #inversion parameters: zb_cell
-    # initial guess for the parameters
-    #ps = zeros(Float64, my_mesh_2D.numOfCells) .+ 0.01
-    ps = zeros(Float64, my_mesh_2D.numOfCells) 
+    #inversion parameters: 
+    # initial guess for the inversion parameters
+   
+    params_array_init = params_array
+    
     
     function predict(θ)
         #Zygote.ignore() do
@@ -350,9 +565,6 @@ if bPerform_Inversion
         #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
         #sol = solve(prob, Tsit5(), adaptive=false, p=θ, dt=dt, saveat=t_save; sensealg=GaussAdjoint(autojacvec=ZygoteVJP()))  #not working
 
-        #solve the ODE with my own solver
-        #sol = my_solve(θ, Q0, my_mesh_2D, tspan, dt)
-
         #if !SciMLBase.successful_retcode(sol)
         #    # Return a high cost instead of NaN
         #    return fill(convert(eltype(θ), Inf), size(sol[1]))
@@ -361,93 +573,11 @@ if bPerform_Inversion
         return sol
     end
 
-    #my_loss for debugging
-    function my_loss(θ)
-        # Add debug prints
-        #Zygote.ignore() do
-            #println("Current parameters: ", ForwardDiff.value.(θ))
-        #end
 
-        sol = Array(predict(θ))            #Forward prediction with current θ (=zb at cells)
-        #l = sol[:,1,end] .- 0.5  #loss = free surface elevation mismatch
-        l = sol[:,1,end] .- h_truth
-        loss = sum(abs2, l)
-
-        #Zygote.ignore() do
-        #    println("loss value = ", ForwardDiff.value(loss))
-        #    println("dloss/dθ = ", ForwardDiff.partials(loss))
-        #    #println("loss = ", loss)
-        #end
-
-        #pred_real = ForwardDiff.value.(sol)
-        #pred_real = sol
-        
-        #println("size of pred_real", size(pred_real))
-        #println("size of h_truth", size(h_truth))
-        #println("pred = ", pred_real[:,1,end])
-        #println("h_truth = ", h_truth)
-
-        #Zygote.ignore() do
-            # plt = plot(pred_real[:,1,end], 
-            #     label="Predicted",
-            #     #ylim=(0, 10),
-            #     xlabel="x",
-            #     ylabel="h",
-            #     linestyle=:solid)
-
-            # plot!(h_truth, label="True", linestyle=:dash)
-
-            # display(plt)
-        #end
-
-        return loss
-    end
-
-    #test predict
-    #sol_value = predict(ps)
-    #@show sol_value
-    #println("sol_value = ", sol_value)
-
-    #loss_value = my_loss(ps)
-    #println("loss_value = ", loss_value)
-
-    #function test_ode_gradient(θ)
-    #    sol = solve(prob, Tsit5(), p=θ, dt=dt, saveat=t_save; sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP()))
-    #    h_pred = Array(sol)[:,1,end]
-    #    return sum(abs2, h_pred)
-    #end
-    
-    #grads = Zygote.gradient(test_ode_gradient, ps)
-    #println(grads)
-
-    #throw("stop here")
-
-    # Add this before gradient computation
-    #@code_warntype(my_loss(ps))
-
-    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-    #grad = ForwardDiff.gradient(my_loss, ps)
-    #grad = Zygote.gradient(my_loss, ps)
-    #tape = ReverseDiff.GradientTape(my_loss, ps)
-    #ReverseDiff.compile!(tape)  # Optionally compile the tape for better performance
-    #grad = zeros(length(ps))  # Preallocate gradient array
-    #grad = ReverseDiff.gradient(my_loss, ps)
-
-    #jac = Zygote.jacobian(predict, ps)
-    #jac = ReverseDiff.jacobian(predict, ps)
-    #@show grad
-    #plot(jac)
-    #readline()
-    #exit()
-    #throw("stop here")
-
-    ## Defining Loss function
-    #zb_cell_local = zeros(Number, mesh.nCells)
-
+    ## Define Loss function
     function loss(θ)
-        pred = predict(θ)            #Forward prediction with current θ (=zb at cells)
-        #l = pred[:,1,end] - 0.5 #h_truth  #loss = free surface elevation mismatch
-        
+        pred = predict(θ)            #Forward prediction with current parameter θ 
+                
         #\theta is the current bed elevation at cells
         l = pred[:,1,end] .+ θ .- WSE_truth  #loss = free surface elevation mismatch
 
@@ -485,14 +615,6 @@ if bPerform_Inversion
         #return loss_pred_eta
     end
 
-    #grad = Zygote.gradient(loss, ps)
-    #grad = ForwardDiff.gradient(loss, ps)
-    #grad = ForwardDiff.gradient(predict, θ)
-    #@show grad
-    #println("grad = ", grad)
-    #readline()
-    #throw("stop here")
-
 
     LOSS = []                              # Loss accumulator
     PRED = []                              # prediction accumulator
@@ -522,10 +644,7 @@ if bPerform_Inversion
         false
     end
 
-    # Let see prediction vs. Truth
-    #scatter(sol[:, end], label = "Truth", size = (800, 500))
-    #plot!(PRED[end][:, end], lw = 2, label = "Prediction")
-
+    # Define AD type choice for optimization's gradient computation
     #The following is from SciMLSensitivity documentation regarding the choice of AD 
     #  AutoForwardDiff(): The fastest choice for small optimizations
     #  AutoReverseDiff(compile=false): A fast choice for large scalar optimizations
@@ -535,12 +654,12 @@ if bPerform_Inversion
     #  AutoModelingToolkit(): The fastest choice for large scalar optimizations
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
-    adtype = Optimization.AutoZygote()         #works on MBP, but slow. Not on Windows (don't know why). 
-    
-    #adtype = Optimization.AutoForwardDiff()  #ForwardDiff.jl is not supported for this problem.
+    adtype = Optimization.AutoZygote()         #
+    #adtype = Optimization.AutoForwardDiff()   #ForwardDiff.jl is not supported for this problem.
     #adtype = Optimization.AutoReverseDiff()
-    #adtype = Optimization.AutoEnzyme()   #failed, don't use "not implemented yet error".
+    #adtype = Optimization.AutoEnzyme()         #
 
+    # Define the optimization function
     #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_function/
     # OptimizationFunction{iip}(f, adtype::AbstractADType = NoAD();
     #                       grad = nothing, hess = nothing, hv = nothing,
@@ -559,13 +678,14 @@ if bPerform_Inversion
 
     optf = Optimization.OptimizationFunction((θ, p) -> loss(θ), adtype)   #\theta is the parameter to be optimized; p is not used.
 
-    #setup the bounds for the bathymetry
+    # Define the bounds for the parameter (only applicable for some optimizers which support lb and ub)
     lb_p = zeros(my_mesh_2D.numOfCells)
     lb_p .= -0.1  
 
     ub_p = zeros(my_mesh_2D.numOfCells)
     ub_p .= 0.3 
 
+    # Define the optimization problem
     #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_problem/
     #OptimizationProblem{iip}(f, u0, p = SciMLBase.NullParameters(),;
     #                          lb = nothing,
@@ -578,6 +698,7 @@ if bPerform_Inversion
     #optprob = Optimization.OptimizationProblem(optf, ps, lb=lb_p, ub=ub_p)
     optprob = Optimization.OptimizationProblem(optf, ps)
 
+    # Solve the optimization problem
     #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
     #Returned optimization solution Fields:
     # u: the representation of the optimization's solution.
@@ -596,22 +717,18 @@ if bPerform_Inversion
     #res = Optimization.solve(optprob, Optim.Newton(), callback=callback)  #error: not supported as the Fminbox optimizer
     #res = Optimization.solve(optprob, Optim.GradientDescent(), callback=callback)  #very slow decrease in loss 
     res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
+
     #@time res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
     #@profile res = Optimization.solve(optprob, Adam(0.01), callback=callback, maxiters=100)
     #Profile.print()
-
     
     #@show res
     
 
     #save the inversion results
-    #@show PARS 
     jldsave(joinpath(save_path, "inversion_results.jld2"); LOSS, PRED, PARS)
 
-end
-
-if bPlot_Inversion_Results
-
+    #process the inversion results
     println("   Processing inversion results ...")
 
     #open the simulation result (as the ground truth)

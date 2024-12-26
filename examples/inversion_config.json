@@ -1,0 +1,68 @@
+{
+  "case": {
+    "name": "uvWSE"
+  },
+  "dataLoader": {
+	"comment": "uv_only: True (u, v) or False (u, v, and WSE).",
+	"training_data": "train_uvWSE.tfrecords",
+	"validation_data": "validation_uvWSE.tfrecords",
+	"test_data": "test_uvWSE.tfrecords",
+	"uv_only": false, 
+	"scaled_data": true,
+	"minMaxVars_file": "variables_min_max.json"
+  },
+  "model":{
+	"comment": "model_type choices: fully_connected_MLP, CNN. loss_type: mse or L2",
+	"load_model_structure_from_json": true,
+	"model_structure_json_filename":"model_64_by_256_uvWSE.json",
+	"model_type": "CNN",
+	"input_shape": [64, 256, 1],
+	"loss_type": "mse",
+    "learning_rate": 0.001,
+    "optimizer": "adam"
+  },
+  "trainer":{
+    "num_epochs": 100,
+    "batch_size": 10,
+	"history_save_filename": "training_history.json",
+    "verbose_training": 1
+  },
+  "inverter":{
+	"comment": "specifications for inversion. use_uv_only: true-use only u and v to do inversion; otherwise u,v,WSE",
+	"use_uv_only": true,
+	"b_zb_init_from_file": false,
+	"zb_init_filename": "sampled_elevations_for_inversion_init.npz",
+	"b_use_masks": true,
+	"mask_filename": "bInDomain.npz",
+	"value_regularization_factor": 0.02,
+	"value_regularization_mean": 0.0,
+	"value_regularization_amplitude": 0.42,
+	"slope_regularization_factor": 0.56,
+	"slope_regularization_mean_xslope": 0.0,
+	"slope_regularization_mean_yslope": 0.0,
+	"slope_regularization_amplitude_xslope": 0.15,
+	"slope_regularization_amplitude_yslope": 0.18,
+	"optimizer": "adam",
+	"adam":{
+		"learning_rate": 0.1,
+		"epsilon": 1e-7
+		},
+	"nSteps": 1000,
+	"inversion_data_files": "inversion_case_uvWSE_1000.npz"
+  },
+  "callbacks":{
+    "checkpoint_monitor": "val_loss",
+    "checkpoint_mode": "min",
+    "checkpoint_save_best_only": true,
+    "checkpoint_save_weights_only": true,
+    "checkpoint_verbose": true,
+	"EarlyStopping_monitor": "val_loss",
+	"EarlyStopping_patience": 10,
+	"EarlyStopping_restore_best_weights": true,
+    "tensorboard_write_graph": true,
+	"ReduceLROnPlateau_monitor": "val_loss",
+	"ReduceLROnPlateau_factor": 0.5,
+	"ReduceLROnPlateau_patience": 5,
+	"ReduceLROnPlateau_min_lr": 1e-5
+  }
+}

@@ -1,0 +1,73 @@
+{
+    "dataLoader": {
+        "test_data": "test_uvWSE.tfrecords",
+        "uv_only": false,
+        "minMaxVars_file": "variables_min_max.json",
+        "scaled_data": true,
+        "training_data": "train_uvWSE.tfrecords",
+        "comment": "uv_only: True (u, v) or False (u, v, and WSE).",
+        "validation_data": "validation_uvWSE.tfrecords"
+    },
+    "case": {
+        "name": "uvWSE"
+    },
+    "model": {
+        "model_structure_json_filename": "model_64_by_256_uvWSE.json",
+        "input_shape": [
+            64,
+            256,
+            1
+        ],
+        "optimizer": "adam",
+        "loss_type": "mse",
+        "learning_rate": 0.01,
+        "model_type": "CNN",
+        "comment": "model_type choices: fully_connected_MLP, CNN. loss_type: mse or L2",
+        "load_model_structure_from_json": true
+    },
+    "trainer": {
+        "history_save_filename": "training_history.json",
+        "batch_size": 20,
+        "verbose_training": 1,
+        "num_epochs": 100
+    },
+    "inverter": {
+        "slope_regularization_amplitude_yslope": 0.18,
+        "optimizer": "adam",
+        "b_use_masks": true,
+        "slope_regularization_mean_yslope": 0,
+        "slope_regularization_factor": 0.56,
+        "adam": {
+            "epsilon": 1.0e-7,
+            "learning_rate": 0.1
+        },
+        "zb_init_filename": "sampled_elevations_for_inversion_init.npz",
+        "mask_filename": "bInDomain.npz",
+        "slope_regularization_mean_xslope": 0,
+        "comment": "specifications for inversion. use_uv_only: true-use only u and v to do inversion; otherwise u,v,WSE",
+        "inversion_data_files": "inversion_case_uvWSE_1000.npz",
+        "b_zb_init_from_file": false,
+        "nSteps": 1000,
+        "use_uv_only": true,
+        "value_regularization_amplitude": 0.42,
+        "value_regularization_mean": 0,
+        "slope_regularization_amplitude_xslope": 0.15,
+        "value_regularization_factor": 0.02,
+        "new_parameter": "new_value"
+    },
+    "callbacks": {
+        "ReduceLROnPlateau_min_lr": 1.0e-5,
+        "EarlyStopping_restore_best_weights": true,
+        "ReduceLROnPlateau_monitor": "val_loss",
+        "ReduceLROnPlateau_factor": 0.5,
+        "EarlyStopping_monitor": "val_loss",
+        "checkpoint_verbose": true,
+        "checkpoint_mode": "min",
+        "EarlyStopping_patience": 10,
+        "checkpoint_monitor": "val_loss",
+        "checkpoint_save_weights_only": true,
+        "checkpoint_save_best_only": true,
+        "ReduceLROnPlateau_patience": 5,
+        "tensorboard_write_graph": true
+    }
+}

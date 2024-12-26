@@ -13,9 +13,9 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
     q_x = copy(Q_cells[:, 2])
     q_y = copy(Q_cells[:, 3])
 
-    h_ghost = zeros(eltype(para), my_mesh_2D.numOfAllBounaryFaces)
-    q_x_ghost = zeros(eltype(para), my_mesh_2D.numOfAllBounaryFaces)
-    q_y_ghost = zeros(eltype(para), my_mesh_2D.numOfAllBounaryFaces)
+    h_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
+    q_x_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
+    q_y_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
 
     #for inlet-q boundaries
     # Loop through all inlet-q boundaries
@@ -131,5 +131,15 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
     # Stack the updated ghost cell values and return new Q_ghostCells
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
     return new_Q_ghostCells
+end
+
+#update inletQ_TotalQ
+function update_inletQ_TotalQ(inlet_discharges_current)
+    #update inletQ_TotalQ based on the provided inlet_discharges_current
+
+    inletQ_TotalQ =  [inlet_discharges_current[iInletQ] for iInletQ in 1:(length(inlet_discharges_current))]
+
+    return inletQ_TotalQ
+
 end
 

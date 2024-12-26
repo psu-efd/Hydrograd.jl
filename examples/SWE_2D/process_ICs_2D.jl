@@ -2,55 +2,53 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(my_mesh_2D, nodeCoordinates, eta, zb_cell, h, q_x, q_y, bPlot::Bool=false)
-    # parameters for initial free surface profile setup
+function setup_initial_condition!(forward_simulation_initial_condition_options, forward_simulation_initial_condition_constant_values, 
+    forward_simulation_initial_condition_values_from_file, my_mesh_2D, nodeCoordinates, eta, zb_cell, h, q_x, q_y,swe_2D_constants, bPlot::Bool=false)
     
-    xMid = (minimum(nodeCoordinates[:,1])+maximum(nodeCoordinates[:,1])) / 2.0   #mid point of the domain
-    
-    bump_center_x = xMid  # center of the bump
-    
-    h_small = 0.01
-    
-    #loop over cells
-    @inbounds for i in 1:my_mesh_2D.numOfCells
-        if my_mesh_2D.cell_centroids[i,1] < bump_center_x
-            eta[i] = 0.5     #0.33   #1.0 for simple.srhhydro
-        else
-            eta[i] = 0.33    #0.5   #1.0 for simple.srhhydro
+    if forward_simulation_initial_condition_options == "constant"
+        #loop over cells
+        @inbounds for i in 1:my_mesh_2D.numOfCells
+            h[i] = forward_simulation_initial_condition_constant_values[1]
+            q_x[i] = forward_simulation_initial_condition_constant_values[2]
+            q_y[i] = forward_simulation_initial_condition_constant_values[3]
         end
+    elseif forward_simulation_initial_condition_options == "from_file"
+        #make sure the length of the initial condition values is the same as the number of cells
+        if length(forward_simulation_initial_condition_values_from_file["h"]) != my_mesh_2D.numOfCells
+            error("The length of the initial condition values of h is not the same as the number of cells.")
+        end
+        if length(forward_simulation_initial_condition_values_from_file["q_x"]) != my_mesh_2D.numOfCells
+            error("The length of the initial condition values of q_x is not the same as the number of cells.")
+        end
+        if length(forward_simulation_initial_condition_values_from_file["q_y"]) != my_mesh_2D.numOfCells
+            error("The length of the initial condition values of q_y is not the same as the number of cells.")
+        end
+
+        #copy the initial condition values
+        h = deepcopy(forward_simulation_initial_condition_values_from_file["h"])
+        q_x = deepcopy(forward_simulation_initial_condition_values_from_file["q_x"])
+        q_y = deepcopy(forward_simulation_initial_condition_values_from_file["q_y"])
     end
     
-    #update water depth
-    @inbounds for i in 1:my_mesh_2D.numOfCells
-        h[i] = eta[i] - zb_cell[i]
-    end
-    
-    h[h.<0.0] .= h_small  #ensure positivity of water depth h
+    h[h.<0.0] .= swe_2D_constants.h_small  #ensure positivity of water depth h
     
     #update the free surface elevation again in case h has been clipped
     @inbounds for i in 1:my_mesh_2D.numOfCells
         eta[i] = h[i] + zb_cell[i]
     end
-
-    #update q_x, q_y
-    @inbounds for i in 1:my_mesh_2D.numOfCells
-        q_x[i] = 0.0
-        q_y[i] = 0.0
-    end
-    
-    #optionally plot the free surface for checking 
+  
+    #optionally plot the ICs for checking 
     if bPlot
         vector_data = [] 
         vector_names = []
         
-        scalar_data = [eta, h, zb_cell]
-        scalar_names = ["eta", "h", "zb_cell"]
+        scalar_data = [eta, h, q_x, q_y, zb_cell]
+        scalar_names = ["eta", "h", "q_x", "q_y", "zb_cell"]
         
-        file_path = joinpath(@__DIR__, "eta_h_zb.vtk" ) 
+        file_path = joinpath(@__DIR__, "initial_conditions.vtk" ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
-        println("eta, h, and zb are saved to ", file_path)
-        #exit(0)
+        println("initial conditions are saved to ", file_path)
     end
     
 end

@@ -85,10 +85,10 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     #srhhydro_EQParams = srhhydro_obj.srhhydro_content["EQParams"]
     #srhhydro_NDParams = srhhydro_obj.srhhydro_content["NDParams"]
     
-    # println("ManningsN: ", srhhydro_ManningsN)
+    #println("ManningsN: ", srhhydro_ManningsN)
     # println("BC: ", srhhydro_BC)
     # println("MONITORING: ", srhhydro_MONITORINGLines)
-    # println("IQParams: ", srhhydro_IQParams)
+    println("IQParams: ", srhhydro_IQParams)
     # println("EWSParamsC: ", srhhydro_EWSParamsC)
     #println("ISupCrParams: ", srhhydro_ISupCrParams)
     #println("EWSParamsRC: ", srhhydro_EWSParamsRC)
@@ -107,6 +107,37 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     srhmat_matNameList = srhmat_obj.matNameList
     srhmat_matZoneCells = srhmat_obj.matZoneCells
 
+    #Amend index-base: SRH-2D is 1-based; Julia is 0-based, as well as Python. PyHMT2D in Python is 0-based.
+    #Thus, we need to amend the index-base of srhmat_matNameList and srhmat_matZoneCells
+    # Create a new dictionary with modified keys
+    srhmat_matNameList_new = Dict{Int, String}()
+    for (k, v) in srhmat_matNameList
+        println("k: ", k, " v: ", v)
+        if parse(Int, k) == -1
+            new_key = 0
+        else
+            new_key = parse(Int, k)   #convert string to int, e.g., "1" -> 1
+        end
+        srhmat_matNameList_new[new_key] = v
+    end
+    srhmat_matNameList = srhmat_matNameList_new
+    srhmat_obj.srhmat_matNameList = srhmat_matNameList
+    println("srhmat_matNameList: ", srhmat_matNameList)
+    println("srhmat_matNameList_new: ", srhmat_matNameList_new)
+
+    srhmat_matZoneCells_new = Dict{Int, Vector{Int}}()
+    for (k, v) in srhmat_matZoneCells
+        if k == -1
+            new_key = 0
+        else
+            new_key = k   
+        end
+        srhmat_matZoneCells_new[new_key] = v
+    end
+    srhmat_matZoneCells = srhmat_matZoneCells_new
+    srhmat_obj.srhmat_matZoneCells = srhmat_matZoneCells
+
+
     #build material ID of each cell 
     matID_cells = zeros(Int, my_mesh_2D.numOfCells)
 
@@ -121,8 +152,8 @@ function process_SRH_2D_input(srhhydro_file_name::String)
 
         if !bFound
             println("Cell ", iCell, " is not found in any material zone. Assign it to the default material zone 0.")
-            matID_cells[iCell] = -1     #-1 means the cell is not in any material zone, i.e., it is in the default material zone
-            push!(srhmat_matZoneCells[-1], iCell)
+            matID_cells[iCell] = 0     #0 means the cell is not in any material zone, i.e., it is in the default material zone
+            push!(srhmat_matZoneCells[0], iCell)
         end
     end
     
@@ -156,7 +187,7 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     srh_all_Dict["srhhydro_EWSParamsC"] = srhhydro_EWSParamsC
     srh_all_Dict["nInletQ_BCs"] = nInletQ_BCs
     srh_all_Dict["nExitH_BCs"] = nExitH_BCs
-    srh_all_Dict["nWall_BCs"] = 0  #nWall_BCs not defined yet. It is computed outside later. 
+    srh_all_Dict["nWall_BCs"] = 0  #nWall_BCs not defined yet. It is computed outside later. There might be default boundaries, which are not defined in the srhhydro file.
     srh_all_Dict["nSymm_BCs"] = 0  #nSymm_BCs not defined yet. It is computed outside later. 
 
     srh_all_Dict["srhgeom_obj"] = srhgeom_obj

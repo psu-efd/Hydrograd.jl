@@ -10,14 +10,17 @@ using ForwardDiff
 using Zygote
 
 
-function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, inletQ_Length, inletQ_TotalQ, exitH_WSE)
+function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, 
+    my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    zb_cells, zb_ghostCells, zb_faces, S0, 
+    active_params_names)
 
     #Zygote.ignore() do  
     #    println("within swe_2D_rhs, t =", t)
     #end
 
     # Mesh data
-    numOfCells = my_mesh_2D.numOfCells
+    #numOfCells = my_mesh_2D.numOfCells
     #maxNumOfCellFaces = my_mesh_2D.maxNumOfCellFaces
 
     g = swe_2D_constants.g
@@ -29,12 +32,29 @@ function swe_2d_rhs(Q, para, t, my_mesh_2D, boundary_conditions, swe_2D_constant
     q_y = @view Q[:, 3]  # discharge in y
 
     # Set parameter values
-    zb_cells_current = para  # para.clone()
+    zb_cells_current = params_array.zb_cells_param  # para.clone()
+    ManningN_list_current = params_array.ManningN_list_param
+    inlet_discharges_current = params_array.inlet_discharges_param
 
-    # Interpolate zb from cell to face and compute bed slope at cells
-    zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
-    #println("zb_ghostCells = ", zb_ghostCells.values)
-    #println("S0 = ", S0)
+    # For the case of inversion or sensitivity analysis, and if zb is an active parameter, 
+    # we need to interpolate zb from cell to face and compute bed slope at cells
+    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "zb" in active_params_names
+        zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
+        #println("zb_ghostCells = ", zb_ghostCells.values)
+        #println("S0 = ", S0)
+    end
+
+    #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
+    # we need to update ManningN at ghost cells
+    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "ManningN" in active_params_names
+        ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, ManningN_list_current)
+    end
+
+    #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
+    # we need to update inletQ_TotalQ based on the provided ManningN_cells
+    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "Q" in active_params_names
+        inletQ_TotalQ = update_inletQ_TotalQ(inletQ_TotalQ, ManningN_cells)
+    end
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
     Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)

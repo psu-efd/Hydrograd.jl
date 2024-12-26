@@ -20,7 +20,7 @@ function setup_ManningN(my_mesh_2D, srh_all_Dict)
     #loop over all cells to setup Manning's n
     for iCell in 1:my_mesh_2D.numOfCells
         matID = matID_cells[iCell]
-        matName = srhmat_matNameList[string(matID)]
+        matName = srhmat_matNameList[matID]
         
         if haskey(srhhydro_ManningsN, matID)
             ManningN_cells[iCell] = srhhydro_ManningsN[matID]
@@ -41,7 +41,7 @@ end
 
 #update Manning's n values based on the provided Manning's n values for each material (zone)
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
-function update_ManningN(my_mesh_2D, srh_all_Dict, new_ManningN_values)
+function update_ManningN(my_mesh_2D, new_ManningN_values)
 
     # Create array directly with comprehension
     ManningN_cells = [new_ManningN_values[matID_cells[i]] for i in 1:my_mesh_2D.numOfCells]
