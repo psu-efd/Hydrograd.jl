@@ -160,6 +160,7 @@ inversion_ode_solver_adaptive = false
 inversion_ode_solver_b_jac_sparsity = false
 inversion_ode_solver_nSave = 1
 inversion_save_file_name = ""
+inversion_save_loss_history_file_name = ""
 
 if bPerform_Inversion
     active_param_names = String.(control_dict["inversion_options"]["active_param_names"])
@@ -577,16 +578,16 @@ if bPerform_Inversion
         v_truth = observed_data["v_truth"]
 
         #p.zb is the current bed elevation at cells
-        l = pred[:,1,end] .+ p.zb .- WSE_truth  #loss = free surface elevation mismatch
+        l = pred[:,1,end] .+ p.zb_cells_param .- WSE_truth  #loss = free surface elevation mismatch
 
         #loss for free surface elevation mismatch
         loss_pred_WSE = sum(abs2, l)
 
         #loss for velocity mismatch
-        loss_pred_uv = zero(eltype(θ))
+        loss_pred_uv = zero(eltype(p.zb_cells_param))
 
         # Add small epsilon to prevent division by zero
-        ϵ = sqrt(eps(eltype(θ)))
+        ϵ = sqrt(eps(eltype(p.zb_cells_param)))
         
         if inversion_bInversion_u_loss      #if also include u in the loss 
             l_u = pred[:,2,end]./(pred[:,1,end] .+ ϵ) .- u_truth
@@ -599,10 +600,10 @@ if bPerform_Inversion
         loss_pred = loss_pred_WSE + loss_pred_uv
 
         #loss for bed slope regularization
-        loss_slope = zero(eltype(θ))
+        loss_slope = zero(eltype(p.zb_cells_param))
 
         if inversion_bInversion_slope_loss    #if bed slope is included in the loss 
-            loss_slope = calc_slope_loss(θ, my_mesh_2D)
+            loss_slope = calc_slope_loss(p.zb_cells_param, my_mesh_2D)
         end 
 
         #combined loss due to free surface elevation mismatch, velocity mismatch, and bed slope regularization
@@ -615,21 +616,24 @@ if bPerform_Inversion
         # Loss function for optimization
         function opt_loss(θ, p)  # Add p argument even if unused
             # Create parameter set from optimization variables
-            new_params = Dict(zip(active_params, θ))
-            p_new = ComponentArray(
-                zb = haskey(new_params, :zb) ? new_params[:zb] : p_init.zb,
-                n = haskey(new_params, :n) ? new_params[:n] : p_init.n,
-                Q = haskey(new_params, :Q) ? new_params[:Q] : p_init.Q
-            )
-            return compute_loss(p_new, Q0, tspan, observed_data)
-        end
+            # Create new ComponentArray based on active parameters
+            if active_params == [:zb_cells_param]
+                p_new = ComponentArray(zb_cells_param=θ, ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=p_init.inlet_discharges_param)
+            elseif active_params == [:ManningN_list_param]
+                p_new = ComponentArray(zb_cells_param=p_init.zb_cells_param, ManningN_list_param=θ, inlet_discharges_param=p_init.inlet_discharges_param)
+            elseif active_params == [:inlet_discharges_param]
+                p_new = ComponentArray(zb_cells_param=p_init.zb_cells_param, ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=θ)
+            elseif active_params == [:zb_cells_param, :inlet_discharges_param] #not supported yet; one parameter at a time
+                p_new = ComponentArray(zb_cells_param=θ[1:1], ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=θ[2:end])
+                error("not supported yet; one parameter at a time") 
+            else
+                error("Unsupported parameter combination")
+            end
+                return compute_loss(p_new, Q0, tspan, observed_data)
+            end
     
-        # Initial values for optimization parameters
-        θ0 = [p_init[param] for param in active_params]
-
-        # Flatten array parameters for optimization (optimizers require a single array for parameters)
-        θ0 = [θ for param in active_params for θ in (param == :Q ? p_init.Q : [p_init[param]])]
-
+        # Initial values for optimization parameters (vcat to flatten the array parameters to 1D array for optimizers)
+        θ0 = vcat([p_init[param] for param in active_params]...)
 
         # Define AD type choice for optimization's gradient computation
         #The following is from SciMLSensitivity documentation regarding the choice of AD 
@@ -747,7 +751,7 @@ if bPerform_Inversion
 
     #process inversion results
     inversion_results_file_name = joinpath(save_path, inversion_save_file_name)
-    process_inversion_results_2D(inversion_results_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+    process_inversion_results_2D(inversion_results_file_name, inversion_save_loss_history_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
 end 
 
 

@@ -55,7 +55,8 @@
             "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },
-        "inversion_save_file_name": "inversion_results.jld2"
+        "inversion_save_file_name": "inversion_results.jld2",
+        "inversion_save_loss_history_file_name": "inversion_loss_history.csv"
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. zb_initial_values_options is the option for the zb initial values: zero, from_file.",

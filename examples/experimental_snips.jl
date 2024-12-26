@@ -12,15 +12,15 @@ function shallow_water_eq(u, p, t)
     h, hu, hv = u
     g = 9.81
 
-    Zygote.ignore() do
-        println("zb = ", zb)
-        println("n = ", n)
-        println("Q = ", Q)
-        println("sum(Q) = ", sum(Q))
-        println("h = ", h)
-        println("hu = ", hu)
-        println("hv = ", hv)
-    end
+    # Zygote.ignore() do
+    #     println("zb = ", zb)
+    #     println("n = ", n)
+    #     println("Q = ", Q)
+    #     println("sum(Q) = ", sum(Q))
+    #     println("h = ", h)
+    #     println("hu = ", hu)
+    #     println("hv = ", hv)
+    # end
 
     # Return derivatives without mutation
     [
