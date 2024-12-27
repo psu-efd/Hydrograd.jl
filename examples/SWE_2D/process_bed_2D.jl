@@ -30,7 +30,7 @@ function setup_bed(my_mesh_2D, nodeCoordinates, bPlotBed::Bool=false)
      zb_cells = zeros(Float64, my_mesh_2D.numOfCells)  # zb at cell centers 
 
     #loop through cells
-    @inbounds for i in 1:my_mesh_2D.numOfCells
+    for i in 1:my_mesh_2D.numOfCells
         #get the node coordinates of the cell
         cell_nodes = my_mesh_2D.cellNodesList[i,:][1:my_mesh_2D.cellNodesCount[i]]
         cell_node_coordinates = nodeCoordinates[cell_nodes, :]

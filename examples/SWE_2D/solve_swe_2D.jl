@@ -228,10 +228,29 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 # Define the ODE function 
 function swe_2d_ode(Q, params_array, t)
 
-    dQdt = swe_2d_rhs(Q, params_array, t, settings, my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells,
-        inletQ_Length, inletQ_TotalQ, exitH_WSE, zb_cells, zb_ghostCells, zb_faces, S0)
+    #return zeros(size(Q))
+    #return Q .* 1.0
 
-    return dQdt
+    # Create closure to capture all extra arguments
+    let settings=settings, my_mesh_2D=my_mesh_2D, srh_all_Dict=srh_all_Dict,
+        boundary_conditions=boundary_conditions, swe_2D_constants=swe_2D_constants,
+        ManningN_cells=ManningN_cells, ManningN_ghostCells=ManningN_ghostCells,
+        inletQ_Length=inletQ_Length, inletQ_TotalQ=inletQ_TotalQ, exitH_WSE=exitH_WSE,
+        zb_cells=zb_cells, zb_ghostCells=zb_ghostCells, zb_faces=zb_faces, S0=S0
+
+        dQdt = swe_2d_rhs(Q, params_array, t, settings,
+            my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+            ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+            zb_cells, zb_ghostCells, zb_faces, S0)
+        return dQdt
+    end
+
+    # dQdt = swe_2d_rhs(Q, params_array, t, settings,
+    #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+    #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #         zb_cells, zb_ghostCells, zb_faces, S0)
+
+    # return dQdt
 end
 
 # Create the ODEFunction with the typed function
@@ -364,6 +383,12 @@ if settings.bPerform_Inversion
     @show Q0
     @show tspan
     @show params_array
+    for value in params_array
+        @assert !ismissing(value) "params_array contains missing values!"
+        @assert !isnothing(value) "params_array contains `nothing` values!"
+    end
+    
+    
     prob = ODEProblem(ode_f, Q0, tspan, params_array)
 
     #use Enzyme to test the gradient of the ODE and identify the source of the error
@@ -383,6 +408,7 @@ if settings.bPerform_Inversion
     try
         test_forward = f(y, p, t)
         println("Forward pass successful")
+        @show typeof(test_forward)
         @show size(test_forward)
         @show test_forward
     catch e
@@ -393,23 +419,30 @@ if settings.bPerform_Inversion
     # Now test the pullback with more detailed error catching
     try
         λ = ones(size(prob.u0)) #zero(prob.u0)
-        _dy, back = Zygote.pullback(y, p) do u, p
-            vec(f(u, p, t))
+        _dy, back = Zygote.pullback(y, p) do u, p  #_dy is the result of the forward pass; back is the gradient function
+            #vec(f(u, p, t))
+            f(u, p, t)
         end
         println("Pullback creation successful")
+        @show typeof(_dy)
         @show size(_dy)
         @show _dy
 
         try
-            tmp1, tmp2 = back(λ)
+            tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
             println("Backward pass successful")
+            @show typeof(tmp1)
             @show size(tmp1)
+            @show typeof(tmp2)
             @show size(tmp2)
             @show tmp1
             @show tmp2
         catch e
             println("Backward pass failed")
             @show e
+            @show typeof(λ)
+            @show size(λ)
+            @show λ
         end
     catch e
         println("Pullback creation failed")

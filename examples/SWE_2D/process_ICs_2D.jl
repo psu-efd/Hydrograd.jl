@@ -7,7 +7,7 @@ function setup_initial_condition!(forward_simulation_initial_condition_options, 
     
     if forward_simulation_initial_condition_options == "constant"
         #loop over cells
-        @inbounds for i in 1:my_mesh_2D.numOfCells
+        for i in 1:my_mesh_2D.numOfCells
             h[i] = forward_simulation_initial_condition_constant_values[1]
             q_x[i] = forward_simulation_initial_condition_constant_values[2]
             q_y[i] = forward_simulation_initial_condition_constant_values[3]
@@ -33,7 +33,7 @@ function setup_initial_condition!(forward_simulation_initial_condition_options, 
     h[h.<0.0] .= swe_2D_constants.h_small  #ensure positivity of water depth h
     
     #update the free surface elevation again in case h has been clipped
-    @inbounds for i in 1:my_mesh_2D.numOfCells
+    for i in 1:my_mesh_2D.numOfCells
         eta[i] = h[i] + zb_cell[i]
     end
   

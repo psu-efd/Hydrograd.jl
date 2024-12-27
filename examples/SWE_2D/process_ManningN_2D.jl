@@ -41,10 +41,12 @@ end
 
 #update Manning's n values based on the provided Manning's n values for each material (zone)
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
-function update_ManningN(my_mesh_2D, new_ManningN_values)
+function update_ManningN(my_mesh_2D, srh_all_Dict, new_ManningN_values)
+
+    matID_cells = srh_all_Dict["matID_cells"]  #material ID for each cell (0-based): 0-default material, 1-first material, 2-second material, etc.
 
     # Create array directly with comprehension
-    ManningN_cells = [new_ManningN_values[matID_cells[i]] for i in 1:my_mesh_2D.numOfCells]
+    ManningN_cells = [new_ManningN_values[matID_cells[i]+1] for i in 1:my_mesh_2D.numOfCells]  #+1 to make matID_cells 1-based (to be consistent with the new_ManningN_values)
 
      #update Manning's n at ghost cells
      ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
