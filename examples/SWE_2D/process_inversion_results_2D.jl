@@ -19,7 +19,13 @@ plot_font = "sans-serif"
 #         legendfont=font(10, plot_font))  #for legend
 
 
-function  process_inversion_results_2D(inversion_results_file_name, inversion_save_loss_history_file_name, my_mesh_2D, nodeCoordinates, zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+function  postprocess_inversion_results_2D(settings, my_mesh_2D, nodeCoordinates, 
+    zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+
+    inversion_results_file_name = joinpath(save_path, settings.inversion_settings.save_file_name)
+
+    inversion_save_loss_history_file_name = settings.inversion_settings.save_loss_history_file_name
+
 
     inversion_results = load(inversion_results_file_name)
     
@@ -58,7 +64,12 @@ function  process_inversion_results_2D(inversion_results_file_name, inversion_sa
     for (i, (curPred, curPars)) in enumerate(zip(PRED, PARS))
         h_i = curPred
         
-        zb_i = curPars.zb_cells_param
+        #if the inversion is for zb, then curPars is the zb_cells_param. Otherwise, curPar is something else such as the Manning's n or the inlet discharges. 
+        if settings.inversion_settings.active_param_names == ["zb"]
+            zb_i = curPars
+        else
+            zb_i = zb_cells_truth
+        end
 
         WSE_i = h_i .+ zb_i
 

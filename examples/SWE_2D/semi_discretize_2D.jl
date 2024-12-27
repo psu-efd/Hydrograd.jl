@@ -10,14 +10,22 @@ using ForwardDiff
 using Zygote
 
 
-function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, 
-    my_mesh_2D, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-    zb_cells, zb_ghostCells, zb_faces, S0, 
-    active_params_names)
+function swe_2d_rhs(Q, params_array, t, settings, 
+    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    zb_cells, zb_ghostCells, zb_faces, S0)
 
-    #Zygote.ignore() do  
-    #    println("within swe_2D_rhs, t =", t)
-    #end
+    Zygote.ignore() do  
+        println("within swe_2D_rhs, t =", t)
+        @show typeof(Q)
+        @show typeof(params_array)
+    end
+
+    data_type = eltype(Q[1,1])
+
+    Zygote.ignore() do
+        @assert data_type <: Real "data_type must be a subtype of Real for AD compatibility"
+    end
+
 
     # Mesh data
     #numOfCells = my_mesh_2D.numOfCells
@@ -27,44 +35,98 @@ function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_In
     h_small = swe_2D_constants.h_small
     RiemannSolver = swe_2D_constants.RiemannSolver
 
-    h = @view Q[:, 1]  # water depth
-    q_x = @view Q[:, 2]  # discharge in x
-    q_y = @view Q[:, 3]  # discharge in y
+    #h = @view Q[:, 1]  # water depth
+    #q_x = @view Q[:, 2]  # discharge in x
+    #q_y = @view Q[:, 3]  # discharge in y
+    h = Q[:, 1]  # water depth
+    q_x = Q[:, 2]  # discharge in x
+    q_y = Q[:, 3]  # discharge in y
 
     # Get parameter values
-    zb_cells_current = params_array.zb_cells_param  
-    ManningN_list_current = params_array.ManningN_list_param
-    inlet_discharges_current = params_array.inlet_discharges_param
+    # Handle both ComponentArray and regular Array
+    if params_array isa ComponentArray
+        zb_cells_current = Array(params_array.zb_cells_param)
+        ManningN_list_current = Array(params_array.ManningN_list_param)
+        inlet_discharges_current = Array(params_array.inlet_discharges_param)
+    else
+        # Assuming the order matches ComponentArray structure
+        n_cells = my_mesh_2D.numOfCells
+        n_materials = srh_all_Dict["srhmat_numOfMaterials"]
+        zb_cells_current = params_array[1:n_cells]
+        ManningN_list_current = params_array[n_cells+1:n_cells+n_materials]
+        inlet_discharges_current = params_array[n_cells+n_materials+1:end]
+    end
+
+    Zygote.ignore() do
+        @show typeof(params_array.zb_cells_param)
+        @show typeof(params_array.ManningN_list_param)
+        @show typeof(params_array.inlet_discharges_param)
+
+        @show typeof(zb_cells_current)
+        @show typeof(ManningN_list_current)
+        @show typeof(inlet_discharges_current)
+    end
 
     # For the case of inversion or sensitivity analysis, and if zb is an active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
-    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "zb" in active_params_names
+    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
+         "zb" in settings.inversion_settings.active_param_names
+
         zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
         #println("zb_ghostCells = ", zb_ghostCells.values)
         #println("S0 = ", S0)
     end
 
+    Zygote.ignore() do
+        @show typeof(zb_ghostCells)
+        @show typeof(zb_faces)
+        @show typeof(S0)
+    end
+
     #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
     # we need to update ManningN at cells and ghost cells
-    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "ManningN" in active_params_names
+    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && 
+        "ManningN" in settings.inversion_settings.active_param_names
+        
         ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, ManningN_list_current)
+    end
+
+    Zygote.ignore() do
+        @show typeof(ManningN_cells)
+        @show typeof(ManningN_ghostCells)
     end
 
     #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
     # we need to update inletQ_TotalQ based on the provided inlet_discharges_current
-    if (bPerform_Inversion || bPerform_Sensitivity_Analysis) && "Q" in active_params_names
+    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && 
+        "Q" in settings.inversion_settings.active_param_names
+        
         inletQ_TotalQ = update_inletQ_TotalQ(inlet_discharges_current)
+    end
+
+    Zygote.ignore() do
+        @show typeof(inletQ_TotalQ)
+    end
+
+    gradient_output = Zygote.gradient((Q) -> sum(process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)), Q)
+
+    Zygote.ignore() do
+        @show gradient_output
     end
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
     Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
+    Zygote.ignore() do
+        @show typeof(Q_ghost)
+    end
+
     # Loop through all cells to calculate the fluxes on faces
-    updates = map(1:my_mesh_2D.numOfCells) do iCell           # .= is in-place mutation!
+    updates = collect(map(1:my_mesh_2D.numOfCells) do iCell           # .= is in-place mutation!
         cell_area = my_mesh_2D.cell_areas[iCell]
 
         # Initialize flux accumulation
-        flux_sum = zeros(eltype(Q), 3)
+        flux_sum = zeros(data_type, 3)
 
         for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
             faceID = abs(my_mesh_2D.cellFacesList[iCell, :][iFace])
@@ -104,38 +166,19 @@ function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_In
         end
 
         # Source terms
-        # source_terms = zeros(eltype(Q), 3)
-        # if h[iCell] <= h_small
-        #     source_terms .= [eltype(Q)(0.0),
-        #         g * h[iCell] * S0[iCell, 1] * cell_area,
-        #         g * h[iCell] * S0[iCell, 2] * cell_area]
-        # else
-        #     u_temp = q_x[iCell] / h[iCell]
-        #     v_temp = q_y[iCell] / h[iCell]
-        #     #u_mag = sqrt(u_temp^2 + v_temp^2)
-        #     u_mag = max(sqrt(u_temp^2 + v_temp^2), sqrt(eps(eltype(u_temp))))
-
-        #     friction_x = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * u_temp
-        #     friction_y = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * v_temp
-
-        #     source_terms .= [zero(eltype(Q)),
-        #         (g * h[iCell] * S0[iCell, 1] - friction_x) * cell_area,
-        #         (g * h[iCell] * S0[iCell, 2] - friction_y) * cell_area]
-        # end
-
         source_terms = if h[iCell] <= h_small
-            [eltype(Q)(0.0),
+            [data_type(0.0),
              g * h[iCell] * S0[iCell, 1] * cell_area,
              g * h[iCell] * S0[iCell, 2] * cell_area]
         else
             u_temp = q_x[iCell] / h[iCell]
             v_temp = q_y[iCell] / h[iCell]
-            u_mag = max(sqrt(u_temp^2 + v_temp^2), sqrt(eps(eltype(u_temp))))
+            u_mag = max(sqrt(u_temp^2 + v_temp^2), sqrt(eps(data_type)))
         
             friction_x = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * u_temp
             friction_y = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * v_temp
         
-            [zero(eltype(Q)),
+            [zero(data_type),
              (g * h[iCell] * S0[iCell, 1] - friction_x) * cell_area,
              (g * h[iCell] * S0[iCell, 2] - friction_y) * cell_area]
         end
@@ -146,14 +189,23 @@ function swe_2d_rhs(Q, params_array, t, bPerform_Forward_Simulation, bPerform_In
         end
 
         # Return the update for this cell (without in-place mutation)
-        (-flux_sum .+ source_terms) ./ cell_area
+        Array((-flux_sum .+ source_terms) ./ cell_area)
+    end)
+
+    Zygote.ignore() do
+        @show typeof(updates)
     end
 
     #convert updates to a 2D array: vcat organizes vectors as rows
     # Stacks vectors vertically, treating each vector as a row of the resulting matrix.
     # The transpose (') ensures the vectors are treated as rows when concatenated.
     #dQdt = vcat(updates'...)  #this breaks reverse mode AD in Zygote
-    dQdt = [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])]
+    #dQdt = [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])]
+    dQdt = hcat(updates...)
+
+    Zygote.ignore() do
+        @show typeof(dQdt)
+    end
 
     #println("dQdt value = ", ForwardDiff.value.(dQdt))
     #println("dQdt partials = ", ForwardDiff.partials.(dQdt))

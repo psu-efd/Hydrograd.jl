@@ -10,7 +10,7 @@
  *                                                                 *
  *******************************************************************
 
- ==> Code Execution Year-Month-Date:  2024 12 25
+ ==> Code Execution Year-Month-Date:  2024 12 26
 
 
  ************************************************************
@@ -24,11 +24,11 @@
       Turbulence Model: Depth-averaged parabolic zero-equation model
 
  MESH SIZE INFO:
-      Total number of cells:                 20
-      Total number of mesh points:           42
-      Total number of faces:                 61
-      Total number of boundary faces:        42
-      NCLVT:                                 80
+      Total number of cells:                100
+      Total number of mesh points:          202
+      Total number of faces:                301
+      Total number of boundary faces:       202
+      NCLVT:                                400
       Number of Mesh Blocks:                  1
       Mesh Type: Unstructured mesh - SMS-2DM format
 
@@ -51,12 +51,12 @@
  ************************************************************
 
  ==> Mesh Size Info over Solution Domain
-     Minimum Mesh Cell Area (m^2)      =   1.250E+00
-     Maximum Mesh Cell Area (m^2)      =   1.250E+00
+     Minimum Mesh Cell Area (m^2)      =   2.500E-01
+     Maximum Mesh Cell Area (m^2)      =   2.500E-01
      Total Solution Domain Area (m^2)  =   2.500E+01
 
  ==> Smallest Angle between Cell-to-Cell-Base-Vector and Face =   9.000E+01
-     Located at Face=      54;    Between two cells:      12      13
+     Located at Face=     140;    Between two cells:      63      63
 
  ==> Total water volume (m3) at t=tstart:
      Within Model Domain =   0.0000E+00
@@ -77,10 +77,10 @@
  =      (Note:FLUX useful for STEADY modeling; VOLUME for UNSTEADY)
  ================================================================
 
- Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -6.4800E+02
+ Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -6.4782E+02
                       Flux in m^3/s at the end of the computation =  -1.8000E-01
 
- Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   6.3954E+02
+ Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   6.3990E+02
                       Flux in m^3/s at the end of the computation =   1.8000E-01
 
  Boundary patch =  3 Total Water Volume (m^3) out of the boundary =   0.0000E+00
@@ -94,21 +94,21 @@
  ==============================================================
 
  Initial Water Volume (m3) in Domain ............................. =   0.0000E+00
- Final   Water Volume (m3) in Domain ............................. =   8.3400E+00
+ Final   Water Volume (m3) in Domain ............................. =   8.6166E+00
 
- Total Water Volume entering domain from boundary (m3) ........... =   6.4800E+02
- Total Water Volume exiting  domain from boundary (m3) ........... =   6.3954E+02
+ Total Water Volume entering domain from boundary (m3) ........... =   6.4782E+02
+ Total Water Volume exiting  domain from boundary (m3) ........... =   6.3990E+02
  Net Water Volume exiting domain from internal boundary (m3) ..... =   0.0000E+00
 
  Total Rainfall Volume (m3) into domain (V_rain) ................. =   0.0000E+00
  Total Infiltrated Volume (m3) lost from domain................... =   0.0000E+00
 
- Water Conservation Error in Volume (m3) ......................... =   1.2390E-01
- Percentage of above Error relative to Total_Incoming_Volume ..... =   0.02%
+ Water Conservation Error in Volume (m3) ......................... =  -6.9227E-01
+ Percentage of above Error relative to Total_Incoming_Volume ..... =   0.11%
  [errors due primarily to numerical discretization etc.]
 
- ==> CPU-TIME(hours) =    1.693E-04
+ ==> CPU-TIME(hours) =    3.299E-04
 
- ==> Wall-TIME(hours) =    3.289E-04
+ ==> Wall-TIME(hours) =    4.881E-04
 
  ==> SRH is successfully executed

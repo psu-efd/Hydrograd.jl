@@ -5,20 +5,19 @@
 #2. bed elevation
 #3. Inlet discharge (constant for now)
 #4. xxx (for future use)
-function preprocess_model_parameters_2D(bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, zb_cells_param, 
-    ManningN_list_param, inlet_discharges_param, active_param_names)
+function preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
 
     # Create ComponentArray for parameters
     params_array = ComponentArray(zb_cells_param=zb_cells_param, ManningN_list_param=ManningN_list_param, inlet_discharges_param=inlet_discharges_param)
     active_params = []
 
-    if bPerform_Inversion || bPerform_Sensitivity_Analysis
-        if length(active_param_names) != 1
+    if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
+        if length(settings.inversion_settings.active_param_names) != 1
             error("Currently only support one active parameter for now. Active parameter names: $active_param_names. Supported active parameter names: zb, ManningN, Q")
         end
 
-        #get the active parameter name
-        active_param_name = active_param_names[1]
+        #get the active parameter name (only one active parameter is supported for now)
+        active_param_name = settings.inversion_settings.active_param_names[1]
 
         if active_param_name == "zb"
             active_params = [:zb_cells_param]

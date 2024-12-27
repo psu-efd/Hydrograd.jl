@@ -2,7 +2,7 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": true,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump.srhhydro",
+        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
         "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": true,
@@ -44,7 +44,7 @@
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
         "inversion_max_iterations": 100,
-        "inversion_solution_truth_file_name": "forward_simulation_solution_truth.json",
+        "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "constant",
         "inversion_forward_simulation_initial_condition_file_name": "inversion_forward_simulation_initial_conditions.json",
         "inversion_forward_simulation_initial_condition_constant_values": [0.33, 0.0, 0.0],

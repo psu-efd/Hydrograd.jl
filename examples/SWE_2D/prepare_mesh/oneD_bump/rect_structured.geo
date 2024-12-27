@@ -3,7 +3,7 @@
 // Parameters
 Lx = 25;    // Length of the rectangle along the x-axis
 Ly = 1;    // Length of the rectangle along the y-axis
-nx = 20;   // Number of divisions along x-axis for structured mesh
+nx = 100;   // Number of divisions along x-axis for structured mesh
 ny = 1;   // Number of divisions along y-axis for structured mesh
 
 // Define points for the rectangle
