@@ -9,9 +9,9 @@ using Zygote
 #return a new Q_ghostCells
 function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
-    h = copy(Q_cells[:, 1])         
-    q_x = copy(Q_cells[:, 2])
-    q_y = copy(Q_cells[:, 3])
+    h = Q_cells[:, 1]         
+    q_x = Q_cells[:, 2]
+    q_y = Q_cells[:, 3]
 
     h_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
     q_x_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
@@ -41,9 +41,7 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
                       for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
         )
 
-        if total_A <= 1e-10
-            error("Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A")
-        end
+        @assert total_A > 1e-10 "Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A"
 
         # Second pass: compute ghost cell values
         h_new = map(internalCellID -> h[internalCellID], current_internalCellIDs)
@@ -130,6 +128,13 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
 
     # Stack the updated ghost cell values and return new Q_ghostCells
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
+
+    Zygote.ignore() do
+        @show size(new_Q_ghostCells)
+        @show typeof(new_Q_ghostCells)
+        @show new_Q_ghostCells
+    end
+
     return new_Q_ghostCells
 end
 

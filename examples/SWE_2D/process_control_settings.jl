@@ -116,6 +116,7 @@ function parse_control_file(control_file::String)
         println("    dt = ", settings.time_settings.dt)
 
         if settings.bPerform_Forward_Simulation
+            println("Forward simulation is to be performed.")
             println("Forward simulation options:")
             println("    solver = ", settings.forward_settings.solver)
             println("    ode_solver = ", settings.forward_settings.ode_solver)
@@ -131,6 +132,7 @@ function parse_control_file(control_file::String)
         end
 
         if settings.bPerform_Inversion
+            println("Inversion is to be performed.")
             println("Inversion options:")
             println("    active_param_names = ", settings.inversion_settings.active_param_names)
             println("    inversion_parameter_initial_values_options = ", settings.inversion_settings.parameter_initial_values_options)

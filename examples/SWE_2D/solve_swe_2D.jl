@@ -123,7 +123,8 @@ srhhydro_inletQ_Dict = srh_all_Dict["srhhydro_IQParams"]
 
 inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[i][1]) for i in 1:(length(srhhydro_inletQ_Dict))]
 
-if settings.bPerform_Forward_Simulation && settings.bVerbose
+#print the true values. The true parameter values are computed regardless of whether performing forward simulation or inversion
+if settings.bVerbose
     println("True zb_cells = ", zb_cells_truth)
     println("True Manning's n values = ", ManningN_values_truth)
     println("True inlet discharges = ", inlet_discharges_truth)
@@ -133,6 +134,13 @@ end
 zb_cells_param = nothing
 ManningN_list_param = nothing
 inlet_discharges_param = nothing
+
+#for forward simulation, the parameter values are from SRH-2D data
+if settings.bPerform_Forward_Simulation
+    zb_cells_param = deepcopy(zb_cells_truth)
+    ManningN_list_param = deepcopy(ManningN_values_truth)
+    inlet_discharges_param = deepcopy(inlet_discharges_truth)
+end
 
 if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
     if settings.inversion_settings.parameter_initial_values_options == "constant"

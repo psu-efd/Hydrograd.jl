@@ -27,14 +27,12 @@ function swe_2d_rhs(Q, params_array, t, settings,
 
     #return zeros(size(Q)) #zeros(data_type, size(Q))
     #return Q .* 1.0
-    
-    
+
 
     Zygote.ignore() do
         println("asserting data_type = ", data_type)
         @assert data_type <: Real "data_type must be a subtype of Real for AD compatibility"
     end
-
 
     # Mesh data
     #numOfCells = my_mesh_2D.numOfCells
@@ -54,9 +52,9 @@ function swe_2d_rhs(Q, params_array, t, settings,
     # Get parameter values
     # Handle both ComponentArray and regular Array
     if params_array isa ComponentArray
-        zb_cells_current = Array(params_array.zb_cells_param)
+        zb_cells_current = params_array.zb_cells_param
         ManningN_list_current = params_array.ManningN_list_param
-        inlet_discharges_current = Array(params_array.inlet_discharges_param)
+        inlet_discharges_current = params_array.inlet_discharges_param
     else
         # Assuming the order matches ComponentArray structure
         n_cells = my_mesh_2D.numOfCells
@@ -83,6 +81,26 @@ function swe_2d_rhs(Q, params_array, t, settings,
     # Make the return value depend on parameters
     #return Q * 1.0 .+ reshape(zb_cells_current, :, 1) .* ones(1, 3)
 
+    try
+        gradient_output = Zygote.gradient(new_zb -> begin
+            zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, new_zb)
+            sum(zb_ghostCells) + sum(zb_faces) + sum(S0)
+        end, zb_cells_current)
+
+        Zygote.ignore() do
+            println("gradeint for interploate_zb_from_cell_to_face_and_compute_S0 successful")
+            println("gradient_output for interploate_zb_from_cell_to_face_and_compute_S0 = ", gradient_output)
+            @show gradient_output
+
+            #throw(ErrorException("Stopping here for debugging"))
+        end
+    catch e
+        println("gradient for interploate_zb_from_cell_to_face_and_compute_S0 failed")
+        @show e
+
+        throw(ErrorException("Stopping here for debugging"))
+    end
+
     # For the case of inversion or sensitivity analysis, and if zb is an active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
     if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
@@ -106,34 +124,34 @@ function swe_2d_rhs(Q, params_array, t, settings,
     # Make the return value depend on parameters
     #return Q * 1.0 .+ reshape(S0[:,1], :, 1) .* ones(1, 3)
 
-    # try
-    #     gradient_output = Zygote.gradient(new_ManningN_values -> begin
-    #             ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, srh_all_Dict, new_ManningN_values)
-    #             sum(ManningN_cells)
-    #         end, ManningN_list_current)
+    try
+        gradient_output = Zygote.gradient(new_ManningN_values -> begin
+                ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, srh_all_Dict, new_ManningN_values)
+                sum(ManningN_cells)
+            end, ManningN_list_current)
 
-    #     Zygote.ignore() do
-    #         println("gradeint for update_ManningN successful")
-    #         println("gradient_output for ManningN = ", gradient_output)
-    #         @show gradient_output
+        Zygote.ignore() do
+            println("gradeint for update_ManningN successful")
+            println("gradient_output for ManningN = ", gradient_output)
+            @show gradient_output
 
-    #         #throw(ErrorException("Stopping here for debugging"))
-    #     end
-    # catch e
-    #     println("gradient for update_ManningN failed")
-    #     @show e
+            #throw(ErrorException("Stopping here for debugging"))
+        end
+    catch e
+        println("gradient for update_ManningN failed")
+        @show e
 
-    #     throw(ErrorException("Stopping here for debugging"))
-    # end
+        throw(ErrorException("Stopping here for debugging"))
+    end
 
     #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
     # we need to update ManningN at cells and ghost cells
     if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
        "ManningN" in settings.inversion_settings.active_param_names
 
-       Zygote.ignore() do
+        Zygote.ignore() do
             println("calling update_ManningN")
-       end
+        end
 
         ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, srh_all_Dict, ManningN_list_current)
     end
@@ -151,25 +169,25 @@ function swe_2d_rhs(Q, params_array, t, settings,
     #return Q * 1.0 .+ reshape(S0[:, 1], :, 1) .* ones(1, 3) .+ reshape(ManningN_cells, :, 1) .* ones(1, 3)
     #return Q * 1.0 .+ reshape(S0[:,1], :, 1) .* ones(1, 3) .+ (ManningN_list_current[1] + ManningN_list_current[2]) .* ones(size(Q))
 
-    # try
-    #     gradient_output = Zygote.gradient(new_inlet_discharge_values -> begin
-    #                 inletQ_TotalQ = update_inletQ_TotalQ(new_inlet_discharge_values)
-    #                 sum(inletQ_TotalQ)
-    #             end, inlet_discharges_current)
-    
-    #     Zygote.ignore() do
-    #             println("gradeint for update_inletQ_TotalQ successful")
-    #             println("gradient_output for update_inletQ_TotalQ = ", gradient_output)
-    #             @show gradient_output
-    
-    #             #throw(ErrorException("Stopping here for debugging"))
-    #     end
-    # catch e
-    #         println("gradient for update_inletQ_TotalQ failed")
-    #         @show e
-    
-    #         throw(ErrorException("Stopping here for debugging"))
-    # end
+    try
+        gradient_output = Zygote.gradient(new_inlet_discharge_values -> begin
+                    inletQ_TotalQ = update_inletQ_TotalQ(new_inlet_discharge_values)
+                    sum(inletQ_TotalQ)
+                end, inlet_discharges_current)
+
+        Zygote.ignore() do
+                println("gradeint for update_inletQ_TotalQ successful")
+                println("gradient_output for update_inletQ_TotalQ = ", gradient_output)
+                @show gradient_output
+
+                #throw(ErrorException("Stopping here for debugging"))
+        end
+    catch e
+            println("gradient for update_inletQ_TotalQ failed")
+            @show e
+
+            throw(ErrorException("Stopping here for debugging"))
+    end
 
     #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
     # we need to update inletQ_TotalQ based on the provided inlet_discharges_current
@@ -190,8 +208,16 @@ function swe_2d_rhs(Q, params_array, t, settings,
     #return Q * 1.0 .+ reshape(S0[:, 1], :, 1) .* ones(1, 3) .+ reshape(ManningN_cells, :, 1) .* ones(1, 3) + inletQ_TotalQ[1] .* ones(size(Q))
     #return Q * 1.0 .+ reshape(S0[:,1], :, 1) .* ones(1, 3) .+ (ManningN_list_current[1] + ManningN_list_current[2]) .* ones(size(Q))
 
+    #try
+    #gradient_output = Zygote.gradient((Q) -> sum(process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)), Q)
+    # Compute gradient with respect to both Q and params_array
+    #gradient_output = Zygote.gradient((Q, params) -> sum(process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)), Q, params_array)
+
     # try
-    #     gradient_output = Zygote.gradient((Q) -> sum(process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)), Q)
+
+    #     gradient_output = Zygote.gradient((Q, params_array) -> begin
+    #             sum(process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE))
+    #         end, Q, params_array)
 
     #     Zygote.ignore() do
     #         println("gradient_output for process_all_boundaries_2d successful")
@@ -208,9 +234,12 @@ function swe_2d_rhs(Q, params_array, t, settings,
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
     Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
+    #Q_ghost = reshape(ManningN_ghostCells, :, 1) .* ones(1, 3)  #fake Q_ghost
 
     Zygote.ignore() do
         @show typeof(Q_ghost)
+        @show size(Q_ghost)
+        @show Q_ghost
     end
 
     # Loop through all cells to calculate the fluxes on faces
@@ -309,12 +338,16 @@ function swe_2d_rhs(Q, params_array, t, settings,
     # Stacks vectors vertically, treating each vector as a row of the resulting matrix.
     # The transpose (') ensures the vectors are treated as rows when concatenated.
     #dQdt = vcat(updates'...)  #this breaks reverse mode AD in Zygote
-    #dQdt = [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])]
-    #dQdt = hcat(updates...)
-    dQdt = reduce(hcat, updates)
+    dQdt = [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])]
+    #dQdt = hcat(updates...)    #wrong dimensions
+    #dQdt = reduce(hcat, updates) #wrong dimensions
 
     Zygote.ignore() do
+        @show size(updates)
+        @show updates
         @show typeof(dQdt)
+        @show size(dQdt)
+        @show dQdt
     end
 
     #println("dQdt value = ", ForwardDiff.value.(dQdt))
@@ -323,8 +356,11 @@ function swe_2d_rhs(Q, params_array, t, settings,
     #println("dQ/dpara = ", ForwardDiff.partials(Q))
     #throw("stop here")
 
-    #return dQdt
+    # Ensure output dQdt has same dimensions as Q
+    @assert size(dQdt) == size(Q) "Dimension mismatch: dQdt $(size(dQdt)) ≠ Q $(size(Q))"
+
+    return dQdt
 
     #return Q .* 1.0
-    return Q * 1.0 .+ reshape(S0[:, 1], :, 1) .* ones(1, 3) .+ reshape(ManningN_cells, :, 1) .* ones(1, 3)
+    #return Q * 1.0 .+ reshape(S0[:, 1], :, 1) .* ones(1, 3) .+ reshape(ManningN_cells, :, 1) .* ones(1, 3)
 end
