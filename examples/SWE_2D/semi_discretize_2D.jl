@@ -18,17 +18,28 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     data_type = eltype(Q)
 
     Zygote.ignore() do
-        println("within swe_2D_rhs, t =", t)
-        println("asserting data_type = ", data_type)
+        if settings.bVerbose
+            println("within swe_2D_rhs, t =", t)
+            println("asserting data_type = ", data_type)
+        end
+
         @assert data_type <: Real "data_type must be a subtype of Real for AD compatibility"
     end
 
     # Extract parameters from the 1D array
     zb_cells_current = @view params_array[param_ranges.zb_start:param_ranges.zb_end]
     ManningN_list_current = @view params_array[param_ranges.manning_start:param_ranges.manning_end]
-    inlet_discharges_current = @view params_array[param_ranges.inletQ_start:param_ranges.inletQ_end]
+
+    nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
+
+    if nInletQ_BCs > 0
+        inlet_discharges_current = @view params_array[param_ranges.inletQ_start:param_ranges.inletQ_end]
+    else
+        inlet_discharges_current = nothing
+    end
 
     Zygote.ignore() do
+
         @show typeof(Q)
         @show typeof(params_array)
 
@@ -39,6 +50,7 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
         @show zb_cells_current
         @show ManningN_list_current
         @show inlet_discharges_current
+
     end
 
     #return zeros(size(Q)) #zeros(data_type, size(Q))
@@ -171,13 +183,20 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
        "Q" in settings.inversion_settings.active_param_names
 
-        inletQ_TotalQ = update_inletQ_TotalQ(inlet_discharges_current)
+        if nInletQ_BCs > 0
+            inletQ_TotalQ = update_inletQ_TotalQ(inlet_discharges_current)
+        else
+            inletQ_TotalQ = nothing
+        end
     end
 
     Zygote.ignore() do
         @show typeof(inletQ_TotalQ)
         @show inletQ_TotalQ
-        @show sum(inletQ_TotalQ)
+
+        if !isnothing(inletQ_TotalQ)
+            @show sum(inletQ_TotalQ)
+        end
     end
 
     # Make the return value depend on parameters
@@ -210,8 +229,9 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     # end
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
-    Q_ghost = process_all_boundaries_2d(Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
-    #Q_ghost = reshape(ManningN_ghostCells, :, 1) .* ones(1, 3)  #fake Q_ghost
+    Q_ghost = process_all_boundaries_2d(settings, Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
+    # Fake Q_ghost for debugging: Create Q_ghost where each row is [1.0, 0.0, 0.0]
+    #Q_ghost = hcat(ones(eltype(Q), my_mesh_2D.numOfAllBounaryFaces), zeros(eltype(Q), my_mesh_2D.numOfAllBounaryFaces, 2))
 
     Zygote.ignore() do
         @show typeof(Q_ghost)
@@ -244,8 +264,17 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
                 hvR = Q_ghost[right_cellID, 3]
             end
 
+            # Zygote.ignore() do
+            #     if iCell == 1  # Print for first cell only
+            #         println("Before Riemann solver:")
+            #         @show hL, huL, hvL
+            #         @show hR, huR, hvR
+            #         @show face_normal
+            #     end
+            # end
+
             if RiemannSolver == "Roe"
-                flux = Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
+                flux = Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
             elseif RiemannSolver == "HLL"
                 error("HLL solver not implemented yet")
             elseif RiemannSolver == "HLLC"
@@ -254,13 +283,22 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
                 error("Wrong choice of RiemannSolver")
             end
 
+            # Zygote.ignore() do
+            #     if iCell == 1  # Print for first cell only
+            #         println("After Riemann solver:")
+            #         @show flux
+            #     end
+            # end
+
             # Accumulate flux contribution
             flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
         end
 
-        if iCell == -1
-            println("flux_sum value = ", ForwardDiff.value.(flux_sum))
-            println("flux_sum partials = ", ForwardDiff.partials.(flux_sum))
+        Zygote.ignore() do
+            if iCell == -1
+                println("flux_sum value = ", ForwardDiff.value.(flux_sum))
+                println("flux_sum partials = ", ForwardDiff.partials.(flux_sum))
+            end
         end
 
         # Source terms
@@ -269,12 +307,12 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
                 g * h[iCell] * S0[iCell, 1] * cell_area,
                 g * h[iCell] * S0[iCell, 2] * cell_area]
         else
-            u_temp = q_x[iCell] / h[iCell]
-            v_temp = q_y[iCell] / h[iCell]
-            u_mag = max(sqrt(u_temp^2 + v_temp^2), sqrt(eps(data_type)))
+            u_temp = q_x[iCell] / max(h[iCell], h_small)
+            v_temp = q_y[iCell] / max(h[iCell], h_small)
+            u_mag = sqrt(u_temp^2 + v_temp^2 + sqrt(eps(data_type)))
 
-            friction_x = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * u_temp
-            friction_y = g * ManningN_cells[iCell]^2 / h[iCell]^(1.0 / 3.0) * u_mag * v_temp
+            friction_x = g * ManningN_cells[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
+            friction_y = g * ManningN_cells[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
 
             [zero(data_type),
                 (g * h[iCell] * S0[iCell, 1] - friction_x) * cell_area,
@@ -286,8 +324,18 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
             println("source_terms partials = ", ForwardDiff.partials.(source_terms))
         end
 
+        if iCell == 1  # Print for first cell only
+            Zygote.ignore() do
+                @show flux_sum
+                @show source_terms
+                @show cell_area
+                @show (-flux_sum .+ source_terms) ./ cell_area
+            end
+        end
+
         # Return the update for this cell (without in-place mutation)
         Array((-flux_sum .+ source_terms) ./ cell_area)
+
     end
 
     Zygote.ignore() do
@@ -320,7 +368,7 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     #dQdt = [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])]
     # Ensure concrete type for output
     dQdt = convert(typeof(Q), [updates[i][j] for i in 1:length(updates), j in 1:length(updates[1])])
-    
+
     #dQdt = hcat(updates...)    #wrong dimensions
     #dQdt = reduce(hcat, updates) #wrong dimensions
 

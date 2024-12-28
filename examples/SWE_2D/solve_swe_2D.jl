@@ -81,7 +81,7 @@ settings = parse_control_file(control_file)
 swe_2D_constants = swe_2D_consts(t=settings.time_settings.tspan[1], dt=settings.time_settings.dt, tStart=settings.time_settings.tspan[1], tEnd=settings.time_settings.tspan[2])
 
 #read data from SRH-2D hydro, geom, and material files; it aslo create the 2D mesh.
-srh_all_Dict = process_SRH_2D_input(settings.srhhydro_file_name)
+srh_all_Dict = process_SRH_2D_input(settings)
 
 #update swe_2D_constants based on the SRH-2D data
 if settings.time_settings.bUse_srhhydro_time_settings
@@ -104,7 +104,7 @@ end
 #setup bed elevation: computer zb at cell centers (zb_cells) from nodes, 
 #then interpolate zb from cell to face (zb_faces) and ghost cells (zb_ghostCells),
 #and compute the bed slope at cells (S0)
-zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(my_mesh_2D, nodeCoordinates, true)
+zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(settings, my_mesh_2D, nodeCoordinates, true)
 
 zb_cells_truth = zeros(size(zb_cells))
 
@@ -118,10 +118,14 @@ srhhydro_ManningsN_Dict = srh_all_Dict["srhhydro_ManningsN"]
 
 ManningN_values_truth = Float64[srhhydro_ManningsN_Dict[i] for i in 0:(length(srhhydro_ManningsN_Dict)-1)]
 
-#get the true inlet discharges
+#get the true inlet discharges (could be nothing if no inletQ_BCs)
 srhhydro_inletQ_Dict = srh_all_Dict["srhhydro_IQParams"]
 
-inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[i][1]) for i in 1:(length(srhhydro_inletQ_Dict))]
+inlet_discharges_truth = nothing
+
+if length(srhhydro_inletQ_Dict) > 0
+    inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[i][1]) for i in 1:(length(srhhydro_inletQ_Dict))]
+end
 
 #print the true values. The true parameter values are computed regardless of whether performing forward simulation or inversion
 if settings.bVerbose
@@ -139,7 +143,10 @@ inlet_discharges_param = nothing
 if settings.bPerform_Forward_Simulation
     zb_cells_param = deepcopy(zb_cells_truth)
     ManningN_list_param = deepcopy(ManningN_values_truth)
-    inlet_discharges_param = deepcopy(inlet_discharges_truth)
+
+    if !isnothing(inlet_discharges_truth)
+        inlet_discharges_param = deepcopy(inlet_discharges_truth)
+    end
 end
 
 if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
@@ -151,11 +158,16 @@ if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
         ManningN_list_param = deepcopy(settings.inversion_settings.ManningN_initial_values)
 
         #inlet discharges
-        inlet_discharges_param = deepcopy(settings.inversion_settings.inlet_discharge_initial_values)
+        if !isnothing(inlet_discharges_truth)
+            inlet_discharges_param = deepcopy(settings.inversion_settings.inlet_discharge_initial_values)
+        end
     elseif settings.inversion_settings.parameter_initial_values_options == "from_file"
         zb_cells_param = settings.inversion_settings.parameter_initial_values_from_file["zb_cells_param"]
         ManningN_list_param = settings.inversion_settings.parameter_initial_values_from_file["ManningN_list_param"]
-        inlet_discharges_param = settings.inversion_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+
+        if !isnothing(inlet_discharges_truth)
+            inlet_discharges_param = settings.inversion_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+        end
     else
         error("Invalid zb_initial_values_options: $zb_initial_values_options. Supported options: zero, from_file.")
     end
@@ -174,8 +186,15 @@ if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
 
     #make sure the length of inlet_discharges_param is the same as the number of inletQ_BCs
     nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
-    if length(inlet_discharges_param) != nInletQ_BCs
-        error("Length mismatch: inlet_discharges_param ($(length(inlet_discharges_param))) != nInletQ_BCs ($nInletQ_BCs)")
+
+    if !isnothing(inlet_discharges_truth)
+        if length(inlet_discharges_param) != nInletQ_BCs
+            error("Length mismatch: inlet_discharges_param ($(length(inlet_discharges_param))) != nInletQ_BCs ($nInletQ_BCs)")
+        end
+    else    #if inlet_discharges_truth is nothing, then nInletQ_BCs should be 0
+        if nInletQ_BCs > 0
+            error("No inletQ_BCs are defined in the SRH-2D data, but nInletQ_BCs is greater than 0. Please check the SRH-2D data.")
+        end
     end
 end
 
@@ -186,22 +205,22 @@ end
 params_array, active_range, param_ranges = preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
 
 #Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
-ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
+ManningN_cells, ManningN_ghostCells = setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
 # setup initial conditions 
-eta = zeros(my_mesh_2D.numOfCells)          #free surface elevation at cells 
+wse = zeros(my_mesh_2D.numOfCells)          #free surface elevation at cells 
 h = zeros(my_mesh_2D.numOfCells)            #water depth at cells 
 q_x = zeros(my_mesh_2D.numOfCells)          #q_x=hu at cells 
 q_y = zeros(my_mesh_2D.numOfCells)          #q_y=hv at cells 
 
-eta_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #free surface elevation at ghost cells 
+wse_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #free surface elevation at ghost cells 
 h_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)            #water depth at ghost cells 
 q_x_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_x=hu at ghost cells 
 q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghost cells 
 
 total_water_volume = []   #total volume of water in the domain 
 
-#setup initial condition for eta, h, q_x, q_y
+#setup initial condition for wse, h, q_x, q_y
 initial_condition_options = nothing
 initial_condition_constant_values = nothing
 initial_condition_values_from_file = nothing
@@ -221,15 +240,15 @@ else
     error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis. No initial condition is to be setup.")
 end
 
-setup_initial_condition!(initial_condition_options, initial_condition_constant_values, initial_condition_values_from_file,
-    my_mesh_2D, nodeCoordinates, eta, zb_cells, h, q_x, q_y, swe_2D_constants, true)
+setup_initial_condition!(settings, initial_condition_options, initial_condition_constant_values, initial_condition_values_from_file,
+    my_mesh_2D, nodeCoordinates, wse, zb_cells, h, q_x, q_y, swe_2D_constants, true)
 
 #setup ghost cells for initial condition
-setup_ghost_cells_initial_condition!(my_mesh_2D, eta, h, q_x, q_y, eta_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+setup_ghost_cells_initial_condition!(settings, my_mesh_2D, wse, h, q_x, q_y, wse_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
 #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
 boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet,
-exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
+exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinates)
 
 #set up initial condition for ODE solver
 Q0 = hcat(h, q_x, q_y)
@@ -243,25 +262,24 @@ function swe_2d_ode(Q, params_array, t)
     #return Q .* 1.0
 
     # Create closure to capture all extra arguments
-    let settings=settings, my_mesh_2D=my_mesh_2D, srh_all_Dict=srh_all_Dict,
-        boundary_conditions=boundary_conditions, swe_2D_constants=swe_2D_constants,
-        ManningN_cells=ManningN_cells, ManningN_ghostCells=ManningN_ghostCells,
-        inletQ_Length=inletQ_Length, inletQ_TotalQ=inletQ_TotalQ, exitH_WSE=exitH_WSE,
-        zb_cells=zb_cells, zb_ghostCells=zb_ghostCells, zb_faces=zb_faces, S0=S0
+    # let settings=settings, my_mesh_2D=my_mesh_2D, srh_all_Dict=srh_all_Dict,
+    #     boundary_conditions=boundary_conditions, swe_2D_constants=swe_2D_constants,
+    #     ManningN_cells=ManningN_cells, ManningN_ghostCells=ManningN_ghostCells,
+    #     inletQ_Length=inletQ_Length, inletQ_TotalQ=inletQ_TotalQ, exitH_WSE=exitH_WSE,
+    #     zb_cells=zb_cells, zb_ghostCells=zb_ghostCells, zb_faces=zb_faces, S0=S0
 
-        dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-            my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-            ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-            zb_cells, zb_ghostCells, zb_faces, S0)
-        return dQdt
-    end
-
-    # dQdt = swe_2d_rhs(Q, params_array, t, settings,
+    #     dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
     #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
     #         zb_cells, zb_ghostCells, zb_faces, S0)
+    #     return dQdt
+    # end
 
-    # return dQdt
+    dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
+             my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+             zb_cells, zb_ghostCells, zb_faces, S0)
+
+    return dQdt
 end
 
 # Create the ODEFunction with the typed function
@@ -315,7 +333,10 @@ if settings.bPerform_Forward_Simulation
     #define the time for saving the results (for forward simulation, which may be different from the time for saving the results in inversion)
     dt_save = (tspan[2] - tspan[1]) / settings.forward_settings.nSave
     t_save = tspan[1]:dt_save:tspan[2]
-    println("t_save = ", t_save)
+
+    if settings.bVerbose
+        println("t_save = ", t_save)
+    end
 
     #define the ODE problem
     prob = ODEProblem(ode_f, Q0, tspan, params_array)
@@ -335,11 +356,11 @@ if settings.bPerform_Forward_Simulation
 
         #save the simulation results (h, u, v) at the last time step to a json file (to be used as ground truth for inversion)
         h_truth = Array(sol)[:, 1, end]
-        eta_truth = h_truth .+ zb_cells_truth
+        wse_truth = h_truth .+ zb_cells_truth
         u_truth = Array(sol)[:, 2, end] ./ Array(sol)[:, 1, end]
         v_truth = Array(sol)[:, 3, end] ./ Array(sol)[:, 1, end]
         open(joinpath(save_path, settings.forward_settings.save_solution_truth_file_name), "w") do io
-            JSON3.pretty(io, Dict("eta_truth" => eta_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cells_truth" => zb_cells_truth, "ManningN_values_truth" => ManningN_values_truth, "inlet_discharges_truth" => inlet_discharges_truth))
+            JSON3.pretty(io, Dict("wse_truth" => wse_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cells_truth" => zb_cells_truth, "ManningN_values_truth" => ManningN_values_truth, "inlet_discharges_truth" => inlet_discharges_truth))
             println(io)
         end
 
@@ -373,12 +394,15 @@ if settings.bPerform_Inversion
     #define the time for saving the results (for inversion, which may be different from the time for saving the results in forward simulation)
     dt_save = (tspan[2] - tspan[1]) / settings.inversion_settings.ode_solver_nSave
     t_save = tspan[1]:dt_save:tspan[2]
-    println("t_save = ", t_save)
+
+    if settings.bVerbose
+        println("t_save = ", t_save)
+    end
 
     #open the forward simulation result (as the ground truth)
     sol_truth = JSON3.read(open(joinpath(save_path, settings.inversion_settings.inversion_truth_file_name)), Dict)
 
-    WSE_truth = sol_truth["eta_truth"]
+    WSE_truth = sol_truth["wse_truth"]
     h_truth = sol_truth["h_truth"]
     u_truth = sol_truth["u_truth"]
     v_truth = sol_truth["v_truth"]
@@ -476,13 +500,13 @@ if settings.bPerform_Inversion
             @show result
 
             # Sum to get scalar output for gradient
-            #sum(result)
-            return result[1,1]
+            sum(result)
+            #return result[1,1]
         end, y, p)
         
         @show typeof(gradient_output)
         @show size.(gradient_output)
-        
+        @show gradient_output
 
         println("After Zygote.gradient, Gradient computation successful")
         println(" ")
@@ -541,6 +565,9 @@ if settings.bPerform_Inversion
     #throw("stop here")
 
     #debug end
+    end
+
+    if false
 
 
     # Define the loss function
@@ -760,7 +787,7 @@ if settings.bPerform_Inversion
     params_array_init = params_array
 
     #perform the inversion
-    sol = optimize_parameters(Q0, tspan, observed_data, params_array_init, active_params)
+    sol = optimize_parameters(Q0, tspan, observed_data, params_array_init, param_dims, active_params)
 
     #save the inversion results
     jldsave(joinpath(save_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)

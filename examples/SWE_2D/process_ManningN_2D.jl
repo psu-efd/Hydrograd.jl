@@ -1,6 +1,6 @@
 #process the Manning's n values 
 
-function setup_ManningN(my_mesh_2D, srh_all_Dict)
+function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
     # Initialize Manning's n values for cells
     ManningN_cells = zeros(Float64, my_mesh_2D.numOfCells)
@@ -11,11 +11,13 @@ function setup_ManningN(my_mesh_2D, srh_all_Dict)
     srhmat_matZoneCells = srh_all_Dict["srhmat_matZoneCells"]  
     matID_cells = srh_all_Dict["matID_cells"] 
 
-    println("srhhydro_ManningsN: ", srhhydro_ManningsN)
-    println("srhmat_numOfMaterials: ", srhmat_numOfMaterials)
-    println("srhmat_matNameList: ", srhmat_matNameList)
-    println("srhmat_matZoneCells: ", srhmat_matZoneCells)
-    println("matID_cells: ", matID_cells)
+    if settings.bVerbose
+        println("srhhydro_ManningsN: ", srhhydro_ManningsN)
+        println("srhmat_numOfMaterials: ", srhmat_numOfMaterials)
+        println("srhmat_matNameList: ", srhmat_matNameList)
+        println("srhmat_matZoneCells: ", srhmat_matZoneCells)
+        println("matID_cells: ", matID_cells)
+    end
     
     #loop over all cells to setup Manning's n
     for iCell in 1:my_mesh_2D.numOfCells

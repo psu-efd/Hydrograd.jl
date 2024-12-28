@@ -7,21 +7,40 @@
 #4. xxx (for future use)
 function preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
 
+    if settings.bVerbose
+        println("preprocess_model_parameters_2D")
+    end
+
     # Concatenate all parameters into a single vector
-    params_array = vcat(zb_cells_param, ManningN_list_param, inlet_discharges_param)
+    if !isnothing(inlet_discharges_param)
+        params_array = vcat(zb_cells_param, ManningN_list_param, inlet_discharges_param)
+    else
+        params_array = vcat(zb_cells_param, ManningN_list_param)
+    end
 
     # First calculate all the lengths and indices
     n_zb = length(zb_cells_param)
     n_manning = length(ManningN_list_param)
-    n_inlet = length(inlet_discharges_param)
+
+    if !isnothing(inlet_discharges_param)
+        n_inlet = length(inlet_discharges_param)
+    else
+        n_inlet = 0
+    end
     
     # Calculate start and end indices
     zb_start = 1
     zb_end = n_zb
     manning_start = zb_end + 1
     manning_end = manning_start + n_manning - 1
-    inletQ_start = manning_end + 1
-    inletQ_end = inletQ_start + n_inlet - 1
+
+    if !isnothing(inlet_discharges_param)
+        inletQ_start = manning_end + 1
+        inletQ_end = inletQ_start + n_inlet - 1
+    else
+        inletQ_start = nothing
+        inletQ_end = nothing
+    end
 
     # Store the range for each parameter for later parameter extraction
     param_ranges = (
@@ -52,16 +71,22 @@ function preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_
         elseif active_param == "ManningN"
             param_ranges.manning_start:param_ranges.manning_end
         elseif active_param == "Q"
-            param_ranges.inletQ_start:param_ranges.inletQ_end
+            if !isnothing(inlet_discharges_param)
+                param_ranges.inletQ_start:param_ranges.inletQ_end
+            else
+                error("No inletQ_BCs are defined in the SRH-2D data. Make no sense to perform inversion or sensitivity analysis on Q. Please check case settings.")
+            end
         else
             error("Invalid active parameter name: $active_param")
         end
     end
 
-    Zygote.ignore() do
-        println("params_array = ", params_array)
-        println("active_range = ", active_range)
-        println("param_ranges = ", param_ranges)
+    if settings.bVerbose
+        Zygote.ignore() do
+            println("params_array = ", params_array)
+            println("active_range = ", active_range)
+            println("param_ranges = ", param_ranges)
+        end
     end
 
     return params_array, active_range, param_ranges

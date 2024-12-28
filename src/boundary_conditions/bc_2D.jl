@@ -14,36 +14,36 @@ Base.@kwdef struct BoundaryConditions2D
     symm_BC_indices::Vector{Int} = Int[]     #indices of symmetry (no slip) boundaries in the boundary list
 
      # Inlet Q boundary data
-    inletQ_faceIDs::Vector{Vector{Int}} = Vector{Int}[]                     #face IDs of the inlet-q boundaries
-    inletQ_ghostCellIDs::Vector{Vector{Int}} = Vector{Int}[]               #ghost cell IDs of the inlet-q boundaries
-    inletQ_internalCellIDs::Vector{Vector{Int}} = Vector{Int}[]           #internal cell IDs of the inlet-q boundaries
+    inletQ_faceIDs::Union{Vector{Vector{Int}}, Nothing} = nothing                     #face IDs of the inlet-q boundaries
+    inletQ_ghostCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing               #ghost cell IDs of the inlet-q boundaries
+    inletQ_internalCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing           #internal cell IDs of the inlet-q boundaries
     #inletQ_faceCentroids::Vector{Matrix{Float64}} = Matrix{Float64}[]          #face centroids of the inlet-q boundaries
-    inletQ_faceOutwardNormals::Vector{Matrix{Float64}} = Matrix{Float64}[]     #face outward normals of the inlet-q boundaries
+    inletQ_faceOutwardNormals::Union{Vector{Matrix{Float64}}, Nothing} = nothing     #face outward normals of the inlet-q boundaries
 
     # Exit H boundary data
-    exitH_faceIDs::Vector{Vector{Int}} = Vector{Int}[]                     #face IDs of the exit-h boundaries
-    exitH_ghostCellIDs::Vector{Vector{Int}} = Vector{Int}[]                 #ghost cell IDs of the exit-h boundaries
-    exitH_internalCellIDs::Vector{Vector{Int}} = Vector{Int}[]             #internal cell IDs of the exit-h boundaries
-    exitH_faceOutwardNormals::Vector{Matrix{Float64}} = Matrix{Float64}[]     #face outward normals of the exit-h boundaries
+    exitH_faceIDs::Union{Vector{Vector{Int}}, Nothing} = nothing                     #face IDs of the exit-h boundaries
+    exitH_ghostCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing                 #ghost cell IDs of the exit-h boundaries
+    exitH_internalCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing             #internal cell IDs of the exit-h boundaries
+    exitH_faceOutwardNormals::Union{Vector{Matrix{Float64}}, Nothing} = nothing     #face outward normals of the exit-h boundaries
 
     # Wall boundary data
-    wall_faceIDs::Vector{Vector{Int}} = Vector{Int}[]                     #face IDs of the wall boundaries
-    wall_ghostCellIDs::Vector{Vector{Int}} = Vector{Int}[]               #ghost cell IDs of the wall boundaries
-    wall_internalCellIDs::Vector{Vector{Int}} = Vector{Int}[]           #internal cell IDs of the wall boundaries
-    wall_faceCentroids::Vector{Matrix{Float64}} = Matrix{Float64}[]          #face centroids of the wall boundaries
-    wall_outwardNormals::Vector{Matrix{Float64}} = Matrix{Float64}[]         #face outward normals of the wall boundaries
+    wall_faceIDs::Union{Vector{Vector{Int}}, Nothing} = nothing                     #face IDs of the wall boundaries
+    wall_ghostCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing               #ghost cell IDs of the wall boundaries
+    wall_internalCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing           #internal cell IDs of the wall boundaries
+    wall_faceCentroids::Union{Vector{Matrix{Float64}}, Nothing} = nothing          #face centroids of the wall boundaries
+    wall_outwardNormals::Union{Vector{Matrix{Float64}}, Nothing} = nothing         #face outward normals of the wall boundaries
 
      # Symmetry boundary data
-    symm_faceIDs::Vector{Vector{Int}} = Vector{Int}[]                     #face IDs of the symmetry boundaries
-    symm_ghostCellIDs::Vector{Vector{Int}} = Vector{Int}[]               #ghost cell IDs of the symmetry boundaries
-    symm_internalCellIDs::Vector{Vector{Int}} = Vector{Int}[]           #internal cell IDs of the symmetry boundaries
-    symm_faceCentroids::Vector{Matrix{Float64}} = Matrix{Float64}[]          #face centroids of the symmetry boundaries
-    symm_outwardNormals::Vector{Matrix{Float64}} = Matrix{Float64}[]         #face outward normals of the symmetry boundaries
+    symm_faceIDs::Union{Vector{Vector{Int}}, Nothing} = nothing                     #face IDs of the symmetry boundaries
+    symm_ghostCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing               #ghost cell IDs of the symmetry boundaries
+    symm_internalCellIDs::Union{Vector{Vector{Int}}, Nothing} = nothing           #internal cell IDs of the symmetry boundaries
+    symm_faceCentroids::Union{Vector{Matrix{Float64}}, Nothing} = nothing          #face centroids of the symmetry boundaries
+    symm_outwardNormals::Union{Vector{Matrix{Float64}}, Nothing} = nothing         #face outward normals of the symmetry boundaries
 
 end
 
  # create boundary conditions
- function initialize_boundary_conditions_2D(srh_all_Dict, nodeCoordinates)
+ function initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinates)
 
     inletQ_BC_indices = []
     exitH_BC_indices = []
@@ -51,7 +51,7 @@ end
     symm_BC_indices = []
 
     #compute the indices of each boundary in the global boundary list
-    compute_boundary_indices_2D!(inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, srh_all_Dict)
+    compute_boundary_indices_2D!(settings, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, srh_all_Dict)
 
     # Get boundary counts
     nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
@@ -60,55 +60,55 @@ end
     nSymm_BCs = srh_all_Dict["nSymm_BCs"]
    
     #inlet_q arrays
-    inletQ_faceIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #face IDs of the inlet-q boundaries
-    inletQ_ghostCellIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #ghost cell IDs of the inlet-q boundaries
-    inletQ_internalCellIDs = Array{Array{Int}}(undef, nInletQ_BCs)   #internal cell IDs of the inlet-q boundaries
+    inletQ_faceIDs = nInletQ_BCs > 0 ? Array{Array{Int}}(undef, nInletQ_BCs) : nothing   #face IDs of the inlet-q boundaries
+    inletQ_ghostCellIDs = nInletQ_BCs > 0 ? Array{Array{Int}}(undef, nInletQ_BCs) : nothing   #ghost cell IDs of the inlet-q boundaries
+    inletQ_internalCellIDs = nInletQ_BCs > 0 ? Array{Array{Int}}(undef, nInletQ_BCs) : nothing   #internal cell IDs of the inlet-q boundaries
 
-    inletQ_faceOutwardNormals = Vector{Matrix{Float64}}(undef, nInletQ_BCs)   #face outward normals of the inlet-q boundaries
+    inletQ_faceOutwardNormals = nInletQ_BCs > 0 ? Vector{Matrix{Float64}}(undef, nInletQ_BCs) : nothing   #face outward normals of the inlet-q boundaries
 
-    inletQ_TotalQ = zeros(Float64, nInletQ_BCs)   #total discharge for each inlet-q boundary
-    inletQ_H = Array{Array{Float64}}(undef, nInletQ_BCs)   #inlet water depth for each face in each inlet-q boundary
-    inletQ_A = Array{Array{Float64}}(undef, nInletQ_BCs)   #area for each face in each inlet-q boundary
-    inletQ_ManningN = Array{Array{Float64}}(undef, nInletQ_BCs)   #Manning's n for each face in each inlet-q boundary
-    inletQ_Length = Array{Array{Float64}}(undef, nInletQ_BCs)   #length for each face in each inlet-q boundary
-    inletQ_TotalA = zeros(Float64, nInletQ_BCs)   #total cross-sectional area for each inlet-q boundary
-    inletQ_DryWet = Array{Array{Int}}(undef, nInletQ_BCs)   #dry(=0)/wet(=1) flag for each inlet-q boundary
+    inletQ_TotalQ = nInletQ_BCs > 0 ? zeros(Float64, nInletQ_BCs) : nothing   #total discharge for each inlet-q boundary
+    inletQ_H = nInletQ_BCs > 0 ? Array{Array{Float64}}(undef, nInletQ_BCs) : nothing   #inlet water depth for each face in each inlet-q boundary
+    inletQ_A = nInletQ_BCs > 0 ? Array{Array{Float64}}(undef, nInletQ_BCs) : nothing   #area for each face in each inlet-q boundary
+    inletQ_ManningN = nInletQ_BCs > 0 ? Array{Array{Float64}}(undef, nInletQ_BCs) : nothing   #Manning's n for each face in each inlet-q boundary
+    inletQ_Length = nInletQ_BCs > 0 ? Array{Array{Float64}}(undef, nInletQ_BCs) : nothing   #length for each face in each inlet-q boundary
+    inletQ_TotalA = nInletQ_BCs > 0 ? zeros(Float64, nInletQ_BCs) : nothing   #total cross-sectional area for each inlet-q boundary
+    inletQ_DryWet = nInletQ_BCs > 0 ? Array{Array{Int}}(undef, nInletQ_BCs) : nothing   #dry(=0)/wet(=1) flag for each inlet-q boundary
 
     #exit_h arrays
-    exitH_faceIDs = Array{Array{Int}}(undef, nExitH_BCs)   #face IDs of the exit-h boundaries
-    exitH_ghostCellIDs = Array{Array{Int}}(undef, nExitH_BCs)   #ghost cell IDs of the exit-h boundaries
-    exitH_internalCellIDs = Array{Array{Int}}(undef, nExitH_BCs)   #internal cell IDs of the exit-h boundaries
+    exitH_faceIDs = nExitH_BCs > 0 ? Array{Array{Int}}(undef, nExitH_BCs) : nothing   #face IDs of the exit-h boundaries
+    exitH_ghostCellIDs = nExitH_BCs > 0 ? Array{Array{Int}}(undef, nExitH_BCs) : nothing   #ghost cell IDs of the exit-h boundaries
+    exitH_internalCellIDs = nExitH_BCs > 0 ? Array{Array{Int}}(undef, nExitH_BCs) : nothing   #internal cell IDs of the exit-h boundaries
 
-    exitH_faceOutwardNormals = Vector{Matrix{Float64}}(undef, nExitH_BCs)   #face outward normals of the exit-h boundaries
+    exitH_faceOutwardNormals = nExitH_BCs > 0 ? Vector{Matrix{Float64}}(undef, nExitH_BCs) : nothing   #face outward normals of the exit-h boundaries
 
-    exitH_WSE = Array{Float64}(undef, nExitH_BCs)   #WSE for each exit-h boundary
-    exitH_H = Array{Array{Float64}}(undef, nExitH_BCs)   #inlet water depth for each exit-h boundary
-    exitH_A = Array{Array{Float64}}(undef, nExitH_BCs)   #inlet cross-sectional area for each exit-h boundary
+    exitH_WSE = nExitH_BCs > 0 ? Array{Float64}(undef, nExitH_BCs) : nothing   #WSE for each exit-h boundary
+    exitH_H = nExitH_BCs > 0 ? Array{Array{Float64}}(undef, nExitH_BCs) : nothing   #inlet water depth for each exit-h boundary
+    exitH_A = nExitH_BCs > 0 ? Array{Array{Float64}}(undef, nExitH_BCs) : nothing   #inlet cross-sectional area for each exit-h boundary
 
     #wall arrays
-    wall_faceIDs = Array{Array{Int}}(undef, nWall_BCs)   #face IDs of the wall boundaries
-    wall_ghostCellIDs = Array{Array{Int}}(undef, nWall_BCs)   #ghost cell IDs of the wall boundaries
-    wall_internalCellIDs = Array{Array{Int}}(undef, nWall_BCs)   #internal cell IDs of the wall boundaries
+    wall_faceIDs = nWall_BCs > 0 ? Array{Array{Int}}(undef, nWall_BCs) : nothing   #face IDs of the wall boundaries
+    wall_ghostCellIDs = nWall_BCs > 0 ? Array{Array{Int}}(undef, nWall_BCs) : nothing   #ghost cell IDs of the wall boundaries
+    wall_internalCellIDs = nWall_BCs > 0 ? Array{Array{Int}}(undef, nWall_BCs) : nothing   #internal cell IDs of the wall boundaries
 
-    wall_faceCentroids = Vector{Matrix{Float64}}(undef, nWall_BCs)   #face centroids of the wall boundaries
-    wall_outwardNormals = Vector{Matrix{Float64}}(undef, nWall_BCs)   #face outward normals of the wall boundaries
+    wall_faceCentroids = nWall_BCs > 0 ? Vector{Matrix{Float64}}(undef, nWall_BCs) : nothing   #face centroids of the wall boundaries
+    wall_outwardNormals = nWall_BCs > 0 ? Vector{Matrix{Float64}}(undef, nWall_BCs) : nothing   #face outward normals of the wall boundaries
 
-    wall_H = Array{Array{Float64}}(undef, nWall_BCs)   #water depth for each wall boundary
-    wall_A = Array{Array{Float64}}(undef, nWall_BCs)   #cross-sectional area for each wall boundary
+    wall_H = nWall_BCs > 0 ? Array{Array{Float64}}(undef, nWall_BCs) : nothing   #water depth for each wall boundary
+    wall_A = nWall_BCs > 0 ? Array{Array{Float64}}(undef, nWall_BCs) : nothing   #cross-sectional area for each wall boundary
 
     #symmetry arrays
-    symm_faceIDs = Array{Array{Int}}(undef, nSymm_BCs)
-    symm_ghostCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
-    symm_internalCellIDs = Array{Array{Int}}(undef, nSymm_BCs)
+    symm_faceIDs = nSymm_BCs > 0 ? Array{Array{Int}}(undef, nSymm_BCs) : nothing
+    symm_ghostCellIDs = nSymm_BCs > 0 ? Array{Array{Int}}(undef, nSymm_BCs) : nothing
+    symm_internalCellIDs = nSymm_BCs > 0 ? Array{Array{Int}}(undef, nSymm_BCs) : nothing
 
-    symm_faceCentroids = Vector{Matrix{Float64}}(undef, nSymm_BCs)
-    symm_outwardNormals = Vector{Matrix{Float64}}(undef, nSymm_BCs)
+    symm_faceCentroids = nSymm_BCs > 0 ? Vector{Matrix{Float64}}(undef, nSymm_BCs) : nothing
+    symm_outwardNormals = nSymm_BCs > 0 ? Vector{Matrix{Float64}}(undef, nSymm_BCs) : nothing
 
-    symm_H = Array{Array{Float64}}(undef, nSymm_BCs)
-    symm_A = Array{Array{Float64}}(undef, nSymm_BCs)
+    symm_H = nSymm_BCs > 0 ? Array{Array{Float64}}(undef, nSymm_BCs) : nothing
+    symm_A = nSymm_BCs > 0 ? Array{Array{Float64}}(undef, nSymm_BCs) : nothing
     
     #preprocess all boundary conditions
-    preprocess_all_boundaries_2D(srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
+    preprocess_all_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
 
     boundary_conditions = BoundaryConditions2D(
         nInletQ_BCs=nInletQ_BCs, 
@@ -144,7 +144,7 @@ end
 
  #compute the indices of each boundary in the global boundary list
  #populate inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices
- function compute_boundary_indices_2D!(inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, srh_all_Dict)
+ function compute_boundary_indices_2D!(settings, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, srh_all_Dict)
 
     my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
@@ -154,9 +154,12 @@ end
 
     #loop over all boundaries to compute the indices of each boundary in the global boundary list
     for iBoundary in 1:my_mesh_2D.numOfBoundaries
+        
         if haskey(srhhydro_BC, iBoundary)
-            println("Key iBoundary exists in the Python dictionary srhhydro_BC.")
-            println("The boundary: ", srhhydro_BC[iBoundary])
+            if settings.bVerbose
+                println("Key iBoundary exists in the Python dictionary srhhydro_BC.")
+                println("The boundary: ", srhhydro_BC[iBoundary])
+            end
         else
             println("Key iBoundary does not exist in the Python dictionary srhhydro_BC.")
             readline()
@@ -166,14 +169,18 @@ end
         boundaryType = srhhydro_BC[iBoundary]   #boundary type: wall, inletQ, exitH
 
         if lowercase(boundaryType) == "inlet-q"
-            println("INLET-Q boundary condition is set for boundary ", iBoundary)
+            if settings.bVerbose
+                println("INLET-Q boundary condition is set for boundary ", iBoundary)
+            end
 
             push!(inletQ_BC_indices, iBoundary)
 
             #find the corresponding Q in IQParams
             if haskey(srhhydro_IQParams, iBoundary)
-                println("Key IQParams exists in the Python dictionary srhhydro_IQParams.")
-                println("Inlet specific discharge: ", srhhydro_IQParams[iBoundary])
+                if settings.bVerbose
+                    println("Key IQParams exists in the Python dictionary srhhydro_IQParams.")
+                    println("Inlet specific discharge: ", srhhydro_IQParams[iBoundary])
+                end
 
                 #update the boundary value: currenlty only support constant discharge
                 #Q_value = parse(Float64, srhhydro_IQParams[iBoundary][1])
@@ -186,14 +193,18 @@ end
             end
 
         elseif lowercase(boundaryType) == "exit-h"
-            println("EXIT-H boundary condition is set for boundary ", iBoundary)
+            if settings.bVerbose
+                println("EXIT-H boundary condition is set for boundary ", iBoundary)
+            end
 
             push!(exitH_BC_indices, iBoundary)
 
             #find the corresponding H in EWSParamsC
             if haskey(srhhydro_EWSParamsC, iBoundary)
-                println("Key EWSParamsC exists in the Python dictionary srhhydro_EWSParamsC.")
-                println("Exit water depth: ", srhhydro_EWSParamsC[iBoundary])
+                if settings.bVerbose
+                    println("Key EWSParamsC exists in the Python dictionary srhhydro_EWSParamsC.")
+                    println("Exit water depth: ", srhhydro_EWSParamsC[iBoundary])
+                end
 
                 #update the boundary value: currenlty only support constant water depth
                 #H_value = parse(Float64, srhhydro_EWSParamsC[iBoundary][1])
@@ -206,12 +217,16 @@ end
             end
 
         elseif lowercase(boundaryType) == "wall"
-            println("WALL boundary condition is set for boundary ", iBoundary)
+            if settings.bVerbose
+                println("WALL boundary condition is set for boundary ", iBoundary)
+            end
 
             push!(wall_BC_indices, iBoundary)
 
         elseif lowercase(boundaryType) == "symm"
-            println("SYMMETRY boundary condition is set for boundary ", iBoundary)
+            if settings.bVerbose
+                println("SYMMETRY boundary condition is set for boundary ", iBoundary)
+            end
 
             push!(symm_BC_indices, iBoundary)
         end
@@ -228,33 +243,35 @@ end
     srh_all_Dict["nSymm_BCs"] = nSymm_BCs  #update the number of symmetry boundaries in the dictionary
     #nSymm_BCs = nSymm_BCs
 
-    #println("inletQ_BC_indices: ", inletQ_BC_indices)
-    #println("exitH_BC_indices: ", exitH_BC_indices) 
-    #println("wall_BC_indices: ", wall_BC_indices)
-    #println("symm_BC_indices: ", symm_BC_indices)
+    if settings.bVerbose
+        println("inletQ_BC_indices: ", inletQ_BC_indices)
+        println("exitH_BC_indices: ", exitH_BC_indices) 
+        println("wall_BC_indices: ", wall_BC_indices)
+        println("symm_BC_indices: ", symm_BC_indices)
+    end
 
 end
 
 
 #preprocess all boundary conditions
-function preprocess_all_boundaries_2D(srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)   
+function preprocess_all_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)   
 
     #preprocess inlet-q boundaries
-    preprocess_inlet_q_boundaries_2D(srh_all_Dict, nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, nodeCoordinates)
+    preprocess_inlet_q_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, nodeCoordinates)
 
     #preprocess exit-h boundaries
-    preprocess_exit_h_boundaries_2D(srh_all_Dict, nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs,exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, nodeCoordinates)
+    preprocess_exit_h_boundaries_2D(settings, srh_all_Dict, nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs,exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, nodeCoordinates)
 
     #preprocess wall boundaries
-    preprocess_wall_boundaries_2D(srh_all_Dict, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, nodeCoordinates)
+    preprocess_wall_boundaries_2D(settings, srh_all_Dict, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, nodeCoordinates)
 
     #preprocess symmetry boundaries
-    preprocess_symmetry_boundaries_2D(srh_all_Dict, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
+    preprocess_symmetry_boundaries_2D(settings, srh_all_Dict, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
 
 end
 
 #preprocess inlet-q boundaries
-function preprocess_inlet_q_boundaries_2D(srh_all_Dict, nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, nodeCoordinates)
+function preprocess_inlet_q_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, inletQ_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_TotalA, inletQ_DryWet, nodeCoordinates)
 
     my_mesh_2D = srh_all_Dict["my_mesh_2D"]
     
@@ -267,7 +284,9 @@ function preprocess_inlet_q_boundaries_2D(srh_all_Dict, nInletQ_BCs, inletQ_BC_i
     for iInletQ in 1:nInletQ_BCs
         iBoundary = inletQ_BC_indices[iInletQ]
 
-        println("Preprocessing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+        if settings.bVerbose
+            println("Preprocessing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+        end
 
         #get the boundary face IDs of the current inlet-q boundary
         current_boundaryFaceIDs = my_mesh_2D.boundaryFaces_Dict[iBoundary]
@@ -324,7 +343,7 @@ function preprocess_inlet_q_boundaries_2D(srh_all_Dict, nInletQ_BCs, inletQ_BC_i
 end
 
 #preprocess exit-h boundaries
-function preprocess_exit_h_boundaries_2D(srh_all_Dict, nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs,  exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, nodeCoordinates)
+function preprocess_exit_h_boundaries_2D(settings, srh_all_Dict, nExitH_BCs, exitH_BC_indices, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs,  exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, nodeCoordinates)
 
     my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
@@ -336,7 +355,9 @@ function preprocess_exit_h_boundaries_2D(srh_all_Dict, nExitH_BCs, exitH_BC_indi
     for iExitH in 1:nExitH_BCs
         iBoundary = exitH_BC_indices[iExitH]
 
-        println("Preprocessing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
+        if settings.bVerbose
+            println("Preprocessing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
+        end
 
         #get the boundary face IDs of the current exit-h boundary
         current_boundaryFaceIDs = my_mesh_2D.boundaryFaces_Dict[iBoundary]
@@ -385,7 +406,7 @@ function preprocess_exit_h_boundaries_2D(srh_all_Dict, nExitH_BCs, exitH_BC_indi
 end
 
 #preprocess wall boundaries
-function preprocess_wall_boundaries_2D(srh_all_Dict, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, nodeCoordinates)
+function preprocess_wall_boundaries_2D(settings, srh_all_Dict, nWall_BCs, wall_BC_indices, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, nodeCoordinates)
 
     my_mesh_2D = srh_all_Dict["my_mesh_2D"]
  
@@ -396,7 +417,9 @@ function preprocess_wall_boundaries_2D(srh_all_Dict, nWall_BCs, wall_BC_indices,
     for iWall in 1:nWall_BCs
         iBoundary = wall_BC_indices[iWall]
 
-        println("Preprocessing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+        if settings.bVerbose
+            println("Preprocessing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+        end
 
         #get the boundary face IDs of the current wall boundary
         current_boundaryFaceIDs = my_mesh_2D.boundaryFaces_Dict[iBoundary]
@@ -443,7 +466,7 @@ function preprocess_wall_boundaries_2D(srh_all_Dict, nWall_BCs, wall_BC_indices,
 end
 
 #preprocess symmetry boundaries: called every time step to update the boundary condition
-function preprocess_symmetry_boundaries_2D(srh_all_Dict, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
+function preprocess_symmetry_boundaries_2D(settings, srh_all_Dict, nSymm_BCs, symm_BC_indices, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
 
     my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 
@@ -454,7 +477,9 @@ function preprocess_symmetry_boundaries_2D(srh_all_Dict, nSymm_BCs, symm_BC_indi
     for iSymm in 1:nSymm_BCs
         iBoundary = symm_BC_indices[iSymm]
 
-        println("Preprocessing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+        if settings.bVerbose
+            println("Preprocessing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+        end
 
         #get the boundary face IDs of the current wall boundary
         current_boundaryFaceIDs = my_mesh_2D.boundaryFaces_Dict[iBoundary]

@@ -1,11 +1,17 @@
 #process input files for SRH-2D case, e.g.. srhhydro, srhgeom, srhmat, srhmon files
 
-function process_SRH_2D_input(srhhydro_file_name::String)
-    println("Python version: ", PyCall.pyversion)
-    println("Python path: ", PyCall.pyprogramname)
+function process_SRH_2D_input(settings)
+
+    if settings.bVerbose
+        println("Python version: ", PyCall.pyversion)
+        println("Python path: ", PyCall.pyprogramname)
+    end
     
     pyHMT2D = pyimport("pyHMT2D")
     pyHMT2D.gVerbose = true
+
+    srhhydro_file_name = settings.srhhydro_file_name
+
     
     # Call a function from the custom package
     #file_path = joinpath(@__DIR__, "backwater.srhhydro" ) 
@@ -23,11 +29,13 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     # for (k, v) in my_srh_2d_data.srhhydro_obj.srhhydro_content
     #     println("$k => $v")
     # end
-    
-    #println("srhgeom file: ", my_srh_2d_data.srhgeom_obj.nodeCoordinates)
-    println("srhgeom file: ", typeof(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
-    println("srhgeom file: ", size(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
-    println("getNumOfElementsNodes: ", my_srh_2d_data.srhgeom_obj.getNumOfElementsNodes())
+
+    if settings.bVerbose
+        #println("srhgeom file: ", my_srh_2d_data.srhgeom_obj.nodeCoordinates)
+        println("srhgeom file: ", typeof(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
+        println("srhgeom file: ", size(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
+        println("getNumOfElementsNodes: ", my_srh_2d_data.srhgeom_obj.getNumOfElementsNodes())
+    end 
     
     # Access the srhhydro data
     srhhydro_obj = my_srh_2d_data.srhhydro_obj
@@ -36,10 +44,14 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     
     srhhydro_MONITORINGLines = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "MONITORING")
-        println("Key MONITORING exists in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key MONITORING exists in the Python dictionary srhhydro_content.")
+        end
         srhhydro_MONITORINGLines = srhhydro_obj.srhhydro_content["MONITORING"]
     else
-        println("Key MONITORING does not exist in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key MONITORING does not exist in the Python dictionary srhhydro_content.")
+        end
     end
     
     srhhydro_Grid_fileName = srhhydro_obj.srhhydro_content["Grid"]
@@ -60,10 +72,14 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     
     srhhydro_IQParams = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "IQParams")
-        println("Key IQParams exists in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key IQParams exists in the Python dictionary srhhydro_content.")
+        end
         srhhydro_IQParams = srhhydro_obj.srhhydro_content["IQParams"]
     else
-        println("Key IQParams does not exist in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key IQParams does not exist in the Python dictionary srhhydro_content.")
+        end
     end
     
     #number of INLET-Q boundary conditions
@@ -71,10 +87,14 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     
     srhhydro_EWSParamsC = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "EWSParamsC")
-        println("Key EWSParamsC exists in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key EWSParamsC exists in the Python dictionary srhhydro_content.")
+        end
         srhhydro_EWSParamsC = srhhydro_obj.srhhydro_content["EWSParamsC"]
     else
-        println("Key EWSParamsC does not exist in the Python dictionary srhhydro_content.")
+        if settings.bVerbose
+            println("Key EWSParamsC does not exist in the Python dictionary srhhydro_content.")
+        end
     end
     
     #number of EXIT-H boundary conditions
@@ -85,15 +105,17 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     #srhhydro_EQParams = srhhydro_obj.srhhydro_content["EQParams"]
     #srhhydro_NDParams = srhhydro_obj.srhhydro_content["NDParams"]
     
-    #println("ManningsN: ", srhhydro_ManningsN)
-    # println("BC: ", srhhydro_BC)
-    # println("MONITORING: ", srhhydro_MONITORINGLines)
-    println("IQParams: ", srhhydro_IQParams)
-    # println("EWSParamsC: ", srhhydro_EWSParamsC)
-    #println("ISupCrParams: ", srhhydro_ISupCrParams)
-    #println("EWSParamsRC: ", srhhydro_EWSParamsRC)
-    #println("EQParams: ", srhhydro_EQParams)
-    #println("NDParams: ", srhhydro_NDParams)
+    if settings.bVerbose
+        #println("ManningsN: ", srhhydro_ManningsN)
+        # println("BC: ", srhhydro_BC)
+        # println("MONITORING: ", srhhydro_MONITORINGLines)
+        println("IQParams: ", srhhydro_IQParams)
+        # println("EWSParamsC: ", srhhydro_EWSParamsC)
+        #println("ISupCrParams: ", srhhydro_ISupCrParams)
+        #println("EWSParamsRC: ", srhhydro_EWSParamsRC)
+        #println("EQParams: ", srhhydro_EQParams)
+        #println("NDParams: ", srhhydro_NDParams)
+    end
     
     # Aceess the mesh geometry data 
     srhgeom_obj = my_srh_2d_data.srhgeom_obj
@@ -112,7 +134,9 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     # Create a new dictionary with modified keys
     srhmat_matNameList_new = Dict{Int, String}()
     for (k, v) in srhmat_matNameList
-        println("k: ", k, " v: ", v)
+        if settings.bVerbose
+            println("k: ", k, " v: ", v)
+        end
         if parse(Int, k) == -1
             new_key = 0
         else
@@ -122,8 +146,11 @@ function process_SRH_2D_input(srhhydro_file_name::String)
     end
     srhmat_matNameList = srhmat_matNameList_new
     srhmat_obj.srhmat_matNameList = srhmat_matNameList
-    println("srhmat_matNameList: ", srhmat_matNameList)
-    println("srhmat_matNameList_new: ", srhmat_matNameList_new)
+
+    if settings.bVerbose
+        println("srhmat_matNameList: ", srhmat_matNameList)
+        println("srhmat_matNameList_new: ", srhmat_matNameList_new)
+    end
 
     srhmat_matZoneCells_new = Dict{Int, Vector{Int}}()
     for (k, v) in srhmat_matZoneCells

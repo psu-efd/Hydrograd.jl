@@ -148,7 +148,7 @@ function hll_riemann_solver(hL, huL, hvL, hR, huR, hvR, g, n; hmin=1e-6)
     end
 end
 
-function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
+function Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     
     #Data type 
     T = eltype(hL)
@@ -156,26 +156,34 @@ function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     # Extract unit normal components
     nx, ny = normal
 
-    # Handle dry bed conditions
+    # Handle dry bed conditions (need to be smoothed; see notes)
     if hL < hmin && hR < hmin
         # Both sides are dry
-        print("Both sides are dry")
-        
+        if settings.bVerbose
+            print("Both sides are dry")
+        end
+
         return zeros(eltype(hL), 3)
     elseif hL < hmin
         # Left side is dry
-        print("Left side is dry")
+        if settings.bVerbose
+            print("Left side is dry")
+        end
+        
         h_flux = huR * nx + hvR * ny
-        hu_flux = (huR * (huR / hR) + 0.5 * g * hR^2) * nx + huR * (hvR / hR) * ny
-        hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * hR^2) * ny
+        hu_flux = (huR * (huR / hR) + 0.5 * g * smooth_pow(hR, 2)) * nx + huR * (hvR / hR) * ny
+        hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * smooth_pow(hR, 2)) * ny
 
         return [h_flux, hu_flux, hv_flux]
     elseif hR < hmin
         # Right side is dry
-        print("Right side is dry")
+        if settings.bVerbose
+            print("Right side is dry")
+        end
+        
         h_flux = huL * nx + hvL * ny
-        hu_flux = (huL * (huL / hL) + 0.5 * g * hL^2) * nx + huL * (hvL / hL) * ny
-        hv_flux = (hvL * (huL / hL)) * nx + (hvL * (hvL / hL) + 0.5 * g * hL^2) * ny
+        hu_flux = (huL * (huL / hL) + 0.5 * g * smooth_pow(hL, 2)) * nx + huL * (hvL / hL) * ny
+        hv_flux = (hvL * (huL / hL)) * nx + (hvL * (hvL / hL) + 0.5 * g * smooth_pow(hL, 2)) * ny
 
         return [h_flux, hu_flux, hv_flux]
     end
@@ -191,13 +199,13 @@ function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     unR = uR * nx + vR * ny
 
     # Compute Roe averages
-    sqrt_hL = sqrt(hL)
-    sqrt_hR = sqrt(hR)
+    sqrt_hL = smooth_sqrt(hL)
+    sqrt_hR = smooth_sqrt(hR)
     hRoe = (hL + hR)/2.0    #Arithmetic average
     uRoe = (sqrt_hL * uL + sqrt_hR * uR) / (sqrt_hL + sqrt_hR)
     vRoe = (sqrt_hL * vL + sqrt_hR * vR) / (sqrt_hL + sqrt_hR)
     unRoe = uRoe * nx + vRoe * ny
-    cRoe = sqrt(g * hRoe)
+    cRoe = smooth_sqrt(g * hRoe)
 
     # Compute wave speeds
     SL = unRoe - cRoe
@@ -206,7 +214,7 @@ function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
     # define matrices 
     R_mat = [T(0.0) T(1.0) T(1.0); ny uRoe-cRoe*nx uRoe+cRoe*nx; -nx vRoe-cRoe*ny vRoe+cRoe*ny]
     L_mat = [-(uRoe*ny-vRoe*nx) ny -nx; unRoe/2/cRoe+0.5 -nx/2/cRoe -ny/2/cRoe; -unRoe/2/cRoe+0.5 nx/2/cRoe ny/2/cRoe]
-    absLamda = [abs(unRoe) T(0.0) T(0.0); T(0.0) abs(unRoe-cRoe) T(0.0); T(0.0) T(0.0) abs(unRoe+cRoe)]
+    absLamda = [smooth_abs(unRoe) T(0.0) T(0.0); T(0.0) smooth_abs(unRoe-cRoe) T(0.0); T(0.0) T(0.0) smooth_abs(unRoe+cRoe)]
 
     absA = R_mat * absLamda * L_mat 
 
@@ -216,12 +224,12 @@ function Riemann_2D_Roe(hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
 
     # Compute fluxes
     h_flux_L = huL * nx + hvL * ny
-    hu_flux_L = (huL * uL + 0.5 * g * hL^2) * nx + huL * vL * ny
-    hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * hL^2) * ny
+    hu_flux_L = (huL * uL + 0.5 * g * smooth_pow(hL, 2)) * nx + huL * vL * ny
+    hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * smooth_pow(hL, 2)) * ny
 
     h_flux_R = huR * nx + hvR * ny
-    hu_flux_R = (huR * uR + 0.5 * g * hR^2) * nx + huR * vR * ny
-    hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * hR^2) * ny
+    hu_flux_R = (huR * uR + 0.5 * g * smooth_pow(hR, 2)) * nx + huR * vR * ny
+    hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * smooth_pow(hR, 2)) * ny
 
     # Roe flux
     h_flux = (h_flux_L + h_flux_R - absA_dQ[1]) / 2.0   

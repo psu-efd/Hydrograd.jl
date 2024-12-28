@@ -61,5 +61,14 @@ export swe_2D_save_results_custom
 
 export SRH2D
 
+#misc tools
 export update_1d_array
+export smooth_abs
+export smooth_sign
+export smooth_max
+export smooth_min
+export smooth_sqrt
+export smooth_pow
+
+
 end

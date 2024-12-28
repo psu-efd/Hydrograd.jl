@@ -24,7 +24,7 @@ end
 #Set up the bed elevation: assuming the nodes coordinates already have the bed elevation
 #   interpolate the bed elevation from nodes to cells, then cells to faces, then compute the bed slope at cells
 #   
-function setup_bed(my_mesh_2D, nodeCoordinates, bPlotBed::Bool=false)
+function setup_bed(settings, my_mesh_2D, nodeCoordinates, bPlotBed::Bool=false)
 
      # Initialize bed elevation at cell centers
      zb_cells = zeros(Float64, my_mesh_2D.numOfCells)  # zb at cell centers 
@@ -53,8 +53,10 @@ function setup_bed(my_mesh_2D, nodeCoordinates, bPlotBed::Bool=false)
         file_path = joinpath(@__DIR__, "zb_S0.vtk" ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
-    
-        println("zb and S0 are saved to ", file_path)
+        
+        if settings.bVerbose
+            println("zb and S0 are saved to ", file_path)
+        end
     end
 
     return zb_cells, zb_ghostCells, zb_faces, S0
