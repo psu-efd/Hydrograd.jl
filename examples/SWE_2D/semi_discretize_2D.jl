@@ -11,8 +11,8 @@ using Zygote
 
 
 function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-    zb_cells, zb_ghostCells, zb_faces, S0)
+    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+    )
 
     #get the data type of Q
     data_type = eltype(Q)
@@ -92,13 +92,13 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
 
     # For the case of inversion or sensitivity analysis, and if zb is an active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
-    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
-       "zb" in settings.inversion_settings.active_param_names
+    #if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
+    #   "zb" in settings.inversion_settings.active_param_names
 
         zb_ghostCells, zb_faces, S0 = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
         #println("zb_ghostCells = ", zb_ghostCells.values)
         #println("S0 = ", S0)
-    end
+    #end
 
     Zygote.ignore() do
         @show typeof(zb_ghostCells)
@@ -135,15 +135,15 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
 
     #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
     # we need to update ManningN at cells and ghost cells
-    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
-       "ManningN" in settings.inversion_settings.active_param_names
+    #if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
+    #   "ManningN" in settings.inversion_settings.active_param_names
 
         Zygote.ignore() do
             println("calling update_ManningN")
         end
 
         ManningN_cells, ManningN_ghostCells = update_ManningN(my_mesh_2D, srh_all_Dict, ManningN_list_current)
-    end
+    #end
 
     Zygote.ignore() do
         @show typeof(ManningN_cells)
@@ -180,15 +180,15 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
 
     #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
     # we need to update inletQ_TotalQ based on the provided inlet_discharges_current
-    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
-       "Q" in settings.inversion_settings.active_param_names
+    #if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) &&
+    #   "Q" in settings.inversion_settings.active_param_names
+
+       inletQ_TotalQ = nothing
 
         if nInletQ_BCs > 0
             inletQ_TotalQ = update_inletQ_TotalQ(inlet_discharges_current)
-        else
-            inletQ_TotalQ = nothing
         end
-    end
+    #end
 
     Zygote.ignore() do
         @show typeof(inletQ_TotalQ)
@@ -226,6 +226,15 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
     #     @show e
 
     #     throw(ErrorException("Stopping here for debugging"))
+    # end
+
+    # grads = Zygote.gradient(inletQ_TotalQ -> sum(process_all_boundaries_2d(settings, Q, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants,
+    #                            inletQ_Length, inletQ_TotalQ, exitH_WSE)), inletQ_TotalQ)
+
+    # Zygote.ignore() do
+    #     println("grads of process_all_boundaries_2d  ")
+    #     @show grads
+    #     println(" ")
     # end
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 

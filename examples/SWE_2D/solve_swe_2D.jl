@@ -275,9 +275,13 @@ function swe_2d_ode(Q, params_array, t)
     #     return dQdt
     # end
 
+    #dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
+    #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #         zb_cells, zb_ghostCells, zb_faces, S0)
+
     dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-             my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-             zb_cells, zb_ghostCells, zb_faces, S0)
+            my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+            )
 
     return dQdt
 end
@@ -443,10 +447,14 @@ if settings.bPerform_Inversion
     # Test forward pass first
     try
         #test_forward = f(y, p, t)
+        #test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+        #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+        #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+        #    zb_cells, zb_ghostCells, zb_faces, S0)
+
         test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-        ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-        zb_cells, zb_ghostCells, zb_faces, S0)
+        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+        )
         
         @show typeof(test_forward)
         @show size(test_forward)
@@ -490,10 +498,14 @@ if settings.bPerform_Inversion
             #result = f(y, p, t)
             #result = swe_2d_ode(y, p, t)
 
+            #result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+            #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+            #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+            #    zb_cells, zb_ghostCells, zb_faces, S0)
+
             result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-                my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-                ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-                zb_cells, zb_ghostCells, zb_faces, S0)
+                my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+                )
 
             @show typeof(result)
             @show size(result)

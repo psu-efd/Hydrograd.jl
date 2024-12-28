@@ -9,6 +9,11 @@ using Zygote
 #return a new Q_ghostCells
 function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
+    Zygote.ignore() do
+        println("process_all_boundaries_2d")
+        println(" ")
+    end
+
     h = @view Q_cells[:, 1]         
     q_x = @view Q_cells[:, 2]
     q_y = @view Q_cells[:, 3]
@@ -20,7 +25,7 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
     #for inlet-q boundaries
     # Loop through all inlet-q boundaries
     for iInletQ in 1:boundary_conditions.nInletQ_BCs
-
+        
         iBoundary = boundary_conditions.inletQ_BC_indices[iInletQ]
 
         if settings.bVerbose
@@ -43,13 +48,13 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         # First pass: compute total_A and dry/wet status
         # current_inletQ_DryWet: 1 for wet, 0 for dry
-        #current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1 : 0, current_internalCellIDs)  #does this break AD?
-        current_inletQ_DryWet = map(internalCellID -> 1, current_internalCellIDs)
+        current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1 : 0, current_internalCellIDs)  #does this break AD?
+        #current_inletQ_DryWet = map(internalCellID -> 1, current_internalCellIDs)
 
         # Compute total_A only for wet faces
-        #total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
-        #              for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
-        #)
+        total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
+                      for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
+        )
 
         #contributions = [
         #    current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
@@ -71,14 +76,19 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
         Zygote.ignore() do
             @show eltype(contributions)
             @show typeof(contributions)
-            all(x -> isa(x, Float64), contributions) || 
-                @warn "Non-Float64 elements found in contributions"
+            #all(x -> isa(x, Float64), contributions) || 
+                #@warn "Non-Float64 elements found in contributions"
 
             @show size(contributions)
             @show contributions
         end
 
-        total_A = sum(contributions)
+        #total_A = sum(contributions)
+
+        Zygote.ignore() do
+            @show typeof(total_A)
+            @show total_A
+        end
 
         @assert total_A > 1e-10 "Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A"
 
@@ -102,6 +112,10 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         q_x_new = [q_updates[iFace][1] for iFace in 1:length(current_internalCellIDs)]
         q_y_new = [q_updates[iFace][2] for iFace in 1:length(current_internalCellIDs)]
+
+        #fake q_x_new and q_y_new for debugging
+        #q_x_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
+        #q_y_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
 
         # Calculate q_updates in a non-mutating way
         # q_x_new = map(enumerate(current_internalCellIDs)) do (iFace, internalCellID)
