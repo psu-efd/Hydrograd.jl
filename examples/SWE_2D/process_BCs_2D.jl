@@ -9,9 +9,9 @@ using Zygote
 #return a new Q_ghostCells
 function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
-    h = Q_cells[:, 1]         
-    q_x = Q_cells[:, 2]
-    q_y = Q_cells[:, 3]
+    h = @view Q_cells[:, 1]         
+    q_x = @view Q_cells[:, 2]
+    q_y = @view Q_cells[:, 3]
 
     h_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
     q_x_ghost = zeros(eltype(Q_cells), my_mesh_2D.numOfAllBounaryFaces)
@@ -37,9 +37,24 @@ function process_all_boundaries_2d(Q_cells, my_mesh_2D, boundary_conditions, Man
         current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1 : 0, current_internalCellIDs)
 
         # Compute total_A only for wet faces
-        total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
-                      for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
-        )
+        #total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
+        #              for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
+        #)
+
+        contributions = [
+            current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
+            for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
+        ]
+
+        # Debug type information
+        Zygote.ignore() do
+            @show eltype(contributions)
+            @show typeof(contributions)
+            all(x -> isa(x, Float64), contributions) || 
+                @warn "Non-Float64 elements found in contributions"
+        end
+
+        total_A = sum(contributions)
 
         @assert total_A > 1e-10 "Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A"
 

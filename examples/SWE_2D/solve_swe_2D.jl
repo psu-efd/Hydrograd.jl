@@ -175,12 +175,15 @@ if settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis
     #make sure the length of inlet_discharges_param is the same as the number of inletQ_BCs
     nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
     if length(inlet_discharges_param) != nInletQ_BCs
-        error("The length of inlet_discharges_param is not the same as the number of inletQ_BCs.")
+        error("Length mismatch: inlet_discharges_param ($(length(inlet_discharges_param))) != nInletQ_BCs ($nInletQ_BCs)")
     end
 end
 
-#preprocess: create a ComponentArray for the model parameters for 2D shallow water equations
-params_array, active_params = preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
+#preprocess: create a array of model parameters for 2D shallow water equations
+#params_array: the 1D array of all parameters (zb_cells_param, ManningN_list_param, inlet_discharges_param)
+#active_range: the range of active parameters 
+#param_ranges: the range of each parameter
+params_array, active_range, param_ranges = preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
 
 #Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
 ManningN_cells, ManningN_ghostCells = setup_ManningN(my_mesh_2D, srh_all_Dict)
@@ -246,7 +249,7 @@ function swe_2d_ode(Q, params_array, t)
         inletQ_Length=inletQ_Length, inletQ_TotalQ=inletQ_TotalQ, exitH_WSE=exitH_WSE,
         zb_cells=zb_cells, zb_ghostCells=zb_ghostCells, zb_faces=zb_faces, S0=S0
 
-        dQdt = swe_2d_rhs(Q, params_array, t, settings,
+        dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
             my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
             ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
             zb_cells, zb_ghostCells, zb_faces, S0)
@@ -391,12 +394,9 @@ if settings.bPerform_Inversion
     @show Q0
     @show tspan
     @show params_array
-    for value in params_array
-        @assert !ismissing(value) "params_array contains missing values!"
-        @assert !isnothing(value) "params_array contains `nothing` values!"
-    end
-    
-    
+    @assert !ismissing(params_array) "params_array contains missing values!"
+    @assert !isnothing(params_array) "params_array contains `nothing` values!"
+        
     prob = ODEProblem(ode_f, Q0, tspan, params_array)
 
     #use Enzyme to test the gradient of the ODE and identify the source of the error
@@ -406,6 +406,10 @@ if settings.bPerform_Inversion
     y = prob.u0
     f = prob.f
     t = tspan[1]  # Add this line to define t
+    @show typeof(p)
+    @show typeof(y)
+    @show typeof(f)
+    @show typeof(t)
     @show p
     @show y
     @show f
@@ -414,50 +418,127 @@ if settings.bPerform_Inversion
 
     # Test forward pass first
     try
-        test_forward = f(y, p, t)
-        println("Forward pass successful")
+        #test_forward = f(y, p, t)
+        test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+        ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+        zb_cells, zb_ghostCells, zb_faces, S0)
+        
         @show typeof(test_forward)
         @show size(test_forward)
         @show test_forward
+
+        println("Forward pass successful")
+        println(" ")
     catch e
         println("Forward pass failed")
+        println(" ")
         @show e
     end
+
+    #try
+        # Test gradient computation directly
+        #@code_warntype swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+        #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+        #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+        #    zb_cells, zb_ghostCells, zb_faces, S0)
+        SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+
+        #use ForwardDiff to test the gradient of the ODE and identify the source of the error
+        # gradient_output = ForwardDiff.gradient((y, p) -> begin
+        #     #result = f(y, p, t)
+        #     #result = swe_2d_ode(y, p, t)
+
+        #     result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+        #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+        #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+        #         zb_cells, zb_ghostCells, zb_faces, S0)
+
+        #     @show typeof(result)
+        #     @show size(result)
+        #     @show result
+
+        #     # Sum to get scalar output for gradient
+        #     sum(result)
+        # end, y, p)
+
+        gradient_output = Zygote.gradient((y, p) -> begin
+            #result = f(y, p, t)
+            #result = swe_2d_ode(y, p, t)
+
+            result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+                my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+                ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+                zb_cells, zb_ghostCells, zb_faces, S0)
+
+            @show typeof(result)
+            @show size(result)
+            @show result
+
+            # Sum to get scalar output for gradient
+            #sum(result)
+            return result[1,1]
+        end, y, p)
+        
+        @show typeof(gradient_output)
+        @show size.(gradient_output)
+        
+
+        println("After Zygote.gradient, Gradient computation successful")
+        println(" ")
+    #catch e
+    #    println("Gradient pass failed")
+        
+    #    @show e
+
+    #    println(" ")
+    #end
 
     # Now test the pullback with more detailed error catching
-    try
-        λ = ones(size(prob.u0)) #zero(prob.u0)
-        _dy, back = Zygote.pullback(y, p) do u, p  #_dy is the result of the forward pass; back is the gradient function
-            #vec(f(u, p, t))
-            f(u, p, t)
-        end
-        println("Pullback creation successful")
-        @show typeof(_dy)
-        @show size(_dy)
-        @show _dy
+    # try
+    #     λ = ones(size(prob.u0)) #zero(prob.u0)
 
-        try
-            tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
-            println("Backward pass successful")
-            @show typeof(tmp1)
-            @show size(tmp1)
-            @show typeof(tmp2)
-            @show size(tmp2)
-            @show tmp1
-            @show tmp2
-        catch e
-            println("Backward pass failed")
-            @show e
-            @show typeof(λ)
-            @show size(λ)
-            @show λ
-        end
-    catch e
-        println("Pullback creation failed")
-        @show e
-    end
+    #     #Zygote.pullback takes two arguments:
+    #     #  First argument: a function that we want to differentiate
+    #     #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
+    #     #_dy is the result of the forward pass; back is the gradient function
+    #     #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
+    #     _dy, back = Zygote.pullback((u, p) -> Array(f(u, p, t)), y, p)
 
-    throw("stop here")
+    #     #_dy, back = Zygote.pullback(y, p) do u, p  
+    #     #    #vec(f(u, p, t))
+    #     #    f(u, p, t)
+    #     #end
+    #     println("Pullback creation successful")
+    #     @show typeof(_dy)
+    #     @show size(_dy)
+    #     @show _dy
+
+    #     try
+    #          # Convert λ to match _dy type
+    #         λ = convert(typeof(_dy), λ)
+
+    #         tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
+    #         println("Backward pass successful")
+    #         @show typeof(tmp1)
+    #         @show size(tmp1)
+    #         @show typeof(tmp2)
+    #         @show size(tmp2)
+    #         @show tmp1
+    #         @show tmp2
+    #     catch e
+    #         println("Backward pass failed")
+    #         @show e
+    #         @show typeof(λ)
+    #         @show size(λ)
+    #         @show λ
+    #     end
+    # catch e
+    #     println("Pullback creation failed")
+    #     @show e
+    # end
+
+    #throw("stop here")
 
     #debug end
 
@@ -537,7 +618,7 @@ if settings.bPerform_Inversion
         return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
     end
 
-    function optimize_parameters(Q0, tspan, observed_data, p_init, active_params)
+    function optimize_parameters(Q0, tspan, observed_data, p_init, param_dims, active_params)
         # Loss function for optimization
         function opt_loss(θ, p)  # Add p argument even if unused
 
@@ -548,22 +629,11 @@ if settings.bPerform_Inversion
                 println("active_params = ", active_params)
                 println("θ = ", θ)
                 println("p_init = ", p_init)
+                println("param_dims = ", param_dims)
             end
 
             # Create parameter set from optimization variables
-            # Create new ComponentArray based on active parameters
-            if active_params == [:zb_cells_param]
-                p_new = ComponentArray(zb_cells_param=θ, ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=p_init.inlet_discharges_param)
-            elseif active_params == [:ManningN_list_param]
-                p_new = ComponentArray(zb_cells_param=p_init.zb_cells_param, ManningN_list_param=θ, inlet_discharges_param=p_init.inlet_discharges_param)
-            elseif active_params == [:inlet_discharges_param]
-                p_new = ComponentArray(zb_cells_param=p_init.zb_cells_param, ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=θ)
-            elseif active_params == [:zb_cells_param, :inlet_discharges_param] #not supported yet; one parameter at a time
-                p_new = ComponentArray(zb_cells_param=θ[1:1], ManningN_list_param=p_init.ManningN_list_param, inlet_discharges_param=θ[2:end])
-                error("not supported yet; one parameter at a time")
-            else
-                error("Unsupported parameter combination")
-            end
+
 
             Zygote.ignore() do
                 println("p_new = ", p_new)
