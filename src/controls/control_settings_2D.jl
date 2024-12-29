@@ -146,7 +146,7 @@ function parse_control_file(control_file::String)
                 println("    inversion_ManningN_initial_values = ", settings.inversion_settings.ManningN_initial_values)
                 println("    inversion_inlet_discharge_initial_values = ", settings.inversion_settings.inlet_discharge_initial_values)
             else
-                error("Invalid inversion_parameter_initial_values_options: $inversion_parameter_initial_values_options. Supported options: from_file, constant.")
+                error("Invalid inversion_parameter_initial_values_options: $(settings.inversion_settings.parameter_initial_values_options). Supported options: from_file, constant.")
             end
 
             println("    inversion_bInversion_slope_loss = ", settings.inversion_settings.bInversion_slope_loss)

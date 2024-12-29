@@ -1,12 +1,8 @@
-using SciMLBase
-using OrdinaryDiffEq
-using Zygote, ForwardDiff
+#println("Current working directory: ", pwd())
+#println("LOAD_PATH: ", LOAD_PATH)
 
-# Test different solvers
-println("Tsit5: ", SciMLBase.isautodifferentiable(Tsit5()))
-println("Euler: ", SciMLBase.isautodifferentiable(Euler()))
+#push!(LOAD_PATH, dirname(dirname(@__FILE__)))
+import Hydrograd
 
-# Test different sensitivity algorithms
-#println("ZygoteVJP: ", SciMLBase.isautodifferentiable(ZygoteVJP()))
-#println("ForwardDiffSensitivity: ", SciMLBase.isautodifferentiable(ForwardDiffSensitivity()))
-#println("InterpolatingAdjoint: ", SciMLBase.isautodifferentiable(InterpolatingAdjoint()))
+# Now try to use print_banner
+Hydrograd.print_banner()

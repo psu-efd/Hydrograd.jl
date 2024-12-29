@@ -2,10 +2,10 @@
 #The process_inversion_results function is used to plot the inversion results in Python.
 
 
-function  postprocess_inversion_results_2D(settings, my_mesh_2D, nodeCoordinates, 
-    zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)
+function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, 
+    zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
 
-    inversion_results_file_name = joinpath(save_path, settings.inversion_settings.save_file_name)
+    inversion_results_file_name = joinpath(case_path, settings.inversion_settings.save_file_name)
 
     inversion_save_loss_history_file_name = settings.inversion_settings.save_loss_history_file_name
 
@@ -41,7 +41,7 @@ function  postprocess_inversion_results_2D(settings, my_mesh_2D, nodeCoordinates
                                 loss_slope = loss_slope)
 
     #save loss history to a file
-    CSV.write(joinpath(save_path, inversion_save_loss_history_file_name), loss_history_df)
+    CSV.write(joinpath(case_path, inversion_save_loss_history_file_name), loss_history_df)
 
     #save the results of each iteration to vtk 
     for (i, (curPred, curPars)) in enumerate(zip(PRED, PARS))
@@ -62,7 +62,7 @@ function  postprocess_inversion_results_2D(settings, my_mesh_2D, nodeCoordinates
         scalar_data = [h_i, WSE_i, zb_i, h_truth, WSE_truth, zb_cells_truth]
         scalar_names = ["h", "WSE", "zb", "h_truth", "WSE_truth", "zb_truth"]
         
-        file_path = joinpath(@__DIR__, "inversion_results_iter_$i.vtk" ) 
+        file_path = joinpath(case_path, "inversion_results_iter_$i.vtk" ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
     

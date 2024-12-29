@@ -10,6 +10,7 @@ Base.@kwdef mutable struct swe_2D_consts
     CFL::Float64 = 0.4  #CFL number 
     tStart::Float64  #start time for simulation
     tEnd::Float64  #end time for simulation 
+    tspan::Tuple{Float64, Float64} #time span for simulation
 
     h_small::Float64 = 1.0e-3  #dry bed water depth threshold (e.g., 1.0e-3)
 
@@ -29,4 +30,5 @@ function update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
     swe_2D_constants.tEnd = tEnd
     swe_2D_constants.dt = dt
     swe_2D_constants.t = tStart   #set the current time as the starting time 
+    swe_2D_constants.tspan = (tStart, tEnd)
 end

@@ -240,15 +240,15 @@ function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
         # Source terms
         source_terms = if h[iCell] <= h_small
             [data_type(0.0),
-                g * h[iCell] * S0[iCell, 1] * cell_area,
-                g * h[iCell] * S0[iCell, 2] * cell_area]
+                g * h[iCell] * S0_local[iCell, 1] * cell_area,
+                g * h[iCell] * S0_local[iCell, 2] * cell_area]
         else
             u_temp = q_x[iCell] / max(h[iCell], h_small)
             v_temp = q_y[iCell] / max(h[iCell], h_small)
             u_mag = sqrt(u_temp^2 + v_temp^2 + sqrt(eps(data_type)))
 
-            friction_x = g * ManningN_cells[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
-            friction_y = g * ManningN_cells[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
+            friction_x = g * ManningN_cells_local[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
+            friction_y = g * ManningN_cells_local[iCell]^2 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
 
             [zero(data_type),
                 (g * h[iCell] * S0_local[iCell, 1] - friction_x) * cell_area,

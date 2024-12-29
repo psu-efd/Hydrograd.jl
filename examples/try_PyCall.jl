@@ -4,7 +4,7 @@ using IterTools
 
 using PyCall
 
-using AdHydraulics
+using Hydrograd
 
 println("Python version: ", PyCall.pyversion)
 println("Python path: ", PyCall.pyprogramname)

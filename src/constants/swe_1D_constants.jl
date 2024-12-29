@@ -1,7 +1,7 @@
 
 #Problem constants and solution fields for 1D SWE with finite volume method
 
-Base.@kwdef mutable struct swe_1D_const
+Base.@kwdef mutable struct swe_1D_consts
     g::Float64 = 9.81   #gravity constant 
 
     t::Float64   #time 

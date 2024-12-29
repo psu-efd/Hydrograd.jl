@@ -4,8 +4,8 @@
     "control_variables": {
         "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": true,
-        "bPerform_Inversion": false,
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": true,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
@@ -43,7 +43,7 @@
         "inversion_upper_bound_zb": 0.3,
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
-        "inversion_max_iterations": 100,
+        "inversion_max_iterations": 10,
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "from_file",
         "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",

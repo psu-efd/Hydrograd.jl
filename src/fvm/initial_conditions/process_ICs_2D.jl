@@ -2,8 +2,26 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(settings, initial_condition_options, initial_condition_constant_values, 
-    initial_condition_values_from_file, my_mesh_2D, nodeCoordinates, wse, zb_cell, h, q_x, q_y,swe_2D_constants, bPlot::Bool=false)
+function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cell, h, q_x, q_y,swe_2D_constants, bPlot::Bool=false)
+
+    initial_condition_options = nothing
+    initial_condition_constant_values = nothing
+    initial_condition_values_from_file = nothing
+
+    if settings.bPerform_Forward_Simulation
+        initial_condition_options = settings.forward_settings.initial_condition_options
+        initial_condition_constant_values = settings.forward_settings.initial_condition_constant_values
+        initial_condition_values_from_file = settings.forward_settings.initial_condition_values_from_file
+    elseif settings.bPerform_Inversion
+        initial_condition_options = settings.inversion_settings.forward_simulation_initial_condition_options
+        initial_condition_constant_values = settings.inversion_settings.forward_simulation_initial_condition_constant_values
+        initial_condition_values_from_file = settings.inversion_settings.forward_simulation_initial_condition_values_from_file
+    elseif settings.bPerform_Sensitivity_Analysis
+        #not implemented yet
+        error("Sensitivity analysis is not implemented yet.")
+    else
+        error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis. No initial condition is to be setup.")
+    end
 
     if settings.bVerbose
         println("setup_initial_condition!")

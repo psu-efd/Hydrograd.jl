@@ -24,16 +24,19 @@ zb_ghostCells = nothing
 zb_faces = nothing
 S0 = nothing
 
+#define the true bed elevation at cells
 zb_cells_truth = nothing
 
 #get the true Manning's n and inlet discharges
 srhhydro_ManningsN_Dict = nothing
 
+#define the true Manning's n values
 ManningN_values_truth = nothing
 
 #get the true inlet discharges (could be nothing if no inletQ_BCs)
 srhhydro_inletQ_Dict = nothing
 
+#define the true inlet discharges
 inlet_discharges_truth = nothing
 
 #define the parameters array (nothing for forward simulation)
@@ -67,9 +70,18 @@ q_y_ghostCells = nothing          #q_y=hv at ghost cells
 total_water_volume = []   #total volume of water in the domain 
 
 #setup initial condition for wse, h, q_x, q_y
-initial_condition_options = nothing
-initial_condition_constant_values = nothing
-initial_condition_values_from_file = nothing
+
+#solution variables
+wse = nothing          #free surface elevation at cells 
+h = nothing            #water depth at cells 
+q_x = nothing          #q_x=hu at cells 
+q_y = nothing          #q_y=hv at cells 
+
+#ghost cells
+wse_ghostCells = nothing          #free surface elevation at ghost cells 
+h_ghostCells = nothing            #water depth at ghost cells 
+q_x_ghostCells = nothing          #q_x=hu at ghost cells 
+q_y_ghostCells = nothing          #q_y=hv at ghost cells 
 
 
 #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
@@ -92,11 +104,10 @@ symm_A = nothing
 #set up initial condition for ODE solver
 Q0 = nothing
 
-Q_ghost = nothing   #ghost cell values of Q
-
 # Create the ODEFunction with the typed function
 ode_f = nothing
 
+# Define the Jacobian sparsity pattern
 jac_sparsity = nothing
 
 # time information (the same for forward simulation, inversion, and sensitivity analysis)

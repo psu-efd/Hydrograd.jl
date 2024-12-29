@@ -9,6 +9,7 @@ using CSV
 using DataFrames
 using Printf
 using Plots
+using SparseArrays
 
 #SciML related 
 using SciMLSensitivity
@@ -56,6 +57,8 @@ function greet_your_package_name()
 end
 
 #applications
+include("applications/forward_simulation/swe_2D_forward_simulation.jl")
+include("applications/inversion/swe_2D_inversion.jl")
 include("applications/inversion/process_inversion_results_2D.jl")
 
 #constants
@@ -66,7 +69,8 @@ include("constants/swe_2D_constants.jl")
 include("controls/control_settings_2D.jl")
 
 #fvm
-include("fvm/discretization/semi_discretize_2D.jl")
+include("fvm/discretization/semi_discretize_swe_2D.jl")
+include("fvm/discretization/sparsity_swe_2D.jl")
 include("fvm/discretization/fvm_schemes_2D.jl")
 include("fvm/discretization/Riemman_solvers/swe_1D_solvers.jl")
 include("fvm/discretization/Riemman_solvers/swe_2D_solvers.jl")
@@ -97,11 +101,13 @@ export print_banner
 export greet_your_package_name
 
 # Applications
-export process_inversion_results_2D
+export swe_2D_forward_simulation
+export swe_2D_inversion
+export postprocess_inversion_results_swe_2D
 
 # Constants
-export swe_1D_const
-export swe_2D_const
+export swe_1D_consts
+export swe_2D_consts
 export update_swe_2D_constants!
 
 # Controls
@@ -127,7 +133,8 @@ export compute_cell_gradient
 export cells_to_faces_scalar
 
 #     discretization - semi-discretization
-export semi_discretize_2D
+export swe_2d_rhs
+export define_sparsity_swe_2D
 
 #     discretization - initial conditions
 export setup_initial_condition!
@@ -138,15 +145,20 @@ export mesh_1D
 export mesh_2D
 export initialize_mesh_1D
 export initialize_mesh_2D
+export check_cell_nodes_counter_clockwise_srhgeom
+export compute_mesh_properties_srhgeom
+export compute_face_normals_srhgeom
+export compute_polygon_area_srhgeom
+export compute_polygon_centroid_srhgeom
 
 # ODE Solvers
 export custom_ODE_solve
 export custom_ODE_update_cells
 
 # Parameters
-export process_model_parameters_2D
-export process_ManningN_2D
-export process_bed_2D
+export setup_model_parameters_2D
+export preprocess_model_parameters_2D
+
 
 # Utilities
 export update_1d_array

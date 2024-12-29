@@ -1,6 +1,6 @@
 #process input files for SRH-2D case, e.g.. srhhydro, srhgeom, srhmat, srhmon files
 
-function process_SRH_2D_input(settings)
+function process_SRH_2D_input(settings, case_path)
 
     if settings.bVerbose
         println("Python version: ", PyCall.pyversion)
@@ -14,9 +14,7 @@ function process_SRH_2D_input(settings)
 
     
     # Call a function from the custom package
-    #file_path = joinpath(@__DIR__, "backwater.srhhydro" ) 
-    #file_path = joinpath(@__DIR__, "simple.srhhydro" ) 
-    file_path = joinpath(@__DIR__, srhhydro_file_name )
+    file_path = joinpath(case_path, srhhydro_file_name )
     my_srh_2d_data = pyHMT2D.SRH_2D.SRH_2D_Data(file_path)
     
     #ManningN_cell = my_srh_2d_data.ManningN_cell

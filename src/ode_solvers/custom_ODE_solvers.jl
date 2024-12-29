@@ -2,16 +2,17 @@
 
 
 # Finite Volume Update
-function custom_ODE_update_cells(Q, para, t)
+function custom_ODE_update_cells(Q, para, t, swe_2D_constants, my_mesh_2D)
 
     #dQdt = zeros(eltype(para), my_mesh_2D.numOfCells, 3)
     
     # compute dQdt 
     #swe_2d_ode!(dQdt, Q, para, t)
-    dQdt = swe_2d_ode(Q, para, t)
+    #dQdt = swe_2d_ode(Q, para, t)
+    dQdt = 0.0
     
      # Vectorized update of Q
-    Q_new = Q + dt * dQdt
+    Q_new = Q + swe_2D_constants.dt * dQdt
     
     # Create mask for dry cells
     dry_mask = Q_new[:, 1] .< swe_2D_constants.h_small
@@ -31,10 +32,10 @@ function custom_ODE_update_cells(Q, para, t)
 end
 
 # Main Solver Function (equivalent to solve(prob, Euler(), adaptive=false, p=para, dt=dt, saveat=t_save))
-function custom_ODE_solve(para, Q0, my_mesh_2D, tspan, dt)
-    t_start = tspan[1]
-    t_end = tspan[2]
-    time_steps = t_start:dt:t_end
+function custom_ODE_solve(para, Q0, my_mesh_2D, swe_2D_constants)
+    t_start = swe_2D_constants.tspan[1]
+    t_end = swe_2D_constants.tspan[2]
+    time_steps = t_start:swe_2D_constants.dt:t_end
 
     nTimeSteps = length(time_steps)
 
@@ -65,7 +66,7 @@ function custom_ODE_solve(para, Q0, my_mesh_2D, tspan, dt)
         end
         
         #update Q
-        Q = my_update_cells(Q, para, t)
+        Q = custom_ODE_update_cells(Q, para, t, swe_2D_constants, my_mesh_2D)
 
         #save the solution
         if (iStep+1) % save_freq == 0
