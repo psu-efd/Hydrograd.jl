@@ -1,4 +1,4 @@
-#some tools for 1D SWE
+#some tools for 1D SWE such as saving results and making plots
 
 using Printf
 using DifferentialEquations

@@ -21,7 +21,9 @@ include("mesh/SRH_2D_Data.jl")
 
 include("util/misc_tools.jl")
 
-export greet_your_package_name
+include("util/smooth_functions.jl")
+
+export print_banner
 
 #swe_1D
 export swe_1D_const
@@ -63,6 +65,8 @@ export SRH2D
 
 #misc tools
 export update_1d_array
+
+#smooth functions
 export smooth_abs
 export smooth_sign
 export smooth_max
