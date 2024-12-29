@@ -1,8 +1,7 @@
-using AdHydraulics
+using Hydrograd
 using Test
 
-@testset "AdHydraulics.jl" begin
+@testset "Hydrograd.jl" begin
     # Write your tests here.
-    @test AdHydraulics.greet_your_package_name() == "Hello from AdHydraulics!"
-    @test AdHydraulics.greet_your_package_name() != "Hello world!"
+    @test Hydrograd.greet_your_package_name() == "Hello from Hydrograd!"
 end

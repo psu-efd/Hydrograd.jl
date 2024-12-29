@@ -12,15 +12,13 @@ using PyCall
 
 using Profile
 
-using AdHydraulics
-
-using OrdinaryDiffEq
+using Hydrograd
 
 using SparseArrays
 
 #SciML
 using SciMLSensitivity
-using ComponentArrays
+using OrdinaryDiffEq
 
 #Optimizers
 using Optimization
@@ -48,11 +46,13 @@ using InteractiveUtils
 #Random.seed!(1234)
 
 # Add some warnings/info for gradient computation
-#@code_warntype(my_loss(ps))
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
 
 #Timing 
 start_time = now()  # Current date and time
+
+#include the files to define the variables
+include("define_variables_2D.jl")
 
 include("process_control_settings.jl")
 include("process_SRH_2D_input.jl")
@@ -96,14 +96,16 @@ my_mesh_2D = srh_all_Dict["my_mesh_2D"]
 nodeCoordinates = srh_all_Dict["srhgeom_obj"].nodeCoordinates
 
 #  setup bed elevation 
-#If performing inversion, set the bed elevation to zero to start with
-if settings.bPerform_Inversion
+#If performing inversion on zb, zero out the bed elevation in nodeCoordinates.
+if settings.bPerform_Inversion && settings.inversion_settings.active_param_names == ["zb"]
     nodeCoordinates[:, 3] .= 0.0
 end
 
-#setup bed elevation: computer zb at cell centers (zb_cells) from nodes, 
+#setup bed elevation: compute zb at cell centers (zb_cells) from nodes, 
 #then interpolate zb from cell to face (zb_faces) and ghost cells (zb_ghostCells),
-#and compute the bed slope at cells (S0)
+#and compute the bed slope at cells (S0). 
+#Note: If performing inversion on zb_cells, these values are not used in the inversion process. 
+#      Instead, they are updated in the inversion process.
 zb_cells, zb_ghostCells, zb_faces, S0 = setup_bed(settings, my_mesh_2D, nodeCoordinates, true)
 
 zb_cells_truth = zeros(size(zb_cells))

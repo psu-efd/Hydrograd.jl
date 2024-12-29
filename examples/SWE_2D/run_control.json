@@ -4,8 +4,8 @@
     "control_variables": {
         "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": false,
-        "bPerform_Inversion": true,
+        "bPerform_Forward_Simulation": true,
+        "bPerform_Inversion": false,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
