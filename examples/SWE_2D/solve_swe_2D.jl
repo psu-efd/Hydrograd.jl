@@ -567,8 +567,17 @@ if settings.bPerform_Inversion
         prob = ODEProblem(ode_f, Q0, tspan, p)
 
         # Solve the ODE (forward pass)
-        #For sensealg argument in ODE solve function: See https://docs.sciml.ai/SciMLSensitivity/dev/faq/ for the choice of AD type (sensealg)
-        #If not specified, the default is a smart polyalgorithm used to automatically determine the most appropriate method for a given equation.
+        #For sensealg argument in ODE solve function: See https://docs.sciml.ai/SciMLSensitivity/dev/manual/differential_equation_sensitivities/ for the choice of AD type (sensealg)
+        #If not specified, the default is a smart polyalgorithm used to automatically determine the most appropriate method for a given equation. It is defined in 
+        #SciMLSensitivity.jl/src/concrete_solve.jl 
+        #default_sensealg = if p !== SciMLBase.NullParameters() &&
+        #                  !(eltype(u0) <: ForwardDiff.Dual) &&
+        #                  !(eltype(p) <: ForwardDiff.Dual) &&
+        #                  !(eltype(u0) <: Complex) &&
+        #                  !(eltype(p) <: Complex) &&
+        #                  length(u0) + length(tunables) <= 100
+        #    ForwardDiffSensitivity()    #for small problems, it uses ForwardDiffSensitivity()
+        #    ...
         #Some options are:
         # 1. BacksolveAdjoint(autojacvec=ZygoteVJP())
         # 2. InterpolatingAdjoint(autojacvec=ZygoteVJP())
@@ -580,9 +589,13 @@ if settings.bPerform_Inversion
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
         if settings.inversion_settings.ode_solver == "Tsit5()"
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save)
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ZygoteVJP())
-            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP()))
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save)  #working, but no control on sensealg
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ZygoteVJP())   #not working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
+            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ReverseDiffAdjoint()) #not working, ReverseDiffAdjoint only supports vector u0.
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ReverseDiffVJP()) #not working
         else
             #pred = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
             error("Not implemented yet")

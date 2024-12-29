@@ -22,13 +22,13 @@ function setup_initial_condition!(settings, initial_condition_options, initial_c
     elseif initial_condition_options == "from_file"
         #make sure the length of the initial condition values is the same as the number of cells
         if length(initial_condition_values_from_file["h"]) != my_mesh_2D.numOfCells
-            error("The length of the initial condition values of h is not the same as the number of cells.")
+            error("The length of the initial condition values of h (", length(initial_condition_values_from_file["h"]), ") is not the same as the number of cells (", my_mesh_2D.numOfCells, ").")
         end
         if length(initial_condition_values_from_file["q_x"]) != my_mesh_2D.numOfCells
-            error("The length of the initial condition values of q_x is not the same as the number of cells.")
+            error("The length of the initial condition values of q_x (", length(initial_condition_values_from_file["q_x"]), ") is not the same as the number of cells (", my_mesh_2D.numOfCells, ").")
         end
         if length(initial_condition_values_from_file["q_y"]) != my_mesh_2D.numOfCells
-            error("The length of the initial condition values of q_y is not the same as the number of cells.")
+            error("The length of the initial condition values of q_y (", length(initial_condition_values_from_file["q_y"]), ") is not the same as the number of cells (", my_mesh_2D.numOfCells, ").")
         end
 
         #copy the initial condition values
