@@ -11,10 +11,6 @@
 # ManningN_cells, ManningN_ghostCells, inletQ_TotalQ, exitH_WSE, 
 # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_array.
 
-using ForwardDiff
-using Zygote
-
-
 #function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
 #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
 #    )

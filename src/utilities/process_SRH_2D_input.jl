@@ -229,17 +229,3 @@ function process_SRH_2D_input(settings)
     return srh_all_Dict  
 end
 
-#update swe_2d_constants based on the SRH-2D data
-function update_swe_2D_constants!(swe_2D_constants, srh_all_Dict)
-
-    srhhydro_SimTime = srh_all_Dict["srhhydro_SimTime"]  
-    tStart = srhhydro_SimTime[1]
-    tEnd = srhhydro_SimTime[2] * 3600 #convert hours to seconds
-    dt = srhhydro_SimTime[3]
-
-    #update the constants
-    swe_2D_constants.tStart = tStart
-    swe_2D_constants.tEnd = tEnd
-    swe_2D_constants.dt = dt
-    swe_2D_constants.t = tStart   #set the current time as the starting time 
-end

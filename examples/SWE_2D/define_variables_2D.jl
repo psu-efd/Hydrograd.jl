@@ -1,6 +1,9 @@
 #define variables 
 
+#control file
 control_file = nothing
+
+#settings
 settings = nothing
 
 #define a swe_2D_constants object with some values from the control file
@@ -10,7 +13,7 @@ swe_2D_constants = nothing
 srh_all_Dict = nothing
 
 #Get the 2D mesh 
-my_mesh_2D = srh_all_Dict["my_mesh_2D"]
+my_mesh_2D = nothing
 
 #mesh related variables which might be mutable (should not be in struct mesh_2D)
 #nodeCoordinates: Float64 2D array [numOfNodes, 3]
@@ -42,10 +45,13 @@ inlet_discharges_param = nothing
 #params_array: the 1D array of all parameters (zb_cells_param, ManningN_list_param, inlet_discharges_param)
 #active_range: the range of active parameters 
 #param_ranges: the range of each parameter
-params_array, active_range, param_ranges = nothing
+params_array =nothing
+active_range = nothing
+param_ranges = nothing
 
 #Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
-ManningN_cells, ManningN_ghostCells = nothing
+ManningN_cells = nothing
+ManningN_ghostCells = nothing
 
 # setup initial conditions 
 wse = nothing          #free surface elevation at cells 

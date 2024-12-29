@@ -64,6 +64,7 @@ end
 # Function to parse control file and create settings
 function parse_control_file(control_file::String)
     control_dict = JSON3.read(open(control_file), Dict)
+    control_file_dir = dirname(control_file)  # Get directory of control file
 
     # Parse time settings
     time_settings = TimeSettings(
@@ -75,13 +76,13 @@ function parse_control_file(control_file::String)
     # Parse forward simulation settings if needed
     forward_settings = nothing
     if control_dict["control_variables"]["bPerform_Forward_Simulation"]
-        forward_settings = parse_forward_settings(control_dict["forward_simulation_options"])
+        forward_settings = parse_forward_settings(control_dict["forward_simulation_options"], control_file_dir)
     end
 
     # Parse inversion settings if needed
     inversion_settings = nothing
     if control_dict["control_variables"]["bPerform_Inversion"]
-        inversion_settings = parse_inversion_settings(control_dict["inversion_options"])
+        inversion_settings = parse_inversion_settings(control_dict["inversion_options"], control_file_dir)
     end
 
     # Create main control settings
@@ -179,12 +180,15 @@ function parse_control_file(control_file::String)
 end
 
 # Helper functions to parse specific settings
-function parse_forward_settings(options::Dict)
+function parse_forward_settings(options::Dict, control_file_dir::String)
     # Handle initial condition values from file if specified
     initial_condition_values = nothing
     if options["forward_simulation_initial_condition_options"] == "from_file"
-        file_path = joinpath(dirname(@__FILE__),
-            options["forward_simulation_initial_condition_file_name"])
+        # Use the current directory to find the file
+        println("Current working directory: ", pwd())
+        file_path = joinpath(control_file_dir, options["forward_simulation_initial_condition_file_name"])
+        println("Attempting to open file: ", file_path)
+
         initial_condition_values = JSON3.read(open(file_path), Dict)
     end
 
@@ -203,19 +207,17 @@ function parse_forward_settings(options::Dict)
     )
 end
 
-function parse_inversion_settings(options::Dict)
+function parse_inversion_settings(options::Dict, control_file_dir::String)
     # Handle parameter initial values from file if specified
     parameter_values_from_file = nothing
     if options["inversion_parameter_initial_values_options"] == "from_file"
-        file_path = joinpath(dirname(@__FILE__),
-            options["inversion_parameter_initial_values_file_name"])
+        file_path = joinpath(control_file_dir, options["inversion_parameter_initial_values_file_name"])
         parameter_values_from_file = JSON3.read(open(file_path), Dict)
     end
 
     forward_simulation_initial_condition_values_from_file = nothing
     if options["inversion_forward_simulation_initial_condition_options"] == "from_file"
-        file_path = joinpath(dirname(@__FILE__),
-            options["inversion_forward_simulation_initial_condition_file_name"])
+        file_path = joinpath(control_file_dir, options["inversion_forward_simulation_initial_condition_file_name"])
         forward_simulation_initial_condition_values_from_file = JSON3.read(open(file_path), Dict)
     end
 

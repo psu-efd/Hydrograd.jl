@@ -1,23 +1,6 @@
 #Functions to process the inversion results: 
 #The process_inversion_results function is used to plot the inversion results in Python.
 
-using Revise
-using JLD2
-#using Plots
-#using PyPlot
-#using CairoMakie
-#using LaTeXStrings
-using CSV, DataFrames
-
-plot_font = "sans-serif"
-# default(fontfamily=plot_font,
-#         linewidth=2, framestyle=:box, label=nothing, grid=false,
-#         titlefont=font(16, plot_font),   #for title
-#         tickfont=font(12, plot_font),    #for tick label 
-#         guidefont=font(16, plot_font),   #for axis title label
-#         annotationfontsize=14,           #for annotate
-#         legendfont=font(10, plot_font))  #for legend
-
 
 function  postprocess_inversion_results_2D(settings, my_mesh_2D, nodeCoordinates, 
     zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth)

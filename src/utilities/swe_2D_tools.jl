@@ -1,11 +1,5 @@
 #some tools for 1D SWE
 
-using Printf
-using DifferentialEquations
-using CSV 
-using DataFrames
-using Plots
-
 #calculate the total water volume in the domain
 function swe_2D_calc_total_water_volume(h, my_mesh_2D)
     total_water_volume = sum(h .* my_mesh_2D.cell_areas)

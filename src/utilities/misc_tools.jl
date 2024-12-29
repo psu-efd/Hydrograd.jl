@@ -1,7 +1,5 @@
 #misc tools
 
-using Zygote
-
 function update_1d_array(arr, idx, values)
     #update a 1D array with a sparse update and avoid breaking the computational graph by creating a new array
     #arr is the array to update

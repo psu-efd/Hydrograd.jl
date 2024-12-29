@@ -54,22 +54,10 @@ start_time = now()  # Current date and time
 #include the files to define the variables
 include("define_variables_2D.jl")
 
-include("process_control_settings.jl")
-include("process_SRH_2D_input.jl")
-include("process_model_parameters_2D.jl")
-include("process_ManningN_2D.jl")
-include("process_BCs_2D.jl")
-include("process_bed_2D.jl")
-include("process_ICs_2D.jl")
-include("semi_discretize_2D.jl")
-include("misc_utilities_2D.jl")
-include("custom_ODE_solver.jl")
-include("process_inversion_results_2D.jl")
-
 #print the banner
 print_banner()
 
-#directory to read from/save to (the same directory as the main file)
+#directory to read from/save to (the same directory as this main file)
 save_path = dirname(@__FILE__)
 
 # Read and parse control file
@@ -355,7 +343,7 @@ if settings.bPerform_Forward_Simulation
 
         println("   Performing 2D SWE simulation with MyOwn solver ...")
 
-        sol = my_solve(params_array, Q0, my_mesh_2D, tspan, dt)
+        sol = custom_ODE_solve(params_array, Q0, my_mesh_2D, tspan, dt)
 
         # #save the results
         # #save the simulation solution results

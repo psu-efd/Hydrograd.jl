@@ -1,9 +1,9 @@
 
-#preprocess: create a ComponentArray for the model parameters for 2D shallow water equations
-#The complete model parameters include:
-#1. Manning's n
-#2. bed elevation
-#3. Inlet discharge (constant for now)
+#preprocess: create a parameter vector for 2D shallow water equations
+#The complete model parameter vector include:
+#1. bed elevation (ncells)
+#2. Manning's n (nMaterials)
+#3. Inlet discharge (nInlet)
 #4. xxx (for future use)
 function preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
 

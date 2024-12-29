@@ -3,7 +3,7 @@
 #
 # This file should be problem specific (each problem may have different bed profile)
 
-using Statistics 
+
 
 #loss due to slope regularization
 function calc_slope_loss(zb_cells, my_mesh_2D)

@@ -1,11 +1,5 @@
 #some tools for 1D SWE such as saving results and making plots
 
-using Printf
-using DifferentialEquations
-using CSV 
-using DataFrames
-using Plots
-
 #calculate the total water volume in the domain
 function swe_1D_calc_total_water_volume(h, dx)
     total_water_volume = sum(h) * dx

@@ -2,7 +2,7 @@
 
 
 # Finite Volume Update
-function my_update_cells(Q, para, t)
+function custom_ODE_update_cells(Q, para, t)
 
     #dQdt = zeros(eltype(para), my_mesh_2D.numOfCells, 3)
     
@@ -31,7 +31,7 @@ function my_update_cells(Q, para, t)
 end
 
 # Main Solver Function (equivalent to solve(prob, Euler(), adaptive=false, p=para, dt=dt, saveat=t_save))
-function my_solve(para, Q0, my_mesh_2D, tspan, dt)
+function custom_ODE_solve(para, Q0, my_mesh_2D, tspan, dt)
     t_start = tspan[1]
     t_end = tspan[2]
     time_steps = t_start:dt:t_end
