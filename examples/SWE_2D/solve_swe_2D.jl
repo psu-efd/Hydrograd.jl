@@ -258,30 +258,9 @@ Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)   #ghost cell value
 # Define the ODE function 
 function swe_2d_ode(Q, params_array, t)
 
-    #return zeros(size(Q))
-    #return Q .* 1.0
-
-    # Create closure to capture all extra arguments
-    # let settings=settings, my_mesh_2D=my_mesh_2D, srh_all_Dict=srh_all_Dict,
-    #     boundary_conditions=boundary_conditions, swe_2D_constants=swe_2D_constants,
-    #     ManningN_cells=ManningN_cells, ManningN_ghostCells=ManningN_ghostCells,
-    #     inletQ_Length=inletQ_Length, inletQ_TotalQ=inletQ_TotalQ, exitH_WSE=exitH_WSE,
-    #     zb_cells=zb_cells, zb_ghostCells=zb_ghostCells, zb_faces=zb_faces, S0=S0
-
-    #     dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-    #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-    #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-    #         zb_cells, zb_ghostCells, zb_faces, S0)
-    #     return dQdt
-    # end
-
-    #dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-    #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-    #         zb_cells, zb_ghostCells, zb_faces, S0)
-
     dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-            my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
-            )
+        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+        zb_cells, zb_ghostCells, zb_faces, S0)
 
     return dQdt
 end
@@ -419,171 +398,170 @@ if settings.bPerform_Inversion
 
 
     #debug start
-    @show Q0
-    @show tspan
-    @show params_array
-    @assert !ismissing(params_array) "params_array contains missing values!"
-    @assert !isnothing(params_array) "params_array contains `nothing` values!"
-        
-    prob = ODEProblem(ode_f, Q0, tspan, params_array)
+    # @show Q0
+    # @show tspan
+    # @show params_array
+    # @assert !ismissing(params_array) "params_array contains missing values!"
+    # @assert !isnothing(params_array) "params_array contains `nothing` values!"
 
-    #use Enzyme to test the gradient of the ODE and identify the source of the error
-    #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
-    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-    p = prob.p
-    y = prob.u0
-    f = prob.f
-    t = tspan[1]  # Add this line to define t
-    @show typeof(p)
-    @show typeof(y)
-    @show typeof(f)
-    @show typeof(t)
-    @show p
-    @show y
-    @show f
-    @show t
+    # prob = ODEProblem(ode_f, Q0, tspan, params_array)
+
+    # #use Enzyme to test the gradient of the ODE and identify the source of the error
+    # #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
+    # SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+    # p = prob.p
+    # y = prob.u0
+    # f = prob.f
+    # t = tspan[1]  # Add this line to define t
+    # @show typeof(p)
+    # @show typeof(y)
+    # @show typeof(f)
+    # @show typeof(t)
+    # @show p
+    # @show y
+    # @show f
+    # @show t
 
 
-    # Test forward pass first
-    try
-        #test_forward = f(y, p, t)
-        #test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-        #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-        #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-        #    zb_cells, zb_ghostCells, zb_faces, S0)
-
-        test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
-        )
-        
-        @show typeof(test_forward)
-        @show size(test_forward)
-        @show test_forward
-
-        println("Forward pass successful")
-        println(" ")
-    catch e
-        println("Forward pass failed")
-        println(" ")
-        @show e
-    end
-
-    #try
-        # Test gradient computation directly
-        #@code_warntype swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-        #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-        #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-        #    zb_cells, zb_ghostCells, zb_faces, S0)
-        SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-
-        #use ForwardDiff to test the gradient of the ODE and identify the source of the error
-        # gradient_output = ForwardDiff.gradient((y, p) -> begin
-        #     #result = f(y, p, t)
-        #     #result = swe_2d_ode(y, p, t)
-
-        #     result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-        #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-        #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-        #         zb_cells, zb_ghostCells, zb_faces, S0)
-
-        #     @show typeof(result)
-        #     @show size(result)
-        #     @show result
-
-        #     # Sum to get scalar output for gradient
-        #     sum(result)
-        # end, y, p)
-
-        gradient_output = Zygote.gradient((y, p) -> begin
-            #result = f(y, p, t)
-            #result = swe_2d_ode(y, p, t)
-
-            #result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-            #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-            #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-            #    zb_cells, zb_ghostCells, zb_faces, S0)
-
-            result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
-                my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
-                )
-
-            @show typeof(result)
-            @show size(result)
-            @show result
-
-            # Sum to get scalar output for gradient
-            sum(result)
-            #return result[1,1]
-        end, y, p)
-        
-        @show typeof(gradient_output)
-        @show size.(gradient_output)
-        @show gradient_output
-
-        println("After Zygote.gradient, Gradient computation successful")
-        println(" ")
-    #catch e
-    #    println("Gradient pass failed")
-        
-    #    @show e
-
-    #    println(" ")
-    #end
-
-    # Now test the pullback with more detailed error catching
+    # # Test forward pass first
     # try
-    #     λ = ones(size(prob.u0)) #zero(prob.u0)
+    #     #test_forward = f(y, p, t)
+    #     #test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #     #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+    #     #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #     #    zb_cells, zb_ghostCells, zb_faces, S0)
 
-    #     #Zygote.pullback takes two arguments:
-    #     #  First argument: a function that we want to differentiate
-    #     #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
-    #     #_dy is the result of the forward pass; back is the gradient function
-    #     #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
-    #     _dy, back = Zygote.pullback((u, p) -> Array(f(u, p, t)), y, p)
+    #     #test_forward = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #     #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+    #     #    )
 
-    #     #_dy, back = Zygote.pullback(y, p) do u, p  
-    #     #    #vec(f(u, p, t))
-    #     #    f(u, p, t)
-    #     #end
-    #     println("Pullback creation successful")
-    #     @show typeof(_dy)
-    #     @show size(_dy)
-    #     @show _dy
+    #     #@show typeof(test_forward)
+    #     #@show size(test_forward)
+    #     #@show test_forward
 
-    #     try
-    #          # Convert λ to match _dy type
-    #         λ = convert(typeof(_dy), λ)
-
-    #         tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
-    #         println("Backward pass successful")
-    #         @show typeof(tmp1)
-    #         @show size(tmp1)
-    #         @show typeof(tmp2)
-    #         @show size(tmp2)
-    #         @show tmp1
-    #         @show tmp2
-    #     catch e
-    #         println("Backward pass failed")
-    #         @show e
-    #         @show typeof(λ)
-    #         @show size(λ)
-    #         @show λ
-    #     end
+    #     println("Forward pass successful")
+    #     println(" ")
     # catch e
-    #     println("Pullback creation failed")
+    #     println("Forward pass failed")
+    #     println(" ")
     #     @show e
     # end
 
-    #throw("stop here")
+    # #try
+    #     # Test gradient computation directly
+    #     #@code_warntype swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #     #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+    #     #    ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #     #    zb_cells, zb_ghostCells, zb_faces, S0)
+    #     SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
 
-    #debug end
-    end
+    #     #use ForwardDiff to test the gradient of the ODE and identify the source of the error
+    #     # gradient_output = ForwardDiff.gradient((y, p) -> begin
+    #     #     #result = f(y, p, t)
+    #     #     #result = swe_2d_ode(y, p, t)
 
-    if false
+    #     #     result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #     #         my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+    #     #         ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #     #         zb_cells, zb_ghostCells, zb_faces, S0)
+
+    #     #     @show typeof(result)
+    #     #     @show size(result)
+    #     #     @show result
+
+    #     #     # Sum to get scalar output for gradient
+    #     #     sum(result)
+    #     # end, y, p)
+
+    #     gradient_output = Zygote.gradient((y, p) -> begin
+    #         #result = f(y, p, t)
+    #         #result = swe_2d_ode(y, p, t)
+
+    #         result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #             my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
+    #             ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
+    #             zb_cells, zb_ghostCells, zb_faces, S0)
+
+    #         #result = swe_2d_rhs(y, p, active_range, param_ranges, t, settings,
+    #         #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
+    #         #    )
+
+    #         @show typeof(result)
+    #         @show size(result)
+    #         @show result
+
+    #         # Sum to get scalar output for gradient
+    #         sum(result)
+    #         #return result[1,1]
+    #     end, y, p)
+
+    #     @show typeof(gradient_output)
+    #     @show size.(gradient_output)
+    #     @show gradient_output
+
+    #     println("After Zygote.gradient, Gradient computation successful")
+    #     println(" ")
+    # #catch e
+    # #    println("Gradient pass failed")
+
+    # #    @show e
+
+    # #    println(" ")
+    # #end
+
+    # # Now test the pullback with more detailed error catching
+    # # try
+    # #     λ = ones(size(prob.u0)) #zero(prob.u0)
+
+    # #     #Zygote.pullback takes two arguments:
+    # #     #  First argument: a function that we want to differentiate
+    # #     #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
+    # #     #_dy is the result of the forward pass; back is the gradient function
+    # #     #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
+    # #     _dy, back = Zygote.pullback((u, p) -> Array(f(u, p, t)), y, p)
+
+    # #     #_dy, back = Zygote.pullback(y, p) do u, p  
+    # #     #    #vec(f(u, p, t))
+    # #     #    f(u, p, t)
+    # #     #end
+    # #     println("Pullback creation successful")
+    # #     @show typeof(_dy)
+    # #     @show size(_dy)
+    # #     @show _dy
+
+    # #     try
+    # #          # Convert λ to match _dy type
+    # #         λ = convert(typeof(_dy), λ)
+
+    # #         tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
+    # #         println("Backward pass successful")
+    # #         @show typeof(tmp1)
+    # #         @show size(tmp1)
+    # #         @show typeof(tmp2)
+    # #         @show size(tmp2)
+    # #         @show tmp1
+    # #         @show tmp2
+    # #     catch e
+    # #         println("Backward pass failed")
+    # #         @show e
+    # #         @show typeof(λ)
+    # #         @show size(λ)
+    # #         @show λ
+    # #     end
+    # # catch e
+    # #     println("Pullback creation failed")
+    # #     @show e
+    # # end
+
+    # #throw("stop here")
+
+    # #debug end
+    # end
+
 
 
     # Define the loss function
-    function compute_loss(p, Q0, tspan, observed_data, data_type)
+    function compute_loss(p, Q0, tspan, observed_data, params_ranges, data_type)
         # Create ODEProblem
         #prob = ODEProblem(shallow_water_eq!, u0, tspan, p)
         prob = ODEProblem(ode_f, Q0, tspan, p)
@@ -602,11 +580,19 @@ if settings.bPerform_Inversion
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
         if settings.inversion_settings.ode_solver == "Tsit5()"
-            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save)
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP()))
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save)
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ZygoteVJP())
+            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP()))
         else
             #pred = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
             error("Not implemented yet")
+        end
+
+        Zygote.ignore() do
+            #@show pred.retcode
+            #@show typeof(pred)
+            #@show size(pred)
+            #@show pred
         end
 
         #compute the loss
@@ -617,14 +603,16 @@ if settings.bPerform_Inversion
         loss_pred_uv = zero(data_type)
         loss_slope = zero(data_type)
 
-        if pred.retcode == :Success
+        if pred.retcode == SciMLBase.ReturnCode.Success
             WSE_truth = observed_data["WSE_truth"]
             h_truth = observed_data["h_truth"]
             u_truth = observed_data["u_truth"]
             v_truth = observed_data["v_truth"]
 
-            #p.zb is the current bed elevation at cells
-            l = pred[:, 1, end] .+ p.zb_cells_param .- WSE_truth  #loss = free surface elevation mismatch
+            #Get the bed elevation at cells
+            zb_cells_temp = @view p[params_ranges.zb_start:params_ranges.zb_end]
+
+            l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
 
             #loss for free surface elevation mismatch
             loss_pred_WSE = sum(abs2, l)
@@ -645,7 +633,7 @@ if settings.bPerform_Inversion
 
             #loss for bed slope regularization
             if settings.inversion_settings.bInversion_slope_loss    #if bed slope is included in the loss 
-                loss_slope = calc_slope_loss(p.zb_cells_param, my_mesh_2D)
+                loss_slope = calc_slope_loss(zb_cells_temp, my_mesh_2D)
             end
 
             #combined loss due to free surface elevation mismatch, velocity mismatch, and bed slope regularization
@@ -654,38 +642,44 @@ if settings.bPerform_Inversion
             loss_total = convert(data_type, Inf)
         end
 
+        Zygote.ignore() do
+            #@show loss_total
+            #@show loss_pred
+            #@show loss_pred_WSE
+            #@show loss_pred_uv
+            #@show loss_slope
+        end
+
         return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
     end
 
-    function optimize_parameters(Q0, tspan, observed_data, p_init, param_dims, active_params)
+    function optimize_parameters(Q0, tspan, observed_data, p_init, active_range, param_ranges)
         # Loss function for optimization
         function opt_loss(θ, p)  # Add p argument even if unused
 
             data_type = eltype(θ)
 
             Zygote.ignore() do
-                println("data_type = ", data_type)
-                println("active_params = ", active_params)
-                println("θ = ", θ)
-                println("p_init = ", p_init)
-                println("param_dims = ", param_dims)
+                #println("data_type = ", data_type)
+                #println("active_range = ", active_range)
+                #println("param_ranges = ", param_ranges)
+                #println("θ = ", θ)
+                #println("p_init = ", p_init)
             end
 
-            # Create parameter set from optimization variables
-
+            # Create new parameter set without mutation
+            p_new = [i ∈ active_range ? θ[i - active_range[1] + 1] : p_init[i] for i in 1:length(p_init)]
 
             Zygote.ignore() do
-                println("p_new = ", p_new)
+                #println("p_new = ", p_new)
             end
 
-            loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred = compute_loss(p_new, Q0, tspan, observed_data, data_type)
-            return loss_total
+            loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred = compute_loss(p_new, Q0, tspan, observed_data, param_ranges, data_type)
+            return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
         end
 
         # Initial values for optimization parameters (vcat to flatten the array parameters to 1D array for optimizers)
-        θ0 = vcat([p_init[param] for param in active_params]...)
-
-
+        θ0 = p_init[active_range]  #get a copy of the subarray of p_init as the initial values for the optimization
 
         # Define AD type choice for optimization's gradient computation
         #The following is from SciMLSensitivity documentation regarding the choice of AD 
@@ -728,9 +722,6 @@ if settings.bPerform_Inversion
         #                          kwargs...)
         optprob = OptimizationProblem(optf, θ0)  # No parameters needed
 
-
-
-
         # Define the bounds for the parameter (only applicable for some optimizers which support lb and ub)
         lb_p = zeros(my_mesh_2D.numOfCells)
         lb_p .= -0.1
@@ -750,8 +741,8 @@ if settings.bPerform_Inversion
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
         if settings.inversion_settings.optimizer == "Adam"
-            #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
-            sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
+            sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
+            #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
         elseif settings.inversion_settings.optimizer == "LBFGS"
             sol = solve(optprob, LBFGS(), callback=callback, maxiters=settings.inversion_settings.max_iterations)
         else
@@ -772,8 +763,11 @@ if settings.bPerform_Inversion
 
     callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred) #callback function to observe training
         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
-        println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ",
-            loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
+
+        Zygote.ignore() do
+            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ",
+                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
+        end
 
         append!(PRED, [pred[:, 1, end]])
         append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred]])
@@ -799,7 +793,7 @@ if settings.bPerform_Inversion
     params_array_init = params_array
 
     #perform the inversion
-    sol = optimize_parameters(Q0, tspan, observed_data, params_array_init, param_dims, active_params)
+    sol = optimize_parameters(Q0, tspan, observed_data, params_array_init, active_range, param_ranges)
 
     #save the inversion results
     jldsave(joinpath(save_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)

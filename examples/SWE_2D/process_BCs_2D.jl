@@ -10,8 +10,10 @@ using Zygote
 function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_conditions, ManningN_cells, zb_faces, swe_2D_constants, inletQ_Length, inletQ_TotalQ, exitH_WSE)
 
     Zygote.ignore() do
-        println("process_all_boundaries_2d")
-        println(" ")
+        if settings.bVerbose
+            #println("process_all_boundaries_2d")
+            #println(" ")
+        end
     end
 
     h = @view Q_cells[:, 1]         
@@ -30,7 +32,7 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         if settings.bVerbose
             Zygote.ignore() do
-                println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+                #println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
             end
         end
 
@@ -55,39 +57,10 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
         total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
                       for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
         )
-
-        #contributions = [
-        #    current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
-        #    for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
-        #]
-
-        # contributions = map(1:length(current_internalCellIDs)) do iFace
-        #     base_contribution = current_inletQ_Length[iFace]^(5.0 / 3.0) * 
-        #                       h[current_internalCellIDs[iFace]] / 
-        #                       ManningN_cells[current_internalCellIDs[iFace]]
-        #     # Multiply by wet/dry status (0 or 1)
-        #     base_contribution * Float64(current_inletQ_DryWet[iFace])
-        # end
-
-        #fake contributions for debugging
-        contributions = [33.33333333322568, 33.333333333285225, 33.333333333489115]
-
-        # Debug type information
+       
         Zygote.ignore() do
-            @show eltype(contributions)
-            @show typeof(contributions)
-            #all(x -> isa(x, Float64), contributions) || 
-                #@warn "Non-Float64 elements found in contributions"
-
-            @show size(contributions)
-            @show contributions
-        end
-
-        #total_A = sum(contributions)
-
-        Zygote.ignore() do
-            @show typeof(total_A)
-            @show total_A
+            #@show typeof(total_A)
+            #@show total_A
         end
 
         @assert total_A > 1e-10 "Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A"
@@ -113,80 +86,26 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
         q_x_new = [q_updates[iFace][1] for iFace in 1:length(current_internalCellIDs)]
         q_y_new = [q_updates[iFace][2] for iFace in 1:length(current_internalCellIDs)]
 
-        #fake q_x_new and q_y_new for debugging
-        #q_x_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
-        #q_y_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
-
-        # Calculate q_updates in a non-mutating way
-        # q_x_new = map(enumerate(current_internalCellIDs)) do (iFace, internalCellID)
-        #     ManningN_face = ManningN_cells[internalCellID]
-        #     face_normal = boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, :]
-        #     velocity_normal = current_inletQ_TotalQ / total_A *
-        #                     current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_face
-            
-        #     # Use multiplication by wet/dry status instead of if/else
-        #     factor = Float64(current_inletQ_DryWet[iFace])
-        #     -h[internalCellID] * velocity_normal * face_normal[1] * factor
-        # end
-
         Zygote.ignore() do
-            @show typeof(current_inletQ_TotalQ)
-            @show typeof(total_A)
-            @show typeof(current_inletQ_Length)
-            @show typeof(ManningN_cells)
+            #@show typeof(current_inletQ_TotalQ)
+            #@show typeof(total_A)
+            #@show typeof(current_inletQ_Length)
+            #@show typeof(ManningN_cells)
 
-            @show current_inletQ_TotalQ
-            @show total_A
-            @show current_inletQ_Length
-            @show ManningN_cells
+            #@show current_inletQ_TotalQ
+            #@show total_A
+            #@show current_inletQ_Length
+            #@show ManningN_cells
         end
-
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / total_A * current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_cells[internalCellID]) 
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / total_A / ManningN_cells[internalCellID]) #break
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / ManningN_cells[internalCellID]) #break
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / total_A ) #works
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * ( ManningN_cells[internalCellID]) #breaks
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_Length[iFace]^(2.0 / 3.0)) #works; current_inletQ_Length from a static struct (?)
-        #                         * boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, 1] * Float64(current_inletQ_DryWet[iFace]), enumerate(current_internalCellIDs))
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ  * current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_cells[internalCellID])  #break
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ  * current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_cells[internalCellID])  #break
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ )    #works
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ /2.0 )    #works
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (total_A )    #break
-        #q_x_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / ManningN_cells[internalCellID])  #break
-        #                 * boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, 1] * Float64(current_inletQ_DryWet[iFace]), enumerate(current_internalCellIDs))
-
-        # q_y_new = map(enumerate(current_internalCellIDs)) do (iFace, internalCellID)
-        #     ManningN_face = ManningN_cells[internalCellID]
-        #     face_normal = boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, :]
-        #     velocity_normal = current_inletQ_TotalQ / total_A *
-        #                     current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_face
-            
-        #     # Use multiplication by wet/dry status instead of if/else
-        #     factor = Float64(current_inletQ_DryWet[iFace])
-        #     -h[internalCellID] * velocity_normal * face_normal[2] * factor
-        # end
-
-        #q_y_new = map(((iFace, internalCellID),) -> -h[internalCellID] * (current_inletQ_TotalQ / total_A * current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_cells[internalCellID]) 
-        #                 * boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, 2] * Float64(current_inletQ_DryWet[iFace]), enumerate(current_internalCellIDs))
-        #q_y_new = map(((iFace, internalCellID),) -> -h[internalCellID] * 0.0 
-        #                         * boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, 2] * Float64(current_inletQ_DryWet[iFace]), enumerate(current_internalCellIDs))
-
+      
         Zygote.ignore() do
-            @show typeof(q_x_new)
-            @show typeof(q_y_new)
-            @show size(q_x_new)
-            @show size(q_y_new)
-            @show q_x_new
-            @show q_y_new
+            #@show typeof(q_x_new)
+            #@show typeof(q_y_new)
+            #@show size(q_x_new)
+            #@show size(q_y_new)
+            #@show q_x_new
+            #@show q_y_new
         end
-
-        #q_x_new = convert.(eltype(Q_cells), q_x_new)
-        #q_y_new = convert.(eltype(Q_cells), q_y_new)
-
-        #fake q_x_new and q_y_new for debugging
-        #q_x_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
-        #q_y_new = [0.0 for iFace in 1:length(current_internalCellIDs)]
 
         # Update ghost arrays using update_1d_array
         h_ghost = update_1d_array(h_ghost, current_ghostCellIDs, h_new)
@@ -201,7 +120,7 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         if settings.bVerbose
             Zygote.ignore() do
-                println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
+                #println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
             end
         end
 
@@ -230,7 +149,7 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         if settings.bVerbose
             Zygote.ignore() do
-                println("Processing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+                #println("Processing WALL boundary ", iWall, " with index in BC list ", iBoundary)
             end
         end
 
@@ -251,7 +170,7 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
 
         if settings.bVerbose
             Zygote.ignore() do
-                println("Processing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
+                #println("Processing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
             end
         end
 
@@ -278,9 +197,9 @@ function process_all_boundaries_2d(settings, Q_cells, my_mesh_2D, boundary_condi
     new_Q_ghostCells = hcat(h_ghost, q_x_ghost, q_y_ghost)
 
     Zygote.ignore() do
-        @show size(new_Q_ghostCells)
-        @show typeof(new_Q_ghostCells)
-        @show new_Q_ghostCells
+        #@show size(new_Q_ghostCells)
+        #@show typeof(new_Q_ghostCells)
+        #@show new_Q_ghostCells
     end
 
     return new_Q_ghostCells

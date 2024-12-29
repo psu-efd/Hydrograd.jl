@@ -34,7 +34,7 @@
         "active_param_names": ["zb"],
         "inversion_parameter_initial_values_options": "constant",
         "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
-        "inversion_zb_initial_values": [0.0],
+        "inversion_zb_initial_values": [0.01],
         "inversion_ManningN_initial_values": [0.02, 0.03],
         "inversion_inlet_discharge_initial_values": [0.2],
         "inversion_bInversion_slope_loss": false,
