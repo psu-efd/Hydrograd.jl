@@ -11,16 +11,10 @@
 # ManningN_cells, ManningN_ghostCells, inletQ_TotalQ, exitH_WSE, 
 # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_array.
 
-#function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-#    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
-#    )
+#This function is used for inversion and sensitivity analysis only. 
+#For convinience, the rhs function is defined separately for forward simulations because of how parameters are treated. 
 
-#function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-#    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
-#    ManningN_cells_passed, ManningN_ghostCells_passed, inletQ_Length, inletQ_TotalQ_passed, exitH_WSE_passed,
-#    zb_cells_passed, zb_ghostCells_passed, zb_faces_passed, S0_passed)
-
-@noinline function swe_2d_rhs(Q::Matrix{T},
+@noinline function swe_2d_rhs_inversion_sensitivity(Q::Matrix{T},
     params_array::Vector{T},
     active_range::UnitRange{Int},
     param_ranges::Vector{UnitRange{Int}},
@@ -218,7 +212,7 @@
     end
 
     # Loop through all cells to calculate the fluxes on faces
-    updates = map(1:my_mesh_2D.numOfCells) do iCell           
+    updates = map(1:my_mesh_2D.numOfCells) do iCell           # .= is in-place mutation!
         cell_area = my_mesh_2D.cell_areas[iCell]
 
         # Initialize flux accumulation
@@ -244,13 +238,10 @@
 
              Zygote.ignore() do
                  if iCell == 1  # Print for first cell only
-                     println("Before Riemann solver:")
-                     @show typeof(hL), typeof(huL), typeof(hvL)
-                     @show hL, huL, hvL
-                     @show typeof(hR), typeof(huR), typeof(hvR)
-                     @show hR, huR, hvR
-                    @show typeof(face_normal)
-                    @show face_normal
+            #         println("Before Riemann solver:")
+            #         @show hL, huL, hvL
+            #         @show hR, huR, hvR
+                     @show face_normal
                  end
              end
 
@@ -264,42 +255,21 @@
                 error("Wrong choice of RiemannSolver")
             end
 
-            Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
-                    println("After Riemann solver:")
-                    @show typeof(flux)
-                    @show flux
-                end
-            end
-
-            Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
-                    println("before accumulating flux_sum")
-                    @show typeof(my_mesh_2D.face_lengths)
-                    @show my_mesh_2D.face_lengths
-                    @show typeof(my_mesh_2D.face_lengths[faceID])
-                    @show my_mesh_2D.face_lengths[faceID]
-                    @show typeof(flux_sum)
-                    @show flux_sum
-                end
-            end
+            # Zygote.ignore() do
+            #     if iCell == 1  # Print for first cell only
+            #         println("After Riemann solver:")
+            #         @show flux
+            #     end
+            # end
 
             # Accumulate flux contribution
             flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
-
-            Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
-                    println("after accumulating flux_sum")
-                    @show typeof(flux_sum)
-                    @show flux_sum
-                end
-            end
         end
 
         Zygote.ignore() do
-            if iCell == 1
-                @show typeof(flux_sum)
-                @show flux_sum
+            if iCell == -1
+                println("flux_sum value = ", ForwardDiff.value.(flux_sum))
+                println("flux_sum partials = ", ForwardDiff.partials.(flux_sum))
             end
         end
 
@@ -326,7 +296,7 @@
             println("source_terms partials = ", ForwardDiff.partials.(source_terms))
         end
 
-        if iCell == 1  # Print for first cell only
+        if iCell == -1  # Print for first cell only
             Zygote.ignore() do
                 if settings.bVerbose
                     @show flux_sum
@@ -355,12 +325,11 @@
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(updates)
-            @show size(updates)
-            @show updates
-            @show typeof(dQdt)
-            @show size(dQdt)
-            @show dQdt
+            #@show size(updates)
+            #@show updates
+            #@show typeof(dQdt)
+            #@show size(dQdt)
+            #@show dQdt
         end
     end
 

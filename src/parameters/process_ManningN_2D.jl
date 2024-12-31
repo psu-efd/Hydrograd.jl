@@ -43,15 +43,23 @@ end
 
 #update Manning's n values based on the provided Manning's n values for each material (zone)
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
-function update_ManningN(my_mesh_2D, srh_all_Dict, new_ManningN_values)
+function update_ManningN(my_mesh_2D::mesh_2D, srh_all_Dict::Dict{String, Any}, new_ManningN_values::Vector{Float64})
 
     matID_cells = srh_all_Dict["matID_cells"]  #material ID for each cell (0-based): 0-default material, 1-first material, 2-second material, etc.
 
     # Create array directly with comprehension
     ManningN_cells = [new_ManningN_values[matID_cells[i]+1] for i in 1:my_mesh_2D.numOfCells]  #+1 to make matID_cells 1-based (to be consistent with the new_ManningN_values)
 
-     #update Manning's n at ghost cells
-     ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
+    #update Manning's n at ghost cells
+    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
+
+    # Check if ManningN_cells and ManningN_ghostCells are AbstractArrays
+    @assert isa(ManningN_cells, AbstractArray) "ManningN_cells must be an AbstractArray"
+    @assert isa(ManningN_ghostCells, AbstractArray) "ManningN_ghostCells must be an AbstractArray"
+
+    # Check if ManningN_cells and ManningN_ghostCells have real number elements
+    @assert eltype(ManningN_cells) <: Real "ManningN_cells must have elements of a real number type"
+    @assert eltype(ManningN_ghostCells) <: Real "ManningN_ghostCells must have elements of a real number type"
 
      return ManningN_cells, ManningN_ghostCells
 end

@@ -188,7 +188,7 @@ function process_SRH_2D_input(settings, case_path)
     # println("matID_cells: ", matID_cells)
 
     #assemble all data into a dictionary and return
-    srh_all_Dict = Dict()
+    srh_all_Dict = Dict{String, Any}()
     srh_all_Dict["srhhydro_obj"] = srhhydro_obj
     srh_all_Dict["srhhydro_ManningsN"] = srhhydro_ManningsN
     srh_all_Dict["srhhydro_BC"] = srhhydro_BC

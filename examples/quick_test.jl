@@ -1,8 +1,9 @@
-#println("Current working directory: ", pwd())
-#println("LOAD_PATH: ", LOAD_PATH)
+# Create a RefValue
+x = Base.RefValue{Any}(10)  # or Base.RefValue{Any}(10)
 
-#push!(LOAD_PATH, dirname(dirname(@__FILE__)))
-import Hydrograd
+# Access the value using []
+println(x[])  # prints: 10
 
-# Now try to use print_banner
-Hydrograd.print_banner()
+# Modify the value
+x[] = "hello"
+println(x[])  # prints: "hello"

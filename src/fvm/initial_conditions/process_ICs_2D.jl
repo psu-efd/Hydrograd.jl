@@ -2,7 +2,7 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cell, h, q_x, q_y,swe_2D_constants, bPlot::Bool=false)
+function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cell, h, q_x, q_y,swe_2D_constants, case_path, bPlot::Bool=false)
 
     initial_condition_options = nothing
     initial_condition_constant_values = nothing
@@ -17,8 +17,9 @@ function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb
         initial_condition_constant_values = settings.inversion_settings.forward_simulation_initial_condition_constant_values
         initial_condition_values_from_file = settings.inversion_settings.forward_simulation_initial_condition_values_from_file
     elseif settings.bPerform_Sensitivity_Analysis
-        #not implemented yet
-        error("Sensitivity analysis is not implemented yet.")
+        initial_condition_options = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_options
+        initial_condition_constant_values = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_constant_values
+        initial_condition_values_from_file = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_values_from_file
     else
         error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis. No initial condition is to be setup.")
     end
@@ -78,7 +79,7 @@ function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb
         scalar_data = [wse, h, q_x, q_y, zb_cell]
         scalar_names = ["wse", "h", "q_x", "q_y", "zb_cell"]
         
-        file_path = joinpath(@__DIR__, "initial_conditions.vtk" ) 
+        file_path = joinpath(case_path, "initial_conditions.vtk" ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
 

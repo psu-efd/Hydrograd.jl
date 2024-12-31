@@ -2,14 +2,25 @@
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
 function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
 
+    # Check if scalar_cells is an AbstractArray
+    @assert isa(scalar_cells, AbstractArray) "scalar_cells must be an AbstractArray"
+
+    # Check if scalar_cells can handle dual numbers
+    @assert eltype(scalar_cells) <: Real "scalar_cells must have elements of a real number type"
+
     scalar_ghostCells = [
         let faceID = my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]
             faceCells = my_mesh_2D.faceCells_Dict[faceID]
             
             # Check validity
-            length(faceCells) == 1 || error("Error: the number of cells for boundary face $(faceID) is not 1.")
+            #length(faceCells) == 1 || throw(error("Error: the number of cells for boundary face $(faceID) is not 1."))
+
+            @assert length(faceCells) == 1 "Error: the number of cells for boundary face $(faceID) is not 1."
+
+            # Ensure index is within bounds
+            @assert 1 <= faceCells[1] <= length(scalar_cells) "Index out of bounds for scalar_cells"
             
-            # Get value from neighboring cell
+            # Get value from neighboring cell (for boundary faces, the neighboring cell is the same as the current cell)
             scalar_cells[faceCells[1]]
         end
         for iBoundaryFace in 1:my_mesh_2D.numOfAllBounaryFaces

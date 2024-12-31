@@ -45,6 +45,36 @@ using InteractiveUtils
 #using Random
 #Random.seed!(1234)
 
+#hack
+#get the current directory
+current_dir = pwd()
+cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D")
+
+# Create a struct to hold all the constant parameters for the RHS function
+struct SWEParameters{T}
+    active_range::UnitRange{Int}
+    param_ranges::Vector{UnitRange{Int}}
+    settings::Hydrograd.ControlSettings
+    my_mesh_2D::Hydrograd.mesh_2D
+    srh_all_Dict::Dict
+    boundary_conditions::Hydrograd.BoundaryConditions2D
+    swe_2D_constants::Hydrograd.swe_2D_consts
+    ManningN_cells::Vector{T}
+    ManningN_ghostCells::Vector{T}
+    inletQ_Length::Vector{Array{T}}
+    inletQ_TotalQ::Vector{T}
+    exitH_WSE::Vector{T}
+    zb_cells::Vector{T}
+    zb_ghostCells::Vector{T}
+    zb_faces::Vector{T}
+    S0::Matrix{T}
+end
+
+struct CombinedParams{T,S}
+    params_array::Vector{T}
+    swe_params::S
+end
+
 # Add some warnings/info for gradient computation
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
 
@@ -108,7 +138,7 @@ end
 #and compute the bed slope at cells (S0). 
 #Note: If performing inversion on zb_cells, these values are not used in the inversion process. 
 #      Instead, they are updated in the inversion process.
-zb_cells, zb_ghostCells, zb_faces, S0 = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, true)
+zb_cells, zb_ghostCells, zb_faces, S0 = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
 
 #define the true bed elevation at cells
 zb_cells_truth = zeros(size(zb_cells))
@@ -158,7 +188,7 @@ params_array, active_range, param_ranges = Hydrograd.setup_model_parameters_2D(s
 ManningN_cells, ManningN_ghostCells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
 #setup initial condition for wse, h, q_x, q_y at cells
-Hydrograd.setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cells, h, q_x, q_y, swe_2D_constants, true)
+Hydrograd.setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cells, h, q_x, q_y, swe_2D_constants, case_path, true)
 
 #setup initial condition for wse, h, q_x, q_y at ghost cells
 Hydrograd.setup_ghost_cells_initial_condition!(settings, my_mesh_2D, wse, h, q_x, q_y, wse_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
@@ -170,20 +200,68 @@ exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = Hydrograd.initiali
 #set up initial condition for for solution state variables for ODE solver
 Q0 = hcat(h, q_x, q_y)
 
-# Define the ODE function 
-function swe_2d_ode(Q, params_array, t)
+Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
-    dQdt = swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
-        my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, ManningN_cells, ManningN_ghostCells, inletQ_Length, inletQ_TotalQ, exitH_WSE,
-        zb_cells, zb_ghostCells, zb_faces, S0)
+# Create the parameters struct
+swe_params = SWEParameters(
+    active_range,
+    param_ranges,
+    settings,
+    my_mesh_2D,
+    srh_all_Dict,
+    boundary_conditions,
+    swe_2D_constants,
+    ManningN_cells,
+    ManningN_ghostCells,
+    inletQ_Length,
+    inletQ_TotalQ,
+    exitH_WSE,
+    zb_cells,
+    zb_ghostCells,
+    zb_faces,
+    S0
+)
 
+# Create the combined parameters
+combined_params = CombinedParams(params_array, swe_params)
+
+# First, convert our struct parameters into a tuple
+function create_param_tuple(params_array, swe_params)
+    return (
+        params_array,
+        swe_params.active_range,
+        swe_params.param_ranges,
+        swe_params.settings,
+        swe_params.my_mesh_2D,
+        swe_params.srh_all_Dict,
+        swe_params.boundary_conditions,
+        swe_params.swe_2D_constants,
+        swe_params.ManningN_cells,
+        swe_params.ManningN_ghostCells,
+        swe_params.inletQ_Length,
+        swe_params.inletQ_TotalQ,
+        swe_params.exitH_WSE,
+        swe_params.zb_cells,
+        swe_params.zb_ghostCells,
+        swe_params.zb_faces,
+        swe_params.S0
+    )
+end
+
+# Define the ODE function to use only params_array
+@noinline function swe_2d_ode(Q, p::Vector{Float64}, t)
+    # p is just params_array, use swe_params directly since it's in scope
+    dQdt = swe_2d_rhs(Q, p, swe_params.active_range, swe_params.param_ranges, t,
+        swe_params.settings, swe_params.my_mesh_2D, swe_params.srh_all_Dict, 
+        swe_params.boundary_conditions, swe_params.swe_2D_constants,
+        swe_params.ManningN_cells, swe_params.ManningN_ghostCells, 
+        swe_params.inletQ_Length, swe_params.inletQ_TotalQ, swe_params.exitH_WSE,
+        swe_params.zb_cells, swe_params.zb_ghostCells, swe_params.zb_faces,
+        swe_params.S0)
     return dQdt
 end
 
-#define the Jacobian sparsity pattern
-jac_sparsity = define_sparsity_swe_2D(settings, my_mesh_2D)
-
-#define the ODE function
+# Create the ODEFunction with just params_array
 ode_f = ODEFunction(swe_2d_ode; jac_prototype=jac_sparsity)
 
 #########################
@@ -194,7 +272,7 @@ if settings.bPerform_Forward_Simulation
     println("   Performing 2D SWE forward simulation ...")
 
     #perform forward simulation
-    Hydrograd.swe_2D_forward_simulation(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, params_array, 
+    Hydrograd.swe_2D_forward_simulation(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, 
             zb_cells_truth, ManningN_values_truth, inlet_discharges_truth,
             total_water_volume, nodeCoordinates, zb_cells,
             case_path)
@@ -212,10 +290,24 @@ if settings.bPerform_Inversion
     #@show swe_2D_constants.tspan
     
     #perform inversion
-    Hydrograd.swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, params_array, active_range, param_ranges,
-            zb_cells_truth, ManningN_values_truth, inlet_discharges_truth,
-            total_water_volume, nodeCoordinates, zb_cells,
-            case_path)
+    #@code_warntype
+    Hydrograd.swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
+                                                nodeCoordinates, case_path)
+
+end
+
+
+#########################   
+#Sensitivity part        # 
+#########################
+
+if settings.bPerform_Sensitivity_Analysis
+
+    println("   Performing sensitivity analysis ...")
+
+    #perform sensitivity analysis
+    Hydrograd.swe_2D_sensitivity(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
+            nodeCoordinates, zb_cells, case_path)
 
 end
 
@@ -224,5 +316,8 @@ end_time = now()  # Current date and time
 elapsed_time = end_time - start_time
 elapsed_seconds = Millisecond(elapsed_time).value / 1000
 println("Elapsed time in seconds: $elapsed_seconds")
+
+#restore the current directory
+cd(current_dir)
 
 println("All done!")

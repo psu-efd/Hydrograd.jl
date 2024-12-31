@@ -50,6 +50,25 @@ struct InversionSettings
     save_loss_history_file_name::String
 end
 
+struct SensitivityAnalysisSettings
+    active_param_names::Vector{String}
+    parameter_values_options::String
+    parameter_values_file_name::String
+    parameter_values_from_file::Union{Dict,Nothing}
+    zb_values::Vector{Float64}
+    ManningN_values::Vector{Float64}
+    inlet_discharge_values::Vector{Float64}
+    forward_simulation_initial_condition_options::String
+    forward_simulation_initial_condition_file_name::String
+    forward_simulation_initial_condition_constant_values::Vector{Float64}
+    forward_simulation_initial_condition_values_from_file::Union{Dict,Nothing}
+    ode_solver::String
+    ode_solver_adaptive::Bool
+    ode_solver_b_jac_sparsity::Bool
+    ode_solver_nSave::Int
+    save_file_name::String
+end
+
 struct ControlSettings
     bVerbose::Bool
     srhhydro_file_name::String
@@ -59,6 +78,7 @@ struct ControlSettings
     time_settings::TimeSettings
     forward_settings::Union{ForwardSimulationSettings,Nothing}
     inversion_settings::Union{InversionSettings,Nothing}
+    sensitivity_analysis_settings::Union{SensitivityAnalysisSettings,Nothing}
 end
 
 # Function to parse control file and create settings
@@ -85,6 +105,12 @@ function parse_control_file(control_file::String)
         inversion_settings = parse_inversion_settings(control_dict["inversion_options"], control_file_dir)
     end
 
+    # Parse sensitivity analysis settings if needed
+    sensitivity_analysis_settings = nothing
+    if control_dict["control_variables"]["bPerform_Sensitivity_Analysis"]
+        sensitivity_analysis_settings = parse_sensitivity_analysis_settings(control_dict["sensitivity_analysis_options"], control_file_dir)
+    end
+
     # Create main control settings
     settings = ControlSettings(
         control_dict["bVerbose"],
@@ -94,7 +120,8 @@ function parse_control_file(control_file::String)
         control_dict["control_variables"]["bPerform_Sensitivity_Analysis"],
         time_settings,
         forward_settings,
-        inversion_settings
+        inversion_settings,
+        sensitivity_analysis_settings
     )
 
     # Validate settings
@@ -169,6 +196,25 @@ function parse_control_file(control_file::String)
 
         if settings.bPerform_Sensitivity_Analysis
             println("Sensitivity analysis is to be performed.")
+
+            println("Sensitivity analysis options:")
+            println("    active_param_names = ", settings.sensitivity_analysis_settings.active_param_names)
+
+            if settings.sensitivity_analysis_settings.parameter_values_options == "from_file"
+                println("    parameter_values_from_file = ", settings.sensitivity_analysis_settings.parameter_values_from_file)
+            elseif settings.sensitivity_analysis_settings.parameter_values_options == "constant"
+                println("    zb_values = ", settings.sensitivity_analysis_settings.zb_values)
+                println("    ManningN_values = ", settings.sensitivity_analysis_settings.ManningN_values)
+                println("    inlet_discharge_values = ", settings.sensitivity_analysis_settings.inlet_discharge_values)
+            else
+                error("Invalid sensitivity_parameter_values_options: $(settings.sensitivity_analysis_settings.parameter_values_options). Supported options: from_file, constant.")
+            end
+
+            println("    ode_solver = ", settings.sensitivity_analysis_settings.ode_solver)
+            println("    ode_solver_adaptive = ", settings.sensitivity_analysis_settings.ode_solver_adaptive)
+            println("    ode_solver_b_jac_sparsity = ", settings.sensitivity_analysis_settings.ode_solver_b_jac_sparsity)
+            println("    ode_solver_nSave = ", settings.sensitivity_analysis_settings.ode_solver_nSave)
+            println("    save_file_name = ", settings.sensitivity_analysis_settings.save_file_name)
         else
             println("No sensitivity analysis is to be performed.")
         end
@@ -249,3 +295,39 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         get(options, "inversion_save_loss_history_file_name", "loss_history.jld2") # save_loss_history_file_name
     )
 end
+
+function parse_sensitivity_analysis_settings(options::Dict, control_file_dir::String)
+    # Handle parameter initial values from file if specified
+    parameter_values_from_file = nothing
+    if options["sensitivity_parameter_values_options"] == "from_file"
+        file_path = joinpath(control_file_dir, options["sensitivity_parameter_values_file_name"])
+        parameter_values_from_file = JSON3.read(open(file_path), Dict)
+    end
+
+    forward_simulation_initial_condition_values_from_file = nothing
+    if options["sensitivity_forward_simulation_initial_condition_options"] == "from_file"
+        file_path = joinpath(control_file_dir, options["sensitivity_forward_simulation_initial_condition_file_name"])
+        forward_simulation_initial_condition_values_from_file = JSON3.read(open(file_path), Dict)
+    end
+
+    SensitivityAnalysisSettings(
+        String.(options["active_param_names"]),
+        options["sensitivity_parameter_values_options"],
+        options["sensitivity_parameter_values_file_name"],
+        parameter_values_from_file,
+        Float64.(options["sensitivity_zb_values"]),
+        Float64.(options["sensitivity_ManningN_values"]),
+        Float64.(options["sensitivity_inlet_discharge_values"]),
+        options["sensitivity_forward_simulation_initial_condition_options"], # forward_simulation_initial_condition_options
+        options["sensitivity_forward_simulation_initial_condition_file_name"], # forward_simulation_initial_condition_file_name
+        Float64.(options["sensitivity_forward_simulation_initial_condition_constant_values"]), # forward_simulation_initial_condition_constant_values,
+        forward_simulation_initial_condition_values_from_file, # forward_simulation_initial_condition_values_from_file
+        options["sensitivity_ode_solver_options"]["ode_solver"],
+        options["sensitivity_ode_solver_options"]["ode_solver_adaptive"],
+        options["sensitivity_ode_solver_options"]["ode_solver_b_jac_sparsity"],
+        Int(options["sensitivity_ode_solver_options"]["ode_solver_nSave"]),
+        options["sensitivity_save_file_name"]
+    )
+end
+
+

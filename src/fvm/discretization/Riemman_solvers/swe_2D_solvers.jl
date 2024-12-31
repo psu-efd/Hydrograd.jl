@@ -10,7 +10,7 @@ function Riemann_2D_hll!(flux, g, h_face, q_face, bcType, bcValue, h_small)
     #return [h_flux, q_flux]
 end 
 
-function Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, normal; hmin=1e-6)
+function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T, huR::T, hvR::T, g::T, normal::Vector{T}; hmin::T=1e-6) where T
     
     #Data type 
     data_type = eltype(hL)

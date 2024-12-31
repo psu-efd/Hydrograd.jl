@@ -9,7 +9,7 @@ using Optimization, OptimizationOptimisers
 function shallow_water_eq(u, p, t)
     # Extract parameters from ComponentArray
     Zygote.ignore() do
-        println("p = ", p)
+        #println("p = ", p)
     end
 
 
@@ -18,13 +18,13 @@ function shallow_water_eq(u, p, t)
     g = 9.81
 
     Zygote.ignore() do
-        println("zb = ", zb)
-        println("n = ", n)
-        println("Q = ", Q)
-        println("sum(Q) = ", sum(Q))
-        println("h = ", h)
-        println("hu = ", hu)
-        println("hv = ", hv)
+        #println("zb = ", zb)
+        #println("n = ", n)
+        #println("Q = ", Q)
+        #println("sum(Q) = ", sum(Q))
+        #println("h = ", h)
+        #println("hu = ", hu)
+        #println("hv = ", hv)
     end
 
     # Return derivatives without mutation
@@ -45,49 +45,49 @@ prob = ODEProblem(shallow_water_eq, u0, tspan, p_init)
 #use Enzyme to test the gradient of the ODE and identify the source of the error
 #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
-p = prob.p
-y = prob.u0
-f = prob.f
-t = tspan[1]  # Add this line to define t
+# p = prob.p
+# y = prob.u0
+# f = prob.f
+# t = tspan[1]  # Add this line to define t
 
-# Test forward pass first
-try
-    test_forward = f(y, p, t)
-    println("Forward pass successful")
-    @show size(test_forward)
-catch e
-    println("Forward pass failed")
-    @show e
-end
+# # Test forward pass first
+# try
+#     test_forward = f(y, p, t)
+#     println("Forward pass successful")
+#     @show size(test_forward)
+# catch e
+#     println("Forward pass failed")
+#     @show e
+# end
 
-# Now test the pullback with more detailed error catching
-try
-    λ = ones(size(y)) #zero(prob.u0)
-    _dy, back = Zygote.pullback(y, p) do u, p
-        vec(f(u, p, t))
-    end
-    println("Pullback creation successful")
-    @show size(_dy)
+# # Now test the pullback with more detailed error catching
+# try
+#     λ = ones(size(y)) #zero(prob.u0)
+#     _dy, back = Zygote.pullback(y, p) do u, p
+#         vec(f(u, p, t))
+#     end
+#     println("Pullback creation successful")
+#     @show size(_dy)
 
-    try
-        tmp1, tmp2 = back(λ)
-        println("Backward pass successful")
-        @show size(tmp1)
-        @show tmp1
-        @show size(tmp2)
-        @show tmp2
-    catch e
-        println("Backward pass failed")
-        @show e
-    end
-catch e
-    println("Pullback creation failed")
-    @show e
-end
+#     try
+#         tmp1, tmp2 = back(λ)
+#         println("Backward pass successful")
+#         @show size(tmp1)
+#         @show tmp1
+#         @show size(tmp2)
+#         @show tmp2
+#     catch e
+#         println("Backward pass failed")
+#         @show e
+#     end
+# catch e
+#     println("Pullback creation failed")
+#     @show e
+# end
 
-throw("stop here")
+# throw("stop here")
 
-#debug end
+# #debug end
 
 
 # Define the loss function (non-mutating version)

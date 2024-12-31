@@ -1,4 +1,4 @@
-#some tools for 1D SWE
+#some tools for 2D SWE
 
 #calculate the total water volume in the domain
 function swe_2D_calc_total_water_volume(h, my_mesh_2D)

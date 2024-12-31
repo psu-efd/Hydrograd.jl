@@ -1,9 +1,7 @@
 #perform inversion for 2D SWE
 
-function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, params_array, active_range, param_ranges,
-    zb_cell_truth, ManningN_cell_truth, inlet_discharges_truth,
-    total_water_volume, nodeCoordinates, zb_cells,
-    case_path)
+function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
+    nodeCoordinates, case_path)
 
     @show swe_2D_constants.tspan
     @show swe_2D_constants.dt
@@ -21,18 +19,18 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
     end
 
     #open the forward simulation result (as the ground truth)
-    sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict)
+    sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String, Vector{Float64}})
 
-    WSE_truth = sol_truth["wse_truth"]
-    h_truth = sol_truth["h_truth"]
-    u_truth = sol_truth["u_truth"]
-    v_truth = sol_truth["v_truth"]
-    zb_cell_truth = sol_truth["zb_cell_truth"]
-    ManningN_cell_truth = sol_truth["ManningN_cell_truth"]
-    inlet_discharges_truth = sol_truth["inlet_discharges_truth"]
+    WSE_truth = Vector{Float64}(sol_truth["wse_truth"])
+    h_truth = Vector{Float64}(sol_truth["h_truth"])
+    u_truth = Vector{Float64}(sol_truth["u_truth"])
+    v_truth = Vector{Float64}(sol_truth["v_truth"])
+    zb_cell_truth = Vector{Float64}(sol_truth["zb_cell_truth"])
+    ManningN_cell_truth = Vector{Float64}(sol_truth["ManningN_cell_truth"])
+    inlet_discharges_truth = Vector{Float64}(sol_truth["inlet_discharges_truth"])
 
     #combine the truth data into a dictionary
-    observed_data = Dict("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, 
+    observed_data = Dict{String, Vector{Float64}}("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, 
                          "zb_cell_truth" => zb_cell_truth, "ManningN_cell_truth" => ManningN_cell_truth, "inlet_discharges_truth" => inlet_discharges_truth)
 
     # Define the loss function
@@ -64,13 +62,13 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
         # 8. InterpolatingVJP()
         # 9. BacksolveVJP()
         if settings.inversion_settings.ode_solver == "Tsit5()"
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save)  #working, but no control on sensealg
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ZygoteVJP())   #not working
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
-            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
-        #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ReverseDiffAdjoint()) #not working, ReverseDiffAdjoint only supports vector u0.
-        #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #working
-        #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=dt, saveat=t_save, sensealg=ReverseDiffVJP()) #not working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)  #working, but no control on sensealg
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ZygoteVJP())   #not working
+            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffAdjoint()) #not working, ReverseDiffAdjoint only supports vector u0.
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffVJP()) #not working
         else
             #pred = solve(prob, Tsit5(), adaptive=true, dt=dt, saveat=t_save)
             error("Not implemented yet")
@@ -92,13 +90,13 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
         loss_slope = zero(data_type)
 
         if pred.retcode == SciMLBase.ReturnCode.Success
-            WSE_truth = observed_data["WSE_truth"]
-            h_truth = observed_data["h_truth"]
-            u_truth = observed_data["u_truth"]
-            v_truth = observed_data["v_truth"]
+            WSE_truth = Vector{Float64}(observed_data["WSE_truth"])
+            h_truth = Vector{Float64}(observed_data["h_truth"])
+            u_truth = Vector{Float64}(observed_data["u_truth"])
+            v_truth = Vector{Float64}(observed_data["v_truth"])
 
             #Get the bed elevation at cells
-            zb_cells_temp = @view p[params_ranges.zb_start:params_ranges.zb_end]
+            zb_cells_temp = @view p[params_ranges[1]]
 
             l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
 
@@ -163,7 +161,13 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
             end
 
             loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred = compute_loss(p_new, Q0, tspan, observed_data, param_ranges, data_type)
-            return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
+
+            # Call callback with all values (but outside gradient calculation)
+            Zygote.ignore() do
+                #callback(θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred)
+            end
+
+            return loss_total
         end
 
         # Initial values for optimization parameters (vcat to flatten the array parameters to 1D array for optimizers)
@@ -228,13 +232,16 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
         #            it exited due to an error. For more details, see the return code documentation.
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
+
+        local sol::OptimizationSolution
+
         if settings.inversion_settings.optimizer == "Adam"
             sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
             #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
         elseif settings.inversion_settings.optimizer == "LBFGS"
             sol = solve(optprob, LBFGS(), callback=callback, maxiters=settings.inversion_settings.max_iterations)
         else
-            error("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed.")
+            throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed."))
         end
 
         #timing and profiling tools
@@ -245,42 +252,84 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, par
     end
 
     #define the accumulators for the inversion results
-    LOSS = []                              # Loss accumulator
-    PRED = []                              # prediction accumulator
-    PARS = []                              # parameters accumulator
+    LOSS::Vector{Float64} = []                              # Loss accumulator
+    #PRED::Vector{Any} = []                              # prediction accumulator
+    PARS::Vector{Vector{Float64}} = []                              # parameters accumulator
 
-    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred) #callback function to observe training
-        iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
-
-        Zygote.ignore() do
-            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ",
-                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
+    # Define concrete type for callback
+    callback = let
+        PARS = PARS
+        LOSS = LOSS
+        (θ::Vector{Float64}, loss_total::Float64) -> begin
+            iter = length(LOSS)
+            Zygote.ignore() do
+                println("      iter, loss_total = ", iter, ", ", loss_total)
+            end
+            push!(LOSS, loss_total)
+            push!(PARS, copy(θ))
+            false
         end
-
-        append!(PRED, [pred[:, 1, end]])
-        append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred]])
-
-        if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
-            #println("theta.u = ", θ.u)
-            append!(PARS, [copy(θ.u)])
-        else
-            append!(PARS, θ)
-        end
-
-        #if l > 1e-9
-        #    false
-        #else 
-        #    true   #force the optimizer to stop 
-        #end
-
-        false
     end
+
+    # callback = function (θ, loss_total) #callback function to observe training
+    #         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+    
+    #         Zygote.ignore() do
+    #             println("      iter, loss_total = ", iter, ", ", loss_total)
+    #         end
+    
+    #         #append!(PRED, [pred[:, 1, end]])
+    #         append!(LOSS, [[loss_total]])
+    
+    #         if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
+    #             #println("theta.u = ", θ.u)
+    #             append!(PARS, [copy(θ.u)])
+    #         else
+    #             append!(PARS, θ)
+    #         end
+    
+    #         #if l > 1e-9
+    #         #    false
+    #         #else 
+    #         #    true   #force the optimizer to stop 
+    #         #end
+    
+    #         false
+    #     end
+
+    # callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred) #callback function to observe training
+    #     iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+
+    #     Zygote.ignore() do
+    #         println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ",
+    #             loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
+    #     end
+
+    #     append!(PRED, [pred[:, 1, end]])
+    #     append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred]])
+
+    #     if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
+    #         #println("theta.u = ", θ.u)
+    #         append!(PARS, [copy(θ.u)])
+    #     else
+    #         append!(PARS, θ)
+    #     end
+
+    #     #if l > 1e-9
+    #     #    false
+    #     #else 
+    #     #    true   #force the optimizer to stop 
+    #     #end
+
+    #     false
+    # end
 
     #inversion parameters: 
     # initial guess for the inversion parameters
-    params_array_init = params_array
+    params_array_init = combined_params.params_array
 
     #perform the inversion
+    @code_warntype optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_array_init, active_range, param_ranges)
     sol = optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_array_init, active_range, param_ranges)
 
     #save the inversion results

@@ -2,7 +2,7 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": true,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
+        "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
         "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": true,
@@ -11,7 +11,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 10.0],
+        "tspan": [0.0, 1.0],
         "dt": 0.1,
         "dt_save": 0.1,
         "nSave": 10
@@ -23,7 +23,7 @@
         "forward_simulation_adaptive": true,
         "forward_simulation_b_jac_sparsity": true,
         "forward_simulation_nSave": 10,
-        "forward_simulation_initial_condition_options": "from_file",
+        "forward_simulation_initial_condition_options": "constant",
         "forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
         "forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
         "forward_simulation_save_file_name": "forward_simulation_solution.jld2",
@@ -31,10 +31,10 @@
     },
     "inversion_options": {
         "comment": "Options for the inversion. zb_initial_values_options is the option for the zb initial values: constant, from_file.",
-        "active_param_names": ["zb"],
+        "active_param_names": ["ManningN"],
         "inversion_parameter_initial_values_options": "constant",
         "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
-        "inversion_zb_initial_values": [0.0],
+        "inversion_zb_initial_values": [0.01],
         "inversion_ManningN_initial_values": [0.02, 0.03],
         "inversion_inlet_discharge_initial_values": [0.2],
         "inversion_bInversion_slope_loss": false,
@@ -43,11 +43,11 @@
         "inversion_upper_bound_zb": 0.3,
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
-        "inversion_max_iterations": 10,
+        "inversion_max_iterations": 2,
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
-        "inversion_forward_simulation_initial_condition_options": "from_file",
+        "inversion_forward_simulation_initial_condition_options": "constant",
         "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "inversion_forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
+        "inversion_forward_simulation_initial_condition_constant_values": [1.0, 0.1, 0.0],
         "inversion_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
@@ -60,16 +60,22 @@
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. zb_initial_values_options is the option for the zb initial values: zero, from_file.",
-        "active_param_names": ["zb"],
-        "zb_values_options": "zero",
-        "zb_values_file_name": "zb_values_for_sensitivity_analysis.json",
-        "ManningN_values": [0.03, 0.03],
-        "inlet_discharge_values": [1.0],
-        "ode_solver_options": {
+        "active_param_names": ["ManningN"],
+        "sensitivity_parameter_values_options": "constant",
+        "sensitivity_parameter_values_file_name": "sensitivity_parameter_values.json",
+        "sensitivity_zb_values": [0.0],
+        "sensitivity_ManningN_values": [0.02, 0.03],
+        "sensitivity_inlet_discharge_values": [0.2],
+        "sensitivity_forward_simulation_initial_condition_options": "constant",
+        "sensitivity_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
+        "sensitivity_forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
+        "sensitivity_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
-            "ode_solver_b_jac_sparsity": true
-        }
+            "ode_solver_b_jac_sparsity": true,
+            "ode_solver_nSave": 1
+        },
+        "sensitivity_save_file_name": "sensitivity_results.jld2"
     }        
 }
