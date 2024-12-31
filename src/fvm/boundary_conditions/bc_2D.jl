@@ -527,19 +527,21 @@ end
 #process all boundaries in just one function call to update Q_ghostCells: called every time step to update the boundary condition
 #return a new Q_ghostCells
 @noinline function process_all_boundaries_2d(
-    settings::ControlSettings, 
-    #Q_cells::Matrix{T}, 
-    h::Vector{T},
-    q_x::Vector{T},
-    q_y::Vector{T},
-    my_mesh_2D::mesh_2D, 
-    boundary_conditions::BoundaryConditions2D, 
-    ManningN_cells::Vector{T}, 
-    zb_faces::Vector{T}, 
-    swe_2D_constants::swe_2D_consts, 
-    inletQ_Length::Vector{Array{T}}, 
-    inletQ_TotalQ::Vector{T}, 
-    exitH_WSE::Vector{T}) where {T}
+    settings::ControlSettings,
+    h::Vector{T1},
+    q_x::Vector{T1},
+    q_y::Vector{T1},
+    my_mesh_2D::mesh_2D,
+    boundary_conditions::BoundaryConditions2D,
+    ManningN_cells::Vector{T2},
+    zb_faces::Vector{T3},
+    swe_2D_constants::swe_2D_consts,
+    inletQ_Length::Vector{Array{Float64}},
+    inletQ_TotalQ::Vector{T4},
+    exitH_WSE::Vector{Float64}) where {T1,T2,T3,T4}
+
+    # Get the most general type
+    T = promote_type(T1,T2,T3,T4)
 
     Zygote.ignore() do
         if settings.bVerbose

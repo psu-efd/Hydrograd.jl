@@ -1,3 +1,5 @@
+using Optimization: OptimizationSolution
+
 #perform inversion for 2D SWE
 
 function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
@@ -64,8 +66,9 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
         if settings.inversion_settings.ode_solver == "Tsit5()"
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)  #working, but no control on sensealg
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ZygoteVJP())   #not working
-            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=EnzymeVJP())   #not working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
+            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffAdjoint()) #not working, ReverseDiffAdjoint only supports vector u0.
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #working
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffVJP()) #not working
@@ -153,8 +156,11 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
                 #println("p_init = ", p_init)
             end
 
-            # Create new parameter set without mutation
-            p_new = [i ∈ active_range ? θ[i-active_range[1]+1] : p_init[i] for i in 1:length(p_init)]
+            # Instead of mutating p_new, create a new array
+            p_new = vcat([
+                i in active_range ? θ[i - active_range.start + 1] : p_init[i]
+                for i in 1:length(p_init)
+            ])
 
             Zygote.ignore() do
                 #println("p_new = ", p_new)
@@ -185,6 +191,8 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
         adtype = Optimization.AutoZygote()
         #adtype = Optimization.AutoReverseDiff(compile=false)
         #adtype = Optimization.AutoForwardDiff()
+        #adtype = Optimization.AutoEnzyme(; mode=set_runtime_activity(Reverse))
+        #adtype = Optimization.AutoEnzyme()
 
         # Define the optimization problem
         #From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_function/
@@ -233,7 +241,7 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
 
-        local sol::OptimizationSolution
+        local sol::Optimization.OptimizationSolution
 
         if settings.inversion_settings.optimizer == "Adam"
             sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
@@ -257,19 +265,27 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
     PARS::Vector{Vector{Float64}} = []                              # parameters accumulator
 
     # Define concrete type for callback
-    callback = let
-        PARS = PARS
-        LOSS = LOSS
-        (θ::Vector{Float64}, loss_total::Float64) -> begin
-            iter = length(LOSS)
-            Zygote.ignore() do
-                println("      iter, loss_total = ", iter, ", ", loss_total)
-            end
-            push!(LOSS, loss_total)
-            push!(PARS, copy(θ))
-            false
-        end
+    # Define the callback to handle both vector and OptimizationState inputs
+    callback = function(state_or_θ, loss)
+        θ = state_or_θ isa Optimization.OptimizationState ? state_or_θ.u : state_or_θ
+        println("Loss: ", loss)
+        println("Parameters: ", θ)
+        return false  # continue optimization
     end
+
+    # callback = let
+    #     PARS = PARS
+    #     LOSS = LOSS
+    #     (θ::Vector{Float64}, loss_total::Float64) -> begin
+    #         iter = length(LOSS)
+    #         Zygote.ignore() do
+    #             println("      iter, loss_total = ", iter, ", ", loss_total)
+    #         end
+    #         push!(LOSS, loss_total)
+    #         push!(PARS, copy(θ))
+    #         false
+    #     end
+    # end
 
     # callback = function (θ, loss_total) #callback function to observe training
     #         iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
@@ -329,16 +345,15 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
     params_array_init = combined_params.params_array
 
     #perform the inversion
-    @code_warntype optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_array_init, active_range, param_ranges)
     sol = optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_array_init, active_range, param_ranges)
 
     #save the inversion results
-    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)
+    #jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)
 
     #process the inversion results
-    println("   Post-processing inversion results ...")
+    #println("   Post-processing inversion results ...")
 
     #process inversion results
-    Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+    #Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
 
 end

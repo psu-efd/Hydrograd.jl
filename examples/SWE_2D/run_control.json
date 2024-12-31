@@ -1,6 +1,6 @@
 {
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
-    "bVerbose": true,
+    "bVerbose": false,
     "control_variables": {
         "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",

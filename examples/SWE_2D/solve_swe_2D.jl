@@ -249,7 +249,7 @@ function create_param_tuple(params_array, swe_params)
 end
 
 # Define the ODE function to use only params_array
-@noinline function swe_2d_ode(Q, p::Vector{Float64}, t)
+@noinline function swe_2d_ode(Q, p::Vector{T}, t) where T
     # p is just params_array, use swe_params directly since it's in scope
     dQdt = swe_2d_rhs(Q, p, swe_params.active_range, swe_params.param_ranges, t,
         swe_params.settings, swe_params.my_mesh_2D, swe_params.srh_all_Dict, 
@@ -290,7 +290,7 @@ if settings.bPerform_Inversion
     #@show swe_2D_constants.tspan
     
     #perform inversion
-    #@code_warntype
+    #@code_warntype 
     Hydrograd.swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
                                                 nodeCoordinates, case_path)
 

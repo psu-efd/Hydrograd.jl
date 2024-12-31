@@ -43,7 +43,9 @@ end
 
 #update Manning's n values based on the provided Manning's n values for each material (zone)
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
-function update_ManningN(my_mesh_2D::mesh_2D, srh_all_Dict::Dict{String, Any}, new_ManningN_values::Vector{Float64})
+function update_ManningN(my_mesh_2D::mesh_2D, 
+    srh_all_Dict::Dict{String, Any}, 
+    new_ManningN_values::Vector{T}) where T <: Real
 
     matID_cells = srh_all_Dict["matID_cells"]  #material ID for each cell (0-based): 0-default material, 1-first material, 2-second material, etc.
 

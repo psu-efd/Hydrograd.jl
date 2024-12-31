@@ -20,25 +20,25 @@
 #    ManningN_cells_passed, ManningN_ghostCells_passed, inletQ_Length, inletQ_TotalQ_passed, exitH_WSE_passed,
 #    zb_cells_passed, zb_ghostCells_passed, zb_faces_passed, S0_passed)
 
-@noinline function swe_2d_rhs(Q::Matrix{T},
-    params_array::Vector{T},
+@noinline function swe_2d_rhs(Q::Matrix{T1},
+    params_array::Vector{T2},
     active_range::UnitRange{Int},
     param_ranges::Vector{UnitRange{Int}},
-    t::T,
+    t::Real,
     settings::ControlSettings,
     my_mesh_2D::mesh_2D,
     srh_all_Dict::Dict,
     boundary_conditions::BoundaryConditions2D,
     swe_2D_constants::swe_2D_consts,
-    ManningN_cells_passed::Vector{T},
-    ManningN_ghostCells_passed::Vector{T},
-    inletQ_Length_passed::Vector{Array{T}},
-    inletQ_TotalQ_passed::Vector{T},
-    exitH_WSE_passed::Vector{T},
-    zb_cells_passed::Vector{T},
-    zb_ghostCells_passed::Vector{T},
-    zb_faces_passed::Vector{T},
-    S0_passed::Matrix{T}) where {T}
+    ManningN_cells_passed::Vector{T3},
+    ManningN_ghostCells_passed::Vector{T4},
+    inletQ_Length_passed::Vector{Array{T5}},
+    inletQ_TotalQ_passed::Vector{T6},
+    exitH_WSE_passed::Vector{T7},
+    zb_cells_passed::Vector{T8},
+    zb_ghostCells_passed::Vector{T9},
+    zb_faces_passed::Vector{T10},
+    S0_passed::Matrix{T11}) where {T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11}
 
     Zygote.ignore() do
         Base.@debug "swe_2d_rhs called" # This can help prevent inlining
