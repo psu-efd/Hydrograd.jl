@@ -1,9 +1,9 @@
-# Create a RefValue
-x = Base.RefValue{Any}(10)  # or Base.RefValue{Any}(10)
+using Zygote
+using Hydrograd
 
-# Access the value using []
-println(x[])  # prints: 10
+h_ghost_local = rand(Float64, 10)
+current_ghostCellIDs = [1, 2, 3, 4, 5]
+current_internalCellIDs = [6, 7, 8, 9, 10]
+h = ones(Float64, 10)
 
-# Modify the value
-x[] = "hello"
-println(x[])  # prints: "hello"
+h_ghost_local = update_1d_array(h_ghost_local, current_ghostCellIDs, h[current_internalCellIDs])

@@ -1,6 +1,13 @@
 #Setup the parameter arrays: zb_cells_param, ManningN_list_param, inlet_discharges_param
 function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_values_truth, inlet_discharges_truth)
 
+    #initialize the parameter arrays
+    zb_cells_param = zeros(eltype(zb_cells_truth), length(zb_cells_truth))
+    ManningN_list_param = zeros(eltype(ManningN_values_truth), length(ManningN_values_truth))
+    inlet_discharges_param = zeros(eltype(inlet_discharges_truth), length(inlet_discharges_truth))
+
+    active_param_name = "none"
+
     #For forward simulation, the parameter values are from SRH-2D data. These parameter values are not used in the forward simulation.
     #For inversion and sensitivity analysis, the parameter values are from the initial values or from a file.
     if settings.bPerform_Forward_Simulation
@@ -12,22 +19,36 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
         end
     elseif settings.bPerform_Inversion 
         if settings.inversion_settings.parameter_initial_values_options == "constant"
-            #bed elevation
-            zb_cells_param = fill(settings.inversion_settings.zb_initial_values[1], my_mesh_2D.numOfCells)
 
-            #Manning's n
-            ManningN_list_param = deepcopy(settings.inversion_settings.ManningN_initial_values)
-
-            #inlet discharges
-            if !isnothing(inlet_discharges_truth)
+            if settings.inversion_settings.active_param_names == ["zb"]
+                active_param_name = "zb"
+                #bed elevation
+                zb_cells_param = fill(settings.inversion_settings.zb_initial_values[1], my_mesh_2D.numOfCells)
+            elseif settings.inversion_settings.active_param_names == ["ManningN"]
+                active_param_name = "ManningN"
+                #Manning's n
+                ManningN_list_param = deepcopy(settings.inversion_settings.ManningN_initial_values)
+            elseif settings.inversion_settings.active_param_names == ["Q"]
+                active_param_name = "Q"
+                #inlet discharges
                 inlet_discharges_param = deepcopy(settings.inversion_settings.inlet_discharge_initial_values)
+            else
+                error("Invalid active parameter name: $(settings.inversion_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
             end
         elseif settings.inversion_settings.parameter_initial_values_options == "from_file"
-            zb_cells_param = settings.inversion_settings.parameter_initial_values_from_file["zb_cells_param"]
-            ManningN_list_param = settings.inversion_settings.parameter_initial_values_from_file["ManningN_list_param"]
-
-            if !isnothing(inlet_discharges_truth)
-                inlet_discharges_param = settings.inversion_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+            if settings.inversion_settings.active_param_names == ["zb"]
+                active_param_name = "zb"
+                zb_cells_param = settings.inversion_settings.parameter_initial_values_from_file["zb_cells_param"]
+            elseif settings.inversion_settings.active_param_names == ["ManningN"]
+                active_param_name = "ManningN"
+                ManningN_list_param = settings.inversion_settings.parameter_initial_values_from_file["ManningN_list_param"]
+            elseif settings.inversion_settings.active_param_names == ["Q"]
+                active_param_name = "Q"
+                if !isnothing(inlet_discharges_truth)
+                    inlet_discharges_param = settings.inversion_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+                end
+            else
+                error("Invalid active parameter name: $(settings.inversion_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
             end
         else
             error("Invalid zb_initial_values_options: $(settings.inversion_settings.parameter_initial_values_options). Supported options: zero, from_file.")
@@ -59,22 +80,37 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
         end
     elseif settings.bPerform_Sensitivity_Analysis
         if settings.sensitivity_analysis_settings.parameter_values_options == "constant"
-            #bed elevation
-            zb_cells_param = fill(settings.sensitivity_analysis_settings.zb_values[1], my_mesh_2D.numOfCells)
-
-            #Manning's n
-            ManningN_list_param = deepcopy(settings.sensitivity_analysis_settings.ManningN_values)
-
-            #inlet discharges
-            if !isnothing(inlet_discharges_truth)
-                inlet_discharges_param = deepcopy(settings.sensitivity_analysis_settings.inlet_discharge_values)
+            if settings.sensitivity_analysis_settings.active_param_names == ["zb"]
+                active_param_name = "zb"
+                #bed elevation
+                zb_cells_param = fill(settings.sensitivity_analysis_settings.zb_values[1], my_mesh_2D.numOfCells)
+            elseif settings.sensitivity_analysis_settings.active_param_names == ["ManningN"]
+                active_param_name = "ManningN"
+                #Manning's n
+                ManningN_list_param = deepcopy(settings.sensitivity_analysis_settings.ManningN_values)
+            elseif settings.sensitivity_analysis_settings.active_param_names == ["Q"]
+                active_param_name = "Q"
+                #inlet discharges
+                if !isnothing(inlet_discharges_truth)
+                    inlet_discharges_param = deepcopy(settings.sensitivity_analysis_settings.inlet_discharge_values)
+                end
+            else
+                error("Invalid active parameter name: $(settings.sensitivity_analysis_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
             end
         elseif settings.sensitivity_analysis_settings.parameter_values_options == "from_file"
-            zb_cells_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["zb_cells_param"]
-            ManningN_list_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["ManningN_list_param"]
-
-            if !isnothing(inlet_discharges_truth)
-                inlet_discharges_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+            if settings.sensitivity_analysis_settings.active_param_names == ["zb"]
+                active_param_name = "zb"
+                zb_cells_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["zb_cells_param"]
+            elseif settings.sensitivity_analysis_settings.active_param_names == ["ManningN"]
+                active_param_name = "ManningN"
+                ManningN_list_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["ManningN_list_param"]
+            elseif settings.sensitivity_analysis_settings.active_param_names == ["Q"]
+                active_param_name = "Q"
+                if !isnothing(inlet_discharges_truth)
+                    inlet_discharges_param = settings.sensitivity_analysis_settings.parameter_initial_values_from_file["inlet_discharges_param"]
+                end
+            else
+                error("Invalid active parameter name: $(settings.sensitivity_analysis_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
             end
         else
             error("Invalid parameter values option: $(settings.sensitivity_analysis_settings.parameter_values_options). Supported options: constant, from_file.")
@@ -106,121 +142,16 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
         end
     end
 
-
-    params_array, active_range, param_ranges = preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
-
-    return params_array, active_range, param_ranges
-
-end
-
-
-#preprocess: create a parameter vector for 2D shallow water equations
-#The complete model parameter vector include:
-#1. bed elevation (ncells)
-#2. Manning's n (nMaterials)
-#3. Inlet discharge (nInlet)
-#4. xxx (for future use)
-function preprocess_model_parameters_2D(settings, zb_cells_param, ManningN_list_param, inlet_discharges_param)
-
-    if settings.bVerbose
-        println("preprocess_model_parameters_2D")
-    end
-
-    # Concatenate all parameters into a single vector
-    if !isnothing(inlet_discharges_param)
-        params_array = vcat(zb_cells_param, ManningN_list_param, inlet_discharges_param)
+    if active_param_name == "zb"
+        params_vector = zb_cells_param
+    elseif active_param_name == "ManningN"
+        params_vector = ManningN_list_param
+    elseif active_param_name == "Q"
+        params_vector = inlet_discharges_param
     else
-        params_array = vcat(zb_cells_param, ManningN_list_param)
+        params_vector = [0.0]   #not used
     end
 
-    # First calculate all the lengths and indices
-    n_zb = length(zb_cells_param)
-    n_manning = length(ManningN_list_param)
+    return params_vector, active_param_name
 
-    if !isnothing(inlet_discharges_param)
-        n_inlet = length(inlet_discharges_param)
-    else
-        n_inlet = 0
-    end
-
-    # Calculate start and end indices
-    zb_start = 1
-    zb_end = n_zb
-    manning_start = zb_end + 1
-    manning_end = manning_start + n_manning - 1
-
-    if !isnothing(inlet_discharges_param)
-        inletQ_start = manning_end + 1
-        inletQ_end = inletQ_start + n_inlet - 1
-    else
-        inletQ_start = 0
-        inletQ_end = 0
-    end
-
-    # Store the range for each parameter for later parameter extraction
-    param_ranges = Vector{UnitRange{Int}}([
-        zb_start:zb_end,
-        manning_start:manning_end,
-        inletQ_start:inletQ_end
-    ])
-
-    # Determine active ranges of parameters
-    active_range = if settings.bPerform_Forward_Simulation
-        #for forward simulation, all parameters are active (not in the sense of inversion, but for the sake of passing parameters to the forward simulation)
-        #the parameter values are from SRH-2D data
-        1:length(params_array)  # All parameters active
-
-    elseif settings.bPerform_Inversion
-
-        if length(settings.inversion_settings.active_param_names) != 1
-            error("Currently only support one active parameter for now. Active parameter names: $(settings.inversion_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
-        end
-
-        #get the active parameter name (only one active parameter is supported for now)
-        active_param = settings.inversion_settings.active_param_names[1]
-        if active_param == "zb"
-            param_ranges[1]
-        elseif active_param == "ManningN"
-            param_ranges[2]
-        elseif active_param == "Q"
-            if !isnothing(inlet_discharges_param)
-                param_ranges[3]
-            else
-                error("No inletQ_BCs are defined in the SRH-2D data. Make no sense to perform inversion or sensitivity analysis on Q. Please check case settings.")
-            end
-        else
-            error("Invalid active parameter name: $active_param")
-        end
-    elseif settings.bPerform_Sensitivity_Analysis
-
-        if length(settings.sensitivity_analysis_settings.active_param_names) != 1
-            error("Currently only support one active parameter for now. Active parameter names: $(settings.sensitivity_analysis_settings.active_param_names). Supported active parameter names: zb, ManningN, Q")
-        end
-
-        #get the active parameter name (only one active parameter is supported for now)
-        active_param = settings.sensitivity_analysis_settings.active_param_names[1]
-        if active_param == "zb"
-            param_ranges[1]
-        elseif active_param == "ManningN"
-            param_ranges[2]
-        elseif active_param == "Q"
-            if !isnothing(inlet_discharges_param)
-                param_ranges[3]
-            else
-                error("No inletQ_BCs are defined in the SRH-2D data. Make no sense to perform inversion or sensitivity analysis on Q. Please check case settings.")
-            end
-        else
-            error("Invalid active parameter name: $active_param")
-        end
-    end
-
-    if settings.bVerbose
-        Zygote.ignore() do
-            println("params_array = ", params_array)
-            println("active_range = ", active_range)
-            println("param_ranges = ", param_ranges)
-        end
-    end
-
-    return params_array, active_range, param_ranges
 end

@@ -7,37 +7,39 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
 end
 
 #save results (sol is a solution from SciML ODE solver)
-function swe_2D_save_results_SciML(sol, total_water_volume, my_mesh_2D, nodeCoordinates, zb_cell, save_path)
+function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, save_path)  
 
-    #solution at the end of the simulation
-    #Q_final = sol.u[end]
+    total_water_volume = []
 
     #calculate total volume of water 
-    for (index, item) in enumerate(tuples(sol))
+    for (index, state) in enumerate(sol)
 
-        Q = item[1]
+        # Extract solution components
+        h_array = state[:, 1]
+        q_x_array = state[:, 2]
+        q_y_array = state[:, 3]
 
-        push!(total_water_volume, swe_2D_calc_total_water_volume(Q[:, 1], my_mesh_2D))
+        #calculate total volume of water
+        push!(total_water_volume, swe_2D_calc_total_water_volume(h_array, my_mesh_2D))
 
-        u_temp = Q[:,2] ./ Q[:,1]
-        v_temp = Q[:,3] ./ Q[:,1]
+        u_temp = q_x_array ./ h_array
+        v_temp = q_y_array ./ h_array
         U_vector = hcat(u_temp, v_temp)
                         
         vector_data = [U_vector] 
         vector_names = ["U"]
 
-        WSE = Q[:,1] + zb_cell
+        WSE = h_array + zb_cell
             
-        scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cell, WSE]
+        scalar_data = [h_array, q_x_array, q_y_array, zb_cell, WSE]
         scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
 
-        vtk_fileName = @sprintf("solution_%04d_AdHydraulics.vtk", index)
+        vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             
         file_path = joinpath(save_path, vtk_fileName ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
     
     end
-
         
     open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
         println(fo, "total_water_volume")

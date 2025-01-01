@@ -1,6 +1,6 @@
 {
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
-    "bVerbose": false,
+    "bVerbose": true,
     "control_variables": {
         "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
@@ -60,7 +60,7 @@
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. zb_initial_values_options is the option for the zb initial values: zero, from_file.",
-        "active_param_names": ["ManningN"],
+        "active_param_names": ["Q"],
         "sensitivity_parameter_values_options": "constant",
         "sensitivity_parameter_values_file_name": "sensitivity_parameter_values.json",
         "sensitivity_zb_values": [0.0],

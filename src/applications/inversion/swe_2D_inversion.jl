@@ -1,12 +1,15 @@
-using Optimization: OptimizationSolution
 
 #perform inversion for 2D SWE
 
-function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, combined_params, active_range, param_ranges,
-    nodeCoordinates, case_path)
+#using Debugger, JuliaInterpreter
 
-    @show swe_2D_constants.tspan
-    @show swe_2D_constants.dt
+function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
+
+    #unpack the extra parameters
+    active_param_name = swe_extra_params.active_param_name
+    settings = swe_extra_params.settings
+    my_mesh_2D = swe_extra_params.my_mesh_2D
+    swe_2D_constants = swe_extra_params.swe_2D_constants
 
     #define the time for saving the results (for inversion, which may be different from the time for saving the results in forward simulation)
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.inversion_settings.ode_solver_nSave
@@ -23,17 +26,127 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
     #open the forward simulation result (as the ground truth)
     sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String, Vector{Float64}})
 
-    WSE_truth = Vector{Float64}(sol_truth["wse_truth"])
-    h_truth = Vector{Float64}(sol_truth["h_truth"])
-    u_truth = Vector{Float64}(sol_truth["u_truth"])
-    v_truth = Vector{Float64}(sol_truth["v_truth"])
-    zb_cell_truth = Vector{Float64}(sol_truth["zb_cell_truth"])
-    ManningN_cell_truth = Vector{Float64}(sol_truth["ManningN_cell_truth"])
-    inlet_discharges_truth = Vector{Float64}(sol_truth["inlet_discharges_truth"])
+    Zygote.ignore() do
+        #@show typeof(sol_truth)
+        #@show length(sol_truth)
+        #@show sol_truth
+    end
+
+    WSE_truth = vec(sol_truth["wse_truth"])
+    h_truth = vec(sol_truth["h_truth"])
+    u_truth = vec(sol_truth["u_truth"])
+    v_truth = vec(sol_truth["v_truth"])
+    zb_cell_truth = vec(sol_truth["zb_cell_truth"])
+    ManningN_cell_truth = vec(sol_truth["ManningN_cell_truth"])
+    inlet_discharges_truth = vec(sol_truth["inlet_discharges_truth"])
+
+    Zygote.ignore() do
+        #@show WSE_truth
+        #@show h_truth
+        #@show u_truth
+        #@show v_truth
+        #@show zb_cell_truth
+        #@show ManningN_cell_truth
+        #@show inlet_discharges_truth
+    end
 
     #combine the truth data into a dictionary
     observed_data = Dict{String, Vector{Float64}}("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, 
                          "zb_cell_truth" => zb_cell_truth, "ManningN_cell_truth" => ManningN_cell_truth, "inlet_discharges_truth" => inlet_discharges_truth)
+
+
+    #debug start
+    @show Q0
+    @show swe_2D_constants.tspan
+    @show params_vector
+    @assert !ismissing(params_vector) "params_vector contains missing values!"
+    @assert !isnothing(params_vector) "params_vector contains `nothing` values!"
+
+    prob = ODEProblem(ode_f, Q0, swe_2D_constants.tspan, params_vector)
+
+    #use Enzyme to test the gradient of the ODE and identify the source of the error
+    #See https://docs.sciml.ai/SciMLSensitivity/dev/faq/
+    SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
+    p = prob.p
+    y = prob.u0
+    f = prob.f
+    t = swe_2D_constants.tspan[1]  # Add this line to define t
+    @show typeof(p)
+    @show typeof(y)
+    @show typeof(f)
+    @show typeof(t)
+    @show p
+    @show y
+    @show f
+    @show t
+
+    # Test forward pass first
+    try
+        #test_forward = f(y, p, t, swe_extra_params)
+        
+        #test_forward = swe_2d_rhs(y, p, t, swe_extra_params)
+
+        #@show typeof(test_forward)
+        #@show size(test_forward)
+        #@show test_forward
+
+        println("\nForward pass successful\n")
+        
+    catch e
+        println("\nForward pass failed\n")
+        @show e
+    end
+
+    # Now test the pullback with more detailed error catching
+    try
+        λ = ones(size(prob.u0)) #zero(prob.u0)
+
+        #Zygote.pullback takes two arguments:
+        #  First argument: a function that we want to differentiate
+        #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
+        #_dy is the result of the forward pass; back is the gradient function
+        #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
+        #_dy, back = Zygote.pullback((u, p) -> Array(swe_2d_rhs(u, p, t, swe_extra_params)), y, p)
+        _dy, back = Zygote.pullback((u, p) -> swe_2d_rhs(u, p, t, swe_extra_params), y, p)
+
+        #_dy, back = Zygote.pullback(y, p) do u, p  
+        #    #vec(f(u, p, t))
+        #    f(u, p, t)
+        #end
+        println("\nPullback creation successful\n")
+        @show typeof(_dy)
+        @show size(_dy)
+        @show _dy
+
+        try
+             # Convert λ to match _dy type
+            λ = convert(typeof(_dy), λ)
+
+            tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
+            println("\nBackward pass is successful\n")
+            @show typeof(tmp1)
+            @show size(tmp1)
+            @show typeof(tmp2)
+            @show size(tmp2)
+            @show tmp1
+            @show tmp2
+        catch e
+            println("\nBackward pass failed\n")
+            @show e
+            @show typeof(λ)
+            @show size(λ)
+            @show λ
+        end
+    catch e
+        println("\nPullback creation failed\n")
+        @show e
+    end
+
+    throw("stop here")
+
+    #debug end
+
+
 
     # Define the loss function
     function compute_loss(p, Q0, tspan, observed_data, params_ranges, data_type)
@@ -67,8 +180,8 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)  #working, but no control on sensealg
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ZygoteVJP())   #not working
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=EnzymeVJP())   #not working
-            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
-            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
+            pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=InterpolatingAdjoint(autojacvec=ZygoteVJP())) #working
+            #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ForwardDiffSensitivity()) #working
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffAdjoint()) #not working, ReverseDiffAdjoint only supports vector u0.
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=BacksolveAdjoint(autojacvec=ZygoteVJP())) #working
             #pred = solve(prob, Tsit5(), adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ReverseDiffVJP()) #not working
@@ -241,11 +354,14 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
 
-        local sol::Optimization.OptimizationSolution
+        local sol = SciMLBase.OptimizationSolution
 
         if settings.inversion_settings.optimizer == "Adam"
             sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
             #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
+
+            #@enter sol = @interpret solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
+
         elseif settings.inversion_settings.optimizer == "LBFGS"
             sol = solve(optprob, LBFGS(), callback=callback, maxiters=settings.inversion_settings.max_iterations)
         else
@@ -342,10 +458,24 @@ function swe_2D_inversion(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, com
 
     #inversion parameters: 
     # initial guess for the inversion parameters
-    params_array_init = combined_params.params_array
+    params_vector_init = copy(params_vector)
+
+    Zygote.ignore() do
+        @show typeof(Q0)
+        @show typeof(swe_2D_constants.tspan)
+        @show typeof(observed_data)
+        @show typeof(params_vector_init)
+        @show typeof(active_range)
+        @show typeof(param_ranges)
+        
+        @show size(params_vector_init)
+        @show params_vector_init
+    end
 
     #perform the inversion
-    sol = optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_array_init, active_range, param_ranges)
+    sol = optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_vector_init, active_range, param_ranges)
+    #@enter sol = @interpret optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_vector_init, active_range, param_ranges)
+    #@enter sol = optimize_parameters(Q0, swe_2D_constants.tspan, observed_data, params_vector_init, active_range, param_ranges)
 
     #save the inversion results
     #jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)

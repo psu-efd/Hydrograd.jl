@@ -1,5 +1,7 @@
 module Hydrograd
 
+using InteractiveUtils #for @code_warntype
+
 using PyCall
 using JSON3
 using JLD2
@@ -56,26 +58,22 @@ function greet_your_package_name()
     return "Hello from Hydrograd!"
 end
 
-#applications
-include("applications/forward_simulation/swe_2D_forward_simulation.jl")
-include("applications/forward_simulation/process_forward_simulation_results_2D.jl")
-include("applications/inversion/swe_2D_inversion.jl")
-include("applications/inversion/process_inversion_results_2D.jl")
-include("applications/sensitivity/swe_2D_sensitivity.jl")
-include("applications/sensitivity/process_sensitivity_results_2D.jl")
+#controls
+include("controls/control_settings_2D.jl")
 
 #constants
 include("constants/swe_1D_constants.jl")
 include("constants/swe_2D_constants.jl")
 
-#controls
-include("controls/control_settings_2D.jl")
 
 #meshes
 include("meshes/mesh_1D.jl")
 include("meshes/mesh_2D.jl")
 
 include("fvm/boundary_conditions/bc_2D.jl")
+
+#applications' common structs
+include("applications/application_commons.jl")
 
 #fvm
 
@@ -100,6 +98,14 @@ include("utilities/process_SRH_2D_input.jl")
 include("utilities/smooth_functions.jl")
 include("utilities/swe_1D_tools.jl")
 include("utilities/swe_2D_tools.jl")
+
+#applications
+include("applications/forward_simulation/swe_2D_forward_simulation.jl")
+include("applications/forward_simulation/process_forward_simulation_results_2D.jl")
+include("applications/inversion/swe_2D_inversion.jl")
+include("applications/inversion/process_inversion_results_2D.jl")
+include("applications/sensitivity/swe_2D_sensitivity.jl")
+include("applications/sensitivity/process_sensitivity_results_2D.jl")
 
 
 export print_banner
@@ -168,6 +174,7 @@ export preprocess_model_parameters_2D
 
 # Utilities
 export update_1d_array
+export save_ode_solution
 export process_SRH_2D_input 
 export smooth_abs
 export smooth_sign
@@ -186,6 +193,7 @@ export swe_2D_save_results_custom
 export export_to_vtk_2D
 
 # Applications
+export SWE2D_Extra_Parameters
 export swe_2D_forward_simulation
 export postprocess_forward_simulation_results_swe_2D
 export swe_2D_inversion

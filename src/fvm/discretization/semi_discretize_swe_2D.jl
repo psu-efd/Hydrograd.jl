@@ -9,36 +9,57 @@
 # Arguments with "_passed" are passed to the function. They are only 
 # used for forward simulations. For inversion and sensitivity analysis, 
 # ManningN_cells, ManningN_ghostCells, inletQ_TotalQ, exitH_WSE, 
-# zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_array.
+# zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector.
 
-#function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
+#function swe_2d_rhs(Q, params_vector, active_range, param_ranges, t, settings,
 #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants, inletQ_Length, exitH_WSE,
 #    )
 
-#function swe_2d_rhs(Q, params_array, active_range, param_ranges, t, settings,
+#function swe_2d_rhs(Q, params_vector, active_range, param_ranges, t, settings,
 #    my_mesh_2D, srh_all_Dict, boundary_conditions, swe_2D_constants,
 #    ManningN_cells_passed, ManningN_ghostCells_passed, inletQ_Length, inletQ_TotalQ_passed, exitH_WSE_passed,
 #    zb_cells_passed, zb_ghostCells_passed, zb_faces_passed, S0_passed)
 
-@noinline function swe_2d_rhs(Q::Matrix{T1},
-    params_array::Vector{T2},
-    active_range::UnitRange{Int},
-    param_ranges::Vector{UnitRange{Int}},
-    t::Real,
-    settings::ControlSettings,
-    my_mesh_2D::mesh_2D,
-    srh_all_Dict::Dict,
-    boundary_conditions::BoundaryConditions2D,
-    swe_2D_constants::swe_2D_consts,
-    ManningN_cells_passed::Vector{T3},
-    ManningN_ghostCells_passed::Vector{T4},
-    inletQ_Length_passed::Vector{Array{T5}},
-    inletQ_TotalQ_passed::Vector{T6},
-    exitH_WSE_passed::Vector{T7},
-    zb_cells_passed::Vector{T8},
-    zb_ghostCells_passed::Vector{T9},
-    zb_faces_passed::Vector{T10},
-    S0_passed::Matrix{T11}) where {T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11}
+# @noinline function swe_2d_rhs(Q::Matrix{T1},
+#     params_vector::Vector{T2},
+#     active_range::UnitRange{Int},
+#     param_ranges::Vector{UnitRange{Int}},
+#     t::Real,
+#     settings::ControlSettings,
+#     my_mesh_2D::mesh_2D,
+#     srh_all_Dict::Dict,
+#     boundary_conditions::BoundaryConditions2D,
+#     swe_2D_constants::swe_2D_consts,
+#     ManningN_cells_passed::Vector{T3},
+#     ManningN_ghostCells_passed::Vector{T4},
+#     inletQ_Length_passed::Vector{Array{T5}},
+#     inletQ_TotalQ_passed::Vector{T6},
+#     exitH_WSE_passed::Vector{T7},
+#     zb_cells_passed::Vector{T8},
+#     zb_ghostCells_passed::Vector{T9},
+#     zb_faces_passed::Vector{T10},
+#     S0_passed::Matrix{T11}) where {T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11}
+
+using JuliaInterpreter
+
+function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T}) where {T}
+
+    # Unpack the extra parameters
+    active_param_name = p_extra.active_param_name
+    settings = p_extra.settings
+    my_mesh_2D = p_extra.my_mesh_2D
+    srh_all_Dict = p_extra.srh_all_Dict
+    boundary_conditions = p_extra.boundary_conditions
+    swe_2D_constants = p_extra.swe_2D_constants
+    ManningN_cells_passed = p_extra.ManningN_cells
+    ManningN_ghostCells_passed = p_extra.ManningN_ghostCells
+    inletQ_Length_passed = p_extra.inletQ_Length
+    inletQ_TotalQ_passed = p_extra.inletQ_TotalQ
+    exitH_WSE_passed = p_extra.exitH_WSE
+    zb_cells_passed = p_extra.zb_cells
+    zb_ghostCells_passed = p_extra.zb_ghostCells
+    zb_faces_passed = p_extra.zb_faces
+    S0_passed = p_extra.S0
 
     Zygote.ignore() do
         Base.@debug "swe_2d_rhs called" # This can help prevent inlining
@@ -47,7 +68,7 @@
     # These are the arguments that are passed to the function. They are only 
     # used for forward simulations. For inversion and sensitivity analysis, 
     # ManningN_cells, ManningN_ghostCells, inletQ_TotalQ, exitH_WSE, 
-    # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_array (computed later in the function)
+    # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector (computed later in the function)
     ManningN_cells_local = deepcopy(ManningN_cells_passed)             #create a reference to ManningN_cells_passed. This makes Zygote happy (Don't know why)
     ManningN_ghostCells_local = deepcopy(ManningN_ghostCells_passed)
     inletQ_Length_local = deepcopy(inletQ_Length_passed)
@@ -57,6 +78,10 @@
     zb_ghostCells_local = deepcopy(zb_ghostCells_passed)
     zb_faces_local = deepcopy(zb_faces_passed)
     S0_local = deepcopy(S0_passed)
+
+    g = swe_2D_constants.g
+    h_small = swe_2D_constants.h_small
+    RiemannSolver = swe_2D_constants.RiemannSolver
 
     #get the data type of Q
     data_type = eltype(Q)
@@ -70,45 +95,17 @@
         @assert data_type <: Real "data_type must be a subtype of Real for AD compatibility"
     end
 
-    # Extract parameters from the 1D array
-    #zb_cells_current = @view params_array[param_ranges[1]]
-    zb_cells_current = copy(params_array[param_ranges[1]])  
-    #ManningN_list_current = @view params_array[param_ranges[2]]
-    ManningN_list_current = copy(params_array[param_ranges[2]])
-
-    nInletQ_BCs = srh_all_Dict["nInletQ_BCs"]
-
-    if nInletQ_BCs > 0
-        #inlet_discharges_current = @view params_array[param_ranges[3]]
-        inlet_discharges_current = copy(params_array[param_ranges[3]])
-    else
-        inlet_discharges_current = [0.0]   #not used for anything
-    end
-
     Zygote.ignore() do
         if settings.bVerbose
-
-            #@show typeof(Q)
-            #@show typeof(params_array)
-
-            @show typeof(zb_cells_current)
-            @show typeof(ManningN_list_current)
-            @show typeof(inlet_discharges_current)
-
-            #@show zb_cells_current
-            #@show ManningN_list_current
-            #@show inlet_discharges_current
-
+            #@show typeof(params_vector)
+            @show params_vector
         end
 
     end
 
     #return zeros(size(Q)) #zeros(data_type, size(Q))
     #return Q .* 1.0
-
-    g = swe_2D_constants.g
-    h_small = swe_2D_constants.h_small
-    RiemannSolver = swe_2D_constants.RiemannSolver
+   
 
     #h = @view Q[:, 1]  # water depth      #view of 2D array does not create a new array; only a reference
     #q_x = @view Q[:, 2]  # discharge in x
@@ -117,13 +114,9 @@
     q_x = copy(Q[:, 2])  # discharge in x
     q_y = copy(Q[:, 3])  # discharge in y
 
-    # Make the return value depend on parameters
-    #return Q * 1.0 .+ reshape(zb_cells_current, :, 1) .* ones(1, 3)
-
     # For the case of inversion or sensitivity analysis, and if zb is an active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
-    if (settings.bPerform_Inversion && "zb" in settings.inversion_settings.active_param_names) ||
-       (settings.bPerform_Sensitivity_Analysis && "zb" in settings.sensitivity_analysis_settings.active_param_names)
+    if ((settings.bPerform_Inversion ||settings.bPerform_Sensitivity_Analysis) && active_param_name == "zb")
 
         Zygote.ignore() do
             if settings.bVerbose
@@ -131,7 +124,7 @@
             end
         end
 
-        zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells_current)
+        zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, params_vector)
     end
 
     Zygote.ignore() do
@@ -146,8 +139,7 @@
 
     #For the case of inversion or sensitivity analysis, and if ManningN is an active parameter, 
     # we need to update ManningN at cells and ghost cells
-    if (settings.bPerform_Inversion && "ManningN" in settings.inversion_settings.active_param_names) ||
-       (settings.bPerform_Sensitivity_Analysis && "ManningN" in settings.sensitivity_analysis_settings.active_param_names)
+    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "ManningN"
 
         Zygote.ignore() do
             if settings.bVerbose
@@ -155,7 +147,7 @@
             end
         end
 
-        ManningN_cells_local, ManningN_ghostCells_local = update_ManningN(my_mesh_2D, srh_all_Dict, ManningN_list_current)
+        ManningN_cells_local, ManningN_ghostCells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
     end
 
     Zygote.ignore() do
@@ -168,21 +160,16 @@
     end
 
     #For the case of inversion or sensitivity analysis, and if Q is an active parameter, 
-    # we need to update inletQ_TotalQ based on the provided inlet_discharges_current
-    if (settings.bPerform_Inversion && "Q" in settings.inversion_settings.active_param_names) ||
-       (settings.bPerform_Sensitivity_Analysis && "Q" in settings.sensitivity_analysis_settings.active_param_names)
+    # we need to update inletQ_TotalQ based on the provided data
+    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "Q"
 
         Zygote.ignore() do
             if settings.bVerbose
-                println("calling update_inletQ_TotalQ")
+                println("updating inletQ_TotalQ")
             end
         end
 
-        #inletQ_TotalQ_local = nothing
-
-        if nInletQ_BCs > 0
-            inletQ_TotalQ_local = update_inletQ_TotalQ(inlet_discharges_current)
-        end
+        inletQ_TotalQ_local = params_vector        
     end
 
     Zygote.ignore() do
@@ -193,27 +180,39 @@
     end
 
     Zygote.ignore() do
-        @show typeof(settings)
-        @show typeof(Q)
-        @show typeof(my_mesh_2D)
-        @show typeof(boundary_conditions)
-        @show typeof(ManningN_cells_local)
-        @show typeof(zb_faces_local)
-        @show typeof(swe_2D_constants)
-        @show typeof(inletQ_Length_local)
-        @show typeof(inletQ_TotalQ_local)
-        @show typeof(exitH_WSE_local)
+        if settings.bVerbose
+            @show typeof(settings)
+            @show typeof(Q)
+            @show typeof(my_mesh_2D)
+            @show typeof(boundary_conditions)
+            @show typeof(ManningN_cells_local)
+            @show typeof(zb_faces_local)
+            @show typeof(swe_2D_constants)
+            @show typeof(inletQ_Length_local)
+            @show typeof(inletQ_TotalQ_local)
+            @show typeof(exitH_WSE_local)
+        end
     end
 
+    #out = Zygote.@code_adjoint process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions, ManningN_cells_local, zb_faces_local, swe_2D_constants, 
+    #                                          inletQ_Length_local, inletQ_TotalQ_local, exitH_WSE_local)
+    #@code_warntype process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions, ManningN_cells_local, zb_faces_local, swe_2D_constants, 
+    #                                          inletQ_Length_local, inletQ_TotalQ_local, exitH_WSE_local)
+    #@show out
+
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of Q_ghost. 
-    Q_ghost_local = process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions, ManningN_cells_local, zb_faces_local, swe_2D_constants, 
+    h_ghost_local, q_x_ghost_local, q_y_ghost_local = process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions, 
+                                              ManningN_cells_local, zb_cells_local, zb_faces_local, swe_2D_constants, 
                                               inletQ_Length_local, inletQ_TotalQ_local, exitH_WSE_local)
 
     Zygote.ignore() do
         if settings.bVerbose
-            #@show typeof(Q_ghost_local)
-            #@show size(Q_ghost_local)
-            #@show Q_ghost_local
+            @show typeof(h_ghost_local)
+            @show typeof(q_x_ghost_local)
+            @show typeof(q_y_ghost_local)
+            @show h_ghost_local
+            @show q_x_ghost_local
+            @show q_y_ghost_local
         end
     end
 
@@ -237,13 +236,13 @@
                 hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
             else  # boundary face
                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-                hR = Q_ghost_local[right_cellID, 1]
-                huR = Q_ghost_local[right_cellID, 2]
-                hvR = Q_ghost_local[right_cellID, 3]
+                hR = h_ghost_local[right_cellID]
+                huR = q_x_ghost_local[right_cellID]
+                hvR = q_y_ghost_local[right_cellID]
             end
 
              Zygote.ignore() do
-                 if iCell == 1  # Print for first cell only
+                 if iCell == -1  # Print for first cell only
                      println("Before Riemann solver:")
                      @show typeof(hL), typeof(huL), typeof(hvL)
                      @show hL, huL, hvL
@@ -265,7 +264,7 @@
             end
 
             Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
+                if iCell == -1  # Print for first cell only
                     println("After Riemann solver:")
                     @show typeof(flux)
                     @show flux
@@ -273,7 +272,7 @@
             end
 
             Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
+                if iCell == -1  # Print for first cell only
                     println("before accumulating flux_sum")
                     @show typeof(my_mesh_2D.face_lengths)
                     @show my_mesh_2D.face_lengths
@@ -288,24 +287,28 @@
             flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
 
             Zygote.ignore() do
-                if iCell == 1  # Print for first cell only
-                    println("after accumulating flux_sum")
+                if settings.bVerbose
+                    if iCell == -1  # Print for first cell only
+                        println("after accumulating flux_sum")
+                        @show typeof(flux_sum)
+                        @show flux_sum
+                    end
+                end
+            end
+        end
+
+        Zygote.ignore() do
+            if settings.bVerbose
+                if iCell == -1
                     @show typeof(flux_sum)
                     @show flux_sum
                 end
             end
         end
 
-        Zygote.ignore() do
-            if iCell == 1
-                @show typeof(flux_sum)
-                @show flux_sum
-            end
-        end
-
         # Source terms
         source_terms = if h[iCell] <= h_small
-            [data_type(0.0),
+            [zero(data_type),
                 g * h[iCell] * S0_local[iCell, 1] * cell_area,
                 g * h[iCell] * S0_local[iCell, 2] * cell_area]
         else
@@ -321,12 +324,7 @@
                 (g * h[iCell] * S0_local[iCell, 2] - friction_y) * cell_area]
         end
 
-        if iCell == -1
-            println("source_terms value = ", ForwardDiff.value.(source_terms))
-            println("source_terms partials = ", ForwardDiff.partials.(source_terms))
-        end
-
-        if iCell == 1  # Print for first cell only
+        if iCell == -1  # Print for first cell only
             Zygote.ignore() do
                 if settings.bVerbose
                     @show flux_sum
