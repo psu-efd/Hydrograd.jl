@@ -153,6 +153,12 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
 
         boundaryFaces_direction_Dict[boundaryID] = boundaryFaces_direction
     end
+
+    #above is the only place the sign of cellFacesList is used. Here, the sign is turned to positive for all. 
+    cellFacesList = abs.(cellFacesList)
+
+    #println("cellFacesList after abs: ", cellFacesList)
+
     
     #println("boundaryFaces_Dict: (after) ", boundaryFaces_Dict)
     #println("boundaryFaces_direction_Dict: ", boundaryFaces_direction_Dict)
@@ -236,7 +242,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
                 end
             else  #boundary face
                 ghostCellID = boundaryFaceID_to_ghostCellID_Dict[abs(faceID)]
-                push!(cellNeighbors_Dict[iCell], -ghostCellID)  #negative ghost cell ID is used to indicate the ghost cell
+                push!(cellNeighbors_Dict[iCell], ghostCellID)  
             end
         end
     end
@@ -425,7 +431,7 @@ function compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nod
     face_lengths = Vector{Float64}(undef, numOfFaces)   #lenght of the face (edge)
 
     #loop over all cells
-    for cellID in 1:length(cellNodesCount)
+    for cellID in eachindex(cellNodesCount)
         
         #number of nodes for the current cell
         nNodes = cellNodesCount[cellID]

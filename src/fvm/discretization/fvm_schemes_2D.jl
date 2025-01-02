@@ -36,7 +36,7 @@ function compute_scalar_gradients(my_mesh_2D, scalar_variable)
     grad_scalar_variable = [compute_cell_gradient(iCell, my_mesh_2D, scalar_variable) 
                             for iCell in 1:my_mesh_2D.numOfCells]
 
-    gradients = [grad_scalar_variable[i][j] for i in 1:length(grad_scalar_variable), j in 1:length(grad_scalar_variable[1])]
+    gradients = [grad_scalar_variable[i][j] for i in eachindex(grad_scalar_variable), j in eachindex(grad_scalar_variable[1])]
      
     return gradients
 end
@@ -60,7 +60,7 @@ function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
         
         # Value of the variable at the current cell and neighbor cell
         variable_c = scalar_variable[iCell]
-        if neighbor_cellID < 0  # Boundary face
+        if neighbor_cellID > my_mesh_2D.numOfCells  # Boundary face if the neighbor cell ID is greater than the number of cells
             variable_n = variable_c  # Assume zero gradient at boundary
         else
             variable_n = scalar_variable[neighbor_cellID]
@@ -70,7 +70,7 @@ function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
         variable_f = (variable_c + variable_n) / 2.0
         
         # Compute flux contribution
-        flux_temp = my_mesh_2D.cell_normals[iCell][iFace] * variable_f * my_mesh_2D.face_lengths[abs(faceID)]
+        flux_temp = my_mesh_2D.cell_normals[iCell][iFace] * variable_f * my_mesh_2D.face_lengths[faceID]
         
         cell_gradient = cell_gradient + flux_temp
 

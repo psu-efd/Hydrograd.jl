@@ -53,7 +53,8 @@ end
 function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
 
     #calculate total volume of water 
-    for index in 1:size(sol, 3)
+    #for index in 1:size(sol, 3)
+    for index in axes(sol, 3)
 
         Q = @view sol[:,:,index]  # Q will be a view of the 2D slice at timestep index
 

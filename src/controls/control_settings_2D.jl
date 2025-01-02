@@ -37,6 +37,7 @@ struct InversionSettings
     optimizer::String
     learning_rate::Float64
     max_iterations::Int
+    inversion_sensealg::String
     inversion_truth_file_name::String
     forward_simulation_initial_condition_options::String
     forward_simulation_initial_condition_file_name::String
@@ -44,6 +45,7 @@ struct InversionSettings
     forward_simulation_initial_condition_values_from_file::Union{Dict,Nothing}
     ode_solver::String
     ode_solver_adaptive::Bool
+    ode_solver_sensealg::String
     ode_solver_b_jac_sparsity::Bool
     ode_solver_nSave::Int
     save_file_name::String
@@ -183,13 +185,18 @@ function parse_control_file(control_file::String)
             println("    optimizer = ", settings.inversion_settings.optimizer)
             println("    learning_rate = ", settings.inversion_settings.learning_rate)
             println("    max_iterations = ", settings.inversion_settings.max_iterations)
+            println("    inversion_sensealg = ", settings.inversion_settings.inversion_sensealg)
             println("    inversion_truth_file_name = ", settings.inversion_settings.inversion_truth_file_name)
             println("    inversion_forward_simulation_initial_condition_options = ", settings.inversion_settings.forward_simulation_initial_condition_options)
             println("    inversion_forward_simulation_initial_condition_file_name = ", settings.inversion_settings.forward_simulation_initial_condition_file_name)
             println("    inversion_forward_simulation_initial_condition_constant_values = ", settings.inversion_settings.forward_simulation_initial_condition_constant_values)
             println("    ode_solver = ", settings.inversion_settings.ode_solver)
             println("    ode_solver_adaptive = ", settings.inversion_settings.ode_solver_adaptive)
+            println("    ode_solver_sensealg = ", settings.inversion_settings.ode_solver_sensealg)
             println("    ode_solver_b_jac_sparsity = ", settings.inversion_settings.ode_solver_b_jac_sparsity)
+            println("    ode_solver_nSave = ", settings.inversion_settings.ode_solver_nSave)
+            println("    save_file_name = ", settings.inversion_settings.save_file_name)
+            println("    save_loss_history_file_name = ", settings.inversion_settings.save_loss_history_file_name)
         else
             println("No inversion is to be performed.")
         end
@@ -282,6 +289,7 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         options["inversion_optimizer"],                        # optimizer
         Float64(options["inversion_learning_rate"]),           # learning_rate
         Int(options["inversion_max_iterations"]),              # max_iterations
+        options["inversion_sensealg"],                       # inversion_sensealg
         options["inversion_truth_file_name"],         # inversion_truth_file_name
         options["inversion_forward_simulation_initial_condition_options"], # forward_simulation_initial_condition_options
         options["inversion_forward_simulation_initial_condition_file_name"], # forward_simulation_initial_condition_file_name
@@ -289,6 +297,7 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         forward_simulation_initial_condition_values_from_file, # forward_simulation_initial_condition_values_from_file
         options["inversion_ode_solver_options"]["ode_solver"], # ode_solver
         options["inversion_ode_solver_options"]["ode_solver_adaptive"], # ode_solver_adaptive
+        options["inversion_ode_solver_options"]["ode_solver_sensealg"], # ode_solver_sensealg
         options["inversion_ode_solver_options"]["ode_solver_b_jac_sparsity"], # ode_solver_b_jac_sparsity
         Int(options["inversion_ode_solver_options"]["ode_solver_nSave"]), # ode_solver_nSave
         options["inversion_save_file_name"],                   # save_file_name

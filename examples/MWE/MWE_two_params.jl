@@ -21,6 +21,10 @@ t0, tMax = 0.0, 10 * dt
 tspan = (t0, tMax)
 t = t0:dt:tMax;
 
+#create material ID for each grid point
+matIDs = [i <= Nx[1] ÷ 2 ? 1 : 2 for i in 1:Nx[1]]
+@show matIDs
+
 ## Definition of Auxiliary functions
 function ddx(u, dx)
     """
@@ -39,21 +43,34 @@ function d2dx(u, dx)
             zero(eltype(u))]
 end
 
+function update_a12(p, xtrs)
+    # Model parameters
+    dx, Nx = xtrs #[1.0,3.0,0.125,100]
+
+    #the diffusion coefficient is a1 on the left half and a2 on the right half
+    a12 = [p[matIDs[i]+1] for i in 1:Nx[1]]
+    return a12
+end
+
 ## ODE description of the Physics:
 function heat(u, p, t, xtrs)
     # Model parameters
     #a0, a1, a2 = p
     dx, Nx = xtrs #[1.0,3.0,0.125,100]
 
-    #the diffusion coefficient is a0 on the left half and a1 on the right half
-    a12 = [i <= Nx[1] ÷ 2 ? 1.0/p[2] : 0.8*p[3] for i in 1:Nx[1]]
+    #the diffusion coefficient is a1 on the left half and a2 on the right half
+    a12 = update_a12(p, xtrs)
 
     Zygote.ignore() do
         #println("a12: ", a12)
         #println(" ")
     end
 
-    return 2.0 * p[1] .* u + a12 .* d2dx(u, dx)
+    rhs = map(1:Nx[1]) do i  
+        2.0 * p[1] * u[i] + a12[i]^2 * d2dx(u, dx)[i]
+    end
+
+    return rhs    
 end
 heat_closure(u, p, t) = heat(u, p, t, xtrs)
 
@@ -65,7 +82,7 @@ arr_sol = Array(sol)
 @show size(arr_sol)
 @show arr_sol[:,end]
 
-ps = [0.3, 0.3, 0.3];   # Initial guess for model parameters
+ps = [0.35, 0.512, 0.328];   # Initial guess for model parameters
 function predict(θ)
     Array(solve(prob, Tsit5(), p = θ, dt = dt, saveat = t))[:,end]   #only take the last time step
 end
@@ -75,9 +92,6 @@ function loss(θ)
     pred = predict(θ)
     return sum(abs2.(pred .- arr_sol[:,end])) # Mean squared error
 end
-
-l = loss(ps)
-size(sol), size(t) # Checking sizes
 
 LOSS = []                              # Loss accumulator
 PRED = []                              # prediction accumulator
@@ -100,6 +114,6 @@ optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype)
 optprob = Optimization.OptimizationProblem(optf, ps)
 
 #res = Optimization.solve(optprob, PolyOpt(), callback = cb, maxiters = 10)
-res = solve(optprob, Adam(0.01), maxiters=300, callback = cb)
+res = solve(optprob, Adam(0.01), maxiters=2, callback = cb)
 
 @show res.u 

@@ -54,7 +54,6 @@ param_ranges = nothing
 
 #Initial setup of Manning's n using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
 ManningN_cells = nothing
-ManningN_ghostCells = nothing
 
 # setup initial conditions 
 wse = nothing          #free surface elevation at cells 
@@ -89,7 +88,6 @@ boundary_conditions = nothing
 inletQ_TotalQ = nothing
 inletQ_H = nothing
 inletQ_A = nothing
-inletQ_ManningN = nothing
 inletQ_Length = nothing
 inletQ_TotalA = nothing
 inletQ_DryWet = nothing

@@ -159,7 +159,7 @@ end
 params_vector, active_param_name = Hydrograd.setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_values_truth, inlet_discharges_truth)
 
 #Initial setup of Manning's n at cells and ghost cells using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
-ManningN_cells, ManningN_ghostCells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
+ManningN_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
 #setup initial condition for wse, h, q_x, q_y at cells
 Hydrograd.setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cells, h, q_x, q_y, swe_2D_constants, case_path, true)
@@ -168,7 +168,7 @@ Hydrograd.setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, z
 Hydrograd.setup_ghost_cells_initial_condition!(settings, my_mesh_2D, wse, h, q_x, q_y, wse_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
 #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
-boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_ManningN, inletQ_Length, inletQ_TotalA, inletQ_DryWet,
+boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_Length, inletQ_TotalA, inletQ_DryWet,
 exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = Hydrograd.initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinates)
 
 #set up initial condition for for solution state variables for ODE solver
@@ -186,7 +186,6 @@ swe_extra_params = SWE2D_Extra_Parameters(
     boundary_conditions,
     swe_2D_constants,
     ManningN_cells,
-    ManningN_ghostCells,
     inletQ_Length,
     inletQ_TotalQ,
     exitH_WSE,
@@ -228,9 +227,7 @@ end
 if settings.bPerform_Inversion
 
     println("   Performing inversion ...")
-
-    #@show swe_2D_constants.tspan
-    
+   
     #perform inversion
     #@code_warntype 
     Hydrograd.swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)

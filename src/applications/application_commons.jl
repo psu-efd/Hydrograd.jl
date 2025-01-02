@@ -12,7 +12,6 @@ struct SWE2D_Extra_Parameters{T}
     boundary_conditions::Hydrograd.BoundaryConditions2D
     swe_2D_constants::Hydrograd.swe_2D_consts
     ManningN_cells::Vector{T}
-    ManningN_ghostCells::Vector{T}
     inletQ_Length::Vector{Vector{T}}
     inletQ_TotalQ::Vector{T}
     exitH_WSE::Vector{T}

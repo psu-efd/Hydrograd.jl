@@ -19,7 +19,8 @@ function update_1d_array(arr, idx, values)
     updated_arr = copy(arr)
     
     # Use broadcasting for the update
-    updated_arr = [i ∈ idx ? values[findfirst(==(i), idx)] : arr[i] for i in 1:length(arr)]
+    #updated_arr = [i ∈ idx ? values[findfirst(==(i), idx)] : arr[i] for i in 1:length(arr)]
+    updated_arr = [i ∈ idx ? values[findfirst(==(i), idx)] : arr[i] for i in eachindex(arr)]
 
     # Use non-mutating array comprehension
     #updated_arr = map(1:length(arr)) do i
@@ -49,6 +50,8 @@ function save_ode_solution(sol, filename)
     # Save only the solution data
     jldsave(filename; sol_data=sol_data)
 end
+
+
 
 
 

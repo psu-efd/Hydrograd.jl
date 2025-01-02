@@ -98,6 +98,7 @@ include("utilities/process_SRH_2D_input.jl")
 include("utilities/smooth_functions.jl")
 include("utilities/swe_1D_tools.jl")
 include("utilities/swe_2D_tools.jl")
+include("utilities/debug_AD.jl")
 
 #applications
 include("applications/forward_simulation/swe_2D_forward_simulation.jl")
@@ -191,7 +192,7 @@ export swe_2D_save_results_SciML
 export swe_2D_save_results_custom
 
 export export_to_vtk_2D
-
+export debug_AD
 # Applications
 export SWE2D_Extra_Parameters
 export swe_2D_forward_simulation

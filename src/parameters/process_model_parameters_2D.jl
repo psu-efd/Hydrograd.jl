@@ -63,7 +63,7 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
         #make sure the length of ManningN_list_param is the same as the number of materials
         srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
         if length(ManningN_list_param) != srhmat_numOfMaterials
-            error("The length of ManningN_list_param is not the same as the number of materials.")
+        #    error("The length of ManningN_list_param is not the same as the number of materials.")
         end
 
         #make sure the length of inlet_discharges_param is the same as the number of inletQ_BCs

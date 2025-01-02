@@ -136,7 +136,7 @@ let counter_temp = 0
 end 
 
 let counter_temp = 0
-    for i in 1:size(cell_centroids, 1)
+    for i in eachindex(cell_centroids)
         println(cell_centroids[i,:])
         counter_temp += 1
         if counter_temp == 5
@@ -239,7 +239,7 @@ q_x = zeros(numOfCells)            #q_x=hu at cells
 q_y = zeros(numOfCells)            #q_y=hv at cells 
 total_water_volume = Float64[]      #total volume of water in the domain 
 
-setup_initial_eta!(mesh, eta, zb_cell, h, swe_1d_constants)
+#setup_initial_eta!(mesh, eta, zb_cell, h, swe_1d_constants)
 
 #setup boundary conditions
 left_bcType = "inletQ"

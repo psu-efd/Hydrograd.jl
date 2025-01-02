@@ -18,7 +18,7 @@ function swe_2D_sensitivity(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, p
     function forward_simulation(θ)
 
         #create the full parameter array
-        p_new = [i ∈ active_range ? θ[i-active_range[1]+1] : convert(eltype(θ), params_array[i]) for i in 1:length(params_array)]
+        p_new = [i ∈ active_range ? θ[i-active_range[1]+1] : convert(eltype(θ), params_array[i]) for i in eachindex(params_array)]
 
         prob = ODEProblem(ode_f, Q0, swe_2D_constants.tspan, p_new)
 

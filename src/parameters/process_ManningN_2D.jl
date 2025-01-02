@@ -30,15 +30,10 @@ function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
             error("Material $matName does not have Manning's n. Assign the default value 0.03.")
         end
     end
-
-    #setup Manning's n at ghost cells
-    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
-   
     
     #println("ManningN_cells: ", ManningN_cells)
-    #println("ManningN_ghostCells: ", ManningN_ghostCells)
 
-    return ManningN_cells, ManningN_ghostCells
+    return ManningN_cells
 end
 
 #update Manning's n values based on the provided Manning's n values for each material (zone)
@@ -50,18 +45,29 @@ function update_ManningN(my_mesh_2D::mesh_2D,
     matID_cells = srh_all_Dict["matID_cells"]  #material ID for each cell (0-based): 0-default material, 1-first material, 2-second material, etc.
 
     # Create array directly with comprehension
-    ManningN_cells = [new_ManningN_values[matID_cells[i]+1] for i in 1:my_mesh_2D.numOfCells]  #+1 to make matID_cells 1-based (to be consistent with the new_ManningN_values)
+    #ManningN_cells = [new_ManningN_values[matID_cells[i]+1] for i in 1:my_mesh_2D.numOfCells]  #+1 to make matID_cells 1-based (to be consistent with the new_ManningN_values)
 
-    #update Manning's n at ghost cells
-    ManningN_ghostCells = update_ghost_cells_scalar(my_mesh_2D, ManningN_cells)    
+    # ManningN_cells = [
+    #     let matID = matID_cells[iCell]+1
+            
+    #         # Ensure index is within bounds
+    #         @assert 1 <= matID <= length(new_ManningN_values) "Index out of bounds for new_ManningN_values"
+            
+    #         # Get value from neighboring cell (for boundary faces, the neighboring cell is the same as the current cell)
+    #         new_ManningN_values[matID]
+    #     end
+    #     for iCell in 1:my_mesh_2D.numOfCells
+    # ]
+
+    #hack for debugging
+    #ManningN_cells = [new_ManningN_values[1] for iCell in 1:my_mesh_2D.numOfCells]
+    ManningN_cells = copy(new_ManningN_values)
 
     # Check if ManningN_cells and ManningN_ghostCells are AbstractArrays
     @assert isa(ManningN_cells, AbstractArray) "ManningN_cells must be an AbstractArray"
-    @assert isa(ManningN_ghostCells, AbstractArray) "ManningN_ghostCells must be an AbstractArray"
 
     # Check if ManningN_cells and ManningN_ghostCells have real number elements
     @assert eltype(ManningN_cells) <: Real "ManningN_cells must have elements of a real number type"
-    @assert eltype(ManningN_ghostCells) <: Real "ManningN_ghostCells must have elements of a real number type"
 
-     return ManningN_cells, ManningN_ghostCells
+    return ManningN_cells
 end

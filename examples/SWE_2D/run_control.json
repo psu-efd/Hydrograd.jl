@@ -1,11 +1,11 @@
 {
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
-    "bVerbose": true,
+    "bVerbose": false,
     "control_variables": {
         "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": false,
-        "bPerform_Inversion": true,
+        "bPerform_Forward_Simulation": true,
+        "bPerform_Inversion": false,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
@@ -35,7 +35,7 @@
         "inversion_parameter_initial_values_options": "constant",
         "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
         "inversion_zb_initial_values": [0.01],
-        "inversion_ManningN_initial_values": [0.02, 0.03],
+        "inversion_ManningN_initial_values": [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03],
         "inversion_inlet_discharge_initial_values": [0.2],
         "inversion_bInversion_slope_loss": false,
         "inversion_bInversion_u_loss": false,
@@ -44,6 +44,7 @@
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
         "inversion_max_iterations": 2,
+        "inversion_sensealg": "AutoZygote()",
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "constant",
         "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
@@ -52,6 +53,7 @@
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
+            "ode_solver_sensealg": "InterpolatingAdjoint(autojacvec=ZygoteVJP())",
             "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },

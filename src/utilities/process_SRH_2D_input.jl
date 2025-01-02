@@ -172,6 +172,7 @@ function process_SRH_2D_input(settings, case_path)
             if iCell in v
                 matID_cells[iCell] = k
                 bFound = true
+                break
             end
         end
 
