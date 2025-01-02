@@ -672,8 +672,8 @@ end
         #velocity_normals = 1.1 * ManningN_faces[1]
         #velocity_normals = 0.03
 
-        q_x_new = -h_internals .* velocity_normals .* face_normals[:, 1]
-        q_y_new = -h_internals .* velocity_normals .* face_normals[:, 2]
+        q_x_new = -h_internals .* velocity_normals .* face_normals[:, 1] .* current_inletQ_DryWet
+        q_y_new = -h_internals .* velocity_normals .* face_normals[:, 2] .* current_inletQ_DryWet
 
         Zygote.ignore() do
             if settings.bVerbose
@@ -681,40 +681,7 @@ end
                 @show q_y_new
             end
         end
-
-        # q_updates = [
-        #     let
-        #         ManningN_face = ManningN_cells[internalCellID]
-        #         face_normal = boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, :]
-
-        #         #velocity_normal = (current_inletQ_TotalQ / total_A *
-        #         #                   current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_face)
-        #         #velocity_normal = 0.1
-        #         #velocity_normal = ManningN_cells[internalCellID]
-        #         #velocity_normal = convert(eltype(ManningN_cells), ManningN_cells[internalCellID])
-        #         #velocity_normal = (current_inletQ_TotalQ / total_A *
-        #         #                   current_inletQ_Length[iFace]^(2.0 / 3.0) / 0.03)
-
-        #         # Try creating intermediate values
-        #         h_internal = h[internalCellID]
-        #         n_value = ManningN_cells[internalCellID]
-        #         velocity_normal = one(eltype(ManningN_cells)) * n_value
-
-        #         if current_inletQ_DryWet[iFace] == 0
-        #             [zero(eltype(Q_cells)), zero(eltype(Q_cells))]
-        #         else
-        #             [-h_internal * velocity_normal * face_normal[1],
-        #              -h_internal * velocity_normal * face_normal[2]]
-        #             #[0.0, 0.0]
-        #             #[-h[internalCellID] * face_normal[1],
-        #             # -h[internalCellID] * face_normal[2]]
-        #         end
-        #     end
-        # for (iFace, internalCellID) in enumerate(current_internalCellIDs)]
-
-        #q_x_new = [q_updates[iFace][1] for iFace in 1:length(current_internalCellIDs)]
-        #q_y_new = [q_updates[iFace][2] for iFace in 1:length(current_internalCellIDs)]
-
+        
         Zygote.ignore() do
             #@show typeof(current_inletQ_TotalQ)
             #@show typeof(total_A)
@@ -755,10 +722,6 @@ end
         h_ghost_local = update_1d_array(h_ghost_local, current_ghostCellIDs, h_new)
         q_x_ghost_local = update_1d_array(q_x_ghost_local, current_ghostCellIDs, q_x_new)
         q_y_ghost_local = update_1d_array(q_y_ghost_local, current_ghostCellIDs, q_y_new)
-
-        #fake it for now
-        #q_x_ghost_local = zeros(eltype(q_x), my_mesh_2D.numOfAllBounaryFaces)
-        #q_y_ghost_local = zeros(eltype(q_y), my_mesh_2D.numOfAllBounaryFaces)
     end
 
     # After inlet-Q boundaries

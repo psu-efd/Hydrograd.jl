@@ -9,9 +9,6 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
     nodeCoordinates = swe2d_extra_params.nodeCoordinates
     swe_2D_constants = swe2d_extra_params.swe_2D_constants
     zb_cells = swe2d_extra_params.zb_cells
-    #zb_ghostCells = combined_params.swe_params.zb_ghostCells,
-    #zb_faces = combined_params.swe_params.zb_faces,
-    #S0 = swe_params.S0
 
     #define the time for saving the results (for forward simulation, which may be different from the time for saving the results in inversion)
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.forward_settings.nSave
@@ -30,8 +27,8 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
 
     #debug AD correctness
     #debug start
-    params_vector_debug = [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]
-    debug_AD(ode_f, Q0, swe_2D_constants, params_vector_debug, swe2d_extra_params)
+    #params_vector_debug = [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]
+    #debug_AD(ode_f, Q0, swe_2D_constants, params_vector_debug, swe2d_extra_params)
     #return
     #debug end
 
