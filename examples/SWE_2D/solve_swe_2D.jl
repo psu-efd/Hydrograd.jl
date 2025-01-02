@@ -12,8 +12,6 @@ using PyCall
 
 using Profile
 
-#includet(joinpath(dirname(dirname(dirname(@__FILE__))), "src", "Hydrograd.jl"))
-#includet(joinpath(dirname(dirname(dirname(@__FILE__))), "src", "Hydrograd.jl"))
 using Hydrograd
 
 #SciML
@@ -211,7 +209,7 @@ ode_f = ODEFunction((u, p, t) -> swe_2d_rhs(u, p, t, swe_extra_params); jac_prot
 #########################
 
 if settings.bPerform_Forward_Simulation
-    println("   Performing 2D SWE forward simulation ...")
+    println("Forward simulation (2D SWE) ...")
 
     #perform forward simulation
     Hydrograd.swe_2D_forward_simulation(ode_f, Q0, params_vector, swe_extra_params, 
@@ -226,7 +224,7 @@ end
 
 if settings.bPerform_Inversion
 
-    println("   Performing inversion ...")
+    println("Parameter inversion ...")
    
     #perform inversion
     #@code_warntype 
@@ -241,7 +239,7 @@ end
 
 if settings.bPerform_Sensitivity_Analysis
 
-    println("   Performing sensitivity analysis ...")
+    println("Sensitivity analysis ...")
 
     #perform sensitivity analysis
     Hydrograd.swe_2D_sensitivity(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, params_vector, active_range, param_ranges,

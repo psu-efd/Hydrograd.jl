@@ -546,13 +546,6 @@ end
 
     Zygote.ignore() do
         if settings.bVerbose
-            #println("process_all_boundaries_2d")
-            #println(" ")
-        end
-    end
-
-    Zygote.ignore() do
-        if settings.bVerbose
             println("\nStarting process_all_boundaries_2d")
             println(" ")
             println("Input types:")
@@ -627,6 +620,7 @@ end
                 println("current_inletQ_Length type: ", typeof(current_inletQ_Length))
                 println("h type: ", typeof(h))
                 println("ManningN_cells type: ", typeof(ManningN_cells))
+                @show ManningN_cells
             end
         end
 

@@ -104,8 +104,8 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
             end
         end
 
-        #ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
-        ManningN_cells_local = params_vector
+        ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
+        #ManningN_cells_local = params_vector
     end
 
     Zygote.ignore() do
@@ -135,9 +135,6 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
             @show inletQ_TotalQ_local
         end
     end
-
-    #@code_warntype process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions, ManningN_cells_local, zb_faces_local, swe_2D_constants, 
-    #                                          inletQ_Length_local, inletQ_TotalQ_local, exitH_WSE_local)
 
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of h_ghost, q_x_ghost, and q_y_ghost. 
     h_ghost_local, q_x_ghost_local, q_y_ghost_local = process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions,

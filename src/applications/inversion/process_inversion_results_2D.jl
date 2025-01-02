@@ -1,9 +1,7 @@
 #Functions to process the inversion results: 
-#The process_inversion_results function is used to plot the inversion results in Python.
+#The process_inversion_results function is used to process the inversion results.
 
-
-function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, 
-    zb_cells_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
 
     inversion_results_file_name = joinpath(case_path, settings.inversion_settings.save_file_name)
 
@@ -51,7 +49,7 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
         if settings.inversion_settings.active_param_names == ["zb"]
             zb_i = curPars
         else
-            zb_i = zb_cells_truth
+            zb_i = zb_cell_truth
         end
 
         WSE_i = h_i .+ zb_i
@@ -59,7 +57,7 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
         vector_data = [] 
         vector_names = []
 
-        scalar_data = [h_i, WSE_i, zb_i, h_truth, WSE_truth, zb_cells_truth]
+        scalar_data = [h_i, WSE_i, zb_i, h_truth, WSE_truth, zb_cell_truth]
         scalar_names = ["h", "WSE", "zb", "h_truth", "WSE_truth", "zb_truth"]
         
         file_path = joinpath(case_path, "inversion_results_iter_$i.vtk" ) 
