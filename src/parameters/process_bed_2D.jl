@@ -74,6 +74,10 @@ function interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells)
      
      # Compute bed slope at cell centers (Bed slope is the negative of zb gradient)
      S0 = -1.0 * compute_scalar_gradients(my_mesh_2D, zb_cells)
+
+     #@show typeof(S0)
+     #@show size(S0)
+     #@show S0
           
      return zb_ghostCells, zb_faces, S0
     

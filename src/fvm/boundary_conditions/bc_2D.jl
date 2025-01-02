@@ -613,41 +613,14 @@ end
         q_x_new = zeros(eltype(q_x), length(current_ghostCellIDs))
         q_y_new = zeros(eltype(q_y), length(current_ghostCellIDs))
 
-        # Before total_A calculation
-        Zygote.ignore() do
-            if settings.bVerbose
-                println("\nBefore total_A calculation:")
-                println("current_inletQ_Length type: ", typeof(current_inletQ_Length))
-                println("h type: ", typeof(h))
-                println("ManningN_cells type: ", typeof(ManningN_cells))
-                @show ManningN_cells
-            end
-        end
-
         # First pass: compute total_A and dry/wet status
         # current_inletQ_DryWet: 1.0 for wet, 0.0 for dry
         current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1.0 : 0.0, current_internalCellIDs)  #does this break AD?
-        #current_inletQ_DryWet = map(internalCellID -> 1, current_internalCellIDs)        
-        #current_inletQ_DryWet = [1.0 for iCell in 1:length(current_internalCellIDs)]
 
         # Compute total_A only for wet faces
         total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]] * current_inletQ_DryWet[iFace]
                         for iFace in eachindex(current_internalCellIDs) 
                      )
-
-        #hack for debugging
-        #total_A = 100.0
-
-        # After total_A calculation
-        Zygote.ignore() do
-            if settings.bVerbose
-                println("\nAfter total_A calculation:")
-                println(" ")
-                println("type of current_inletQ_DryWet: ", typeof(current_inletQ_DryWet))
-                println("total_A type: ", typeof(total_A))
-                @show h
-            end
-        end
 
         Zygote.ignore() do
             @assert total_A > 1e-10 "Total cross-sectional conveyance for inlet-q boundary $iInletQ is not positive: $total_A"
@@ -663,52 +636,34 @@ end
         face_normals = boundary_conditions.inletQ_faceOutwardNormals[iInletQ]
         velocity_normals = current_inletQ_TotalQ / total_A *
                            current_inletQ_Length.^(2.0 / 3.0) ./ ManningN_faces
-        #velocity_normals = 1.1 * ManningN_faces[1]
-        #velocity_normals = 0.03
 
         q_x_new = -h_internals .* velocity_normals .* face_normals[:, 1] .* current_inletQ_DryWet
         q_y_new = -h_internals .* velocity_normals .* face_normals[:, 2] .* current_inletQ_DryWet
 
         Zygote.ignore() do
             if settings.bVerbose
-                @show q_x_new
-                @show q_y_new
-            end
-        end
-        
-        Zygote.ignore() do
-            #@show typeof(current_inletQ_TotalQ)
-            #@show typeof(total_A)
-            #@show typeof(current_inletQ_Length)
-            #@show typeof(ManningN_cells)
+                #@show q_x_new
+                #@show q_y_new
 
-            #@show current_inletQ_TotalQ
-            #@show total_A
-            #@show current_inletQ_Length
-            #@show ManningN_cells
-        end
-
-        Zygote.ignore() do
-            if settings.bVerbose
-                @show typeof(h_new)
-                @show typeof(q_x_new)
-                @show typeof(q_y_new)
-                @show size(q_x_new)
-                @show size(q_y_new)
-                @show size(h_new)
-                @show h_new
-                @show q_x_new
-                @show q_y_new
+                #@show typeof(h_new)
+                #@show typeof(q_x_new)
+                #@show typeof(q_y_new)
+                #@show size(q_x_new)
+                #@show size(q_y_new)
+                #@show size(h_new)
+                #@show h_new
+                #@show q_x_new
+                #@show q_y_new
             end
         end
 
         # Before update_1d_array calls
         Zygote.ignore() do
             if settings.bVerbose
-                println(" ")
-                println("\nBefore update_1d_array:")
-                println("h_new type: ", typeof(h_new))
-                println("current_ghostCellIDs type: ", typeof(current_ghostCellIDs))
+                #println(" ")
+                #println("\nBefore update_1d_array:")
+                #println("h_new type: ", typeof(h_new))
+                #println("current_ghostCellIDs type: ", typeof(current_ghostCellIDs))
             end
         end
 
@@ -721,22 +676,14 @@ end
     # After inlet-Q boundaries
     Zygote.ignore() do
         if settings.bVerbose
-            println("\nAfter inlet-Q boundaries")
-            println(" ")
-            println("h_ghost_local: ", typeof(h_ghost_local))
-            println("q_x_ghost_local: ", typeof(q_x_ghost_local))
-            println("q_y_ghost_local: ", typeof(q_y_ghost_local))
-            @show h_ghost_local
-            @show q_x_ghost_local
-            @show q_y_ghost_local
-        end
-    end
-
-    # Before exit-H boundaries
-    Zygote.ignore() do
-        if settings.bVerbose
-            #println("\nBefore exit-H boundaries")
+            #println("\nAfter inlet-Q boundaries")
             #println(" ")
+            #println("h_ghost_local: ", typeof(h_ghost_local))
+            #println("q_x_ghost_local: ", typeof(q_x_ghost_local))
+            #println("q_y_ghost_local: ", typeof(q_y_ghost_local))
+            #@show h_ghost_local
+            #@show q_x_ghost_local
+            #@show q_y_ghost_local
         end
     end
 
@@ -744,14 +691,6 @@ end
     #loop through all exit-h boundaries
     for iExitH in 1:boundary_conditions.nExitH_BCs
         iBoundary = boundary_conditions.exitH_BC_indices[iExitH]
-
-        if settings.bVerbose
-            Zygote.ignore() do
-                #println("Processing EXIT-H boundary ", iExitH, " with index in BC list ", iBoundary)
-            end
-        end
-
-        #iBoundary = exitH_BC_indices[iExitH]
 
         current_ghostCellIDs = boundary_conditions.exitH_ghostCellIDs[iExitH]  # ghost cell IDs for this boundary
         current_internalCellIDs = boundary_conditions.exitH_internalCellIDs[iExitH]  # internal cell IDs for this boundary
@@ -772,26 +711,14 @@ end
         q_y_ghost_local = update_1d_array(q_y_ghost_local, current_ghostCellIDs, q_y[current_internalCellIDs])
     end
 
-    # After exit-H boundaries
-    Zygote.ignore() do
-        if settings.bVerbose
-            #println("\nAfter exit-H boundaries")
-            #println(" ")
-            #println("h_ghost_local: ", typeof(h_ghost_local))
-            #println("q_x_ghost_local: ", typeof(q_x_ghost_local))
-            #println("q_y_ghost_local: ", typeof(q_y_ghost_local))
-            #println(" ")
-        end
-    end
-
     #for wall boundaries
     #loop through all wall boundaries
     for iWall in 1:boundary_conditions.nWall_BCs
         iBoundary = boundary_conditions.wall_BC_indices[iWall]
 
-        if settings.bVerbose
-            Zygote.ignore() do
-                #println("Processing WALL boundary ", iWall, " with index in BC list ", iBoundary)
+        Zygote.ignore() do
+            if settings.bVerbose
+                #println("Processing WALL boundary ", iWall, " with index in BC list ", iBoundary)                
             end
         end
 
@@ -805,24 +732,13 @@ end
         q_y_ghost_local = update_1d_array(q_y_ghost_local, current_ghostCellIDs, -q_y[current_internalCellIDs])
     end
 
-    # After wall boundaries
-    Zygote.ignore() do
-        if settings.bVerbose
-            #println("\nAfter wall boundaries")
-            #println(" ")
-            #println("h_ghost_local: ", typeof(h_ghost_local))
-            #println("q_x_ghost_local: ", typeof(q_x_ghost_local))
-            #println("q_y_ghost_local: ", typeof(q_y_ghost_local))
-        end
-    end
-
     #for symmetry boundaries
     #loop through all symmetry boundaries
     for iSymm in 1:boundary_conditions.nSymm_BCs
         iBoundary = boundary_conditions.symm_BC_indices[iSymm]
 
-        if settings.bVerbose
-            Zygote.ignore() do
+        Zygote.ignore() do
+            if settings.bVerbose            
                 #println("Processing SYMMETRY boundary ", iSymm, " with index in BC list ", iBoundary)
             end
         end
@@ -844,18 +760,6 @@ end
 
         q_x_ghost_local = update_1d_array(q_x_ghost_local, current_ghostCellIDs, q_x_new)
         q_y_ghost_local = update_1d_array(q_y_ghost_local, current_ghostCellIDs, q_y_new)
-    end
-
-    # After symmetry boundaries
-    Zygote.ignore() do
-        if settings.bVerbose
-            #println("\nAfter symmetry boundaries")
-            #println(" ")
-            #println("h_ghost_local: ", typeof(h_ghost_local))
-            #println("q_x_ghost_local: ", typeof(q_x_ghost_local))
-            #println("q_y_ghost_local: ", typeof(q_y_ghost_local))
-            #println(" ")
-        end
     end
 
     Zygote.ignore() do

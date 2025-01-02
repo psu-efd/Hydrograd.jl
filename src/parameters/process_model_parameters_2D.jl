@@ -1,4 +1,4 @@
-#Setup the parameter arrays: zb_cells_param, ManningN_list_param, inlet_discharges_param
+#Setup the parameter arrays: zb_cells_param, ManningN_list_param, and inlet_discharges_param
 function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_values_truth, inlet_discharges_truth)
 
     #initialize the parameter arrays

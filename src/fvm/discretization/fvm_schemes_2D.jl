@@ -82,20 +82,6 @@ end
 # interpolate a scalar field from cell centers to face centers
 # The boundary condition is not considered here.
 function cells_to_faces_scalar(my_mesh_2D, scalar_variable_c)
-    # # Create new array instead of modifying in-place
-    # scalar_variable_f = zeros(eltype(scalar_variable_c), my_mesh_2D.numOfFaces)
-    
-    # #loop through faces  
-    # for iFace in 1:my_mesh_2D.numOfFaces
-    #     #get current face's cells
-    #     facecells = my_mesh_2D.faceCells_Dict[iFace]
-        
-    #     if length(facecells) == 2   #internal face
-    #         scalar_variable_f[iFace] = (scalar_variable_c[facecells[1]] + scalar_variable_c[facecells[2]]) / 2.0    
-    #     else  #boundary face
-    #         scalar_variable_f[iFace] = scalar_variable_c[facecells[1]]  
-    #     end
-    # end
 
     scalar_variable_f = [
         if length(my_mesh_2D.faceCells_Dict[iFace]) == 2

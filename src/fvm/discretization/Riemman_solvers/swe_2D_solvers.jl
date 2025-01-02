@@ -2,7 +2,6 @@
 
 # HLL Riemman solver
 #Ref: https://github.com/wme7/ShallowWaterEquations
-# bcType: -1 (for internal faces, not even a boundary face)
 function Riemann_2D_hll!(flux, g, h_face, q_face, bcType, bcValue, h_small)
 
     error("Riemann_2D_hll! is not implemented")

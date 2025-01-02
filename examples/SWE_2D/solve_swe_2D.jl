@@ -43,10 +43,10 @@ using InteractiveUtils
 #using Random
 #Random.seed!(1234)
 
-#hack
+#hack for debugging
 #get the current directory
-current_dir = pwd()
-cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D")
+#current_dir = pwd()
+#cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D")
 
 # Add some warnings/info for gradient computation
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
@@ -193,16 +193,20 @@ swe_extra_params = SWE2D_Extra_Parameters(
     S0
 )
 
-# Define the ODE function: p_extra is swe_params to pass more arguments to the ODE function
-#@noinline 
-# function swe_2d_ode(Q, p::Vector{T}, t::Float64, p_extra::SWEParameters{T}) where {T}
-#     # p is just params_vector, use swe_params directly since it's in scope
-#     dQdt = swe_2d_rhs(Q, p, t, p_extra)
-#     return dQdt::Matrix{T}
-# end
+
 
 # Create the ODEFunction with the extra parameters struct passed in.
-ode_f = ODEFunction((u, p, t) -> swe_2d_rhs(u, p, t, swe_extra_params); jac_prototype=jac_sparsity)
+ode_f = ODEFunction((u, p, t) -> begin
+
+    if settings.bVerbose
+        #@show typeof(u)
+        #@show typeof(p)
+        #@show typeof(t)
+        #@show typeof(swe_extra_params)
+    end
+
+    swe_2d_rhs(u, p, t, swe_extra_params)
+end; jac_prototype=jac_sparsity)
 
 #########################
 #Forward Simulation part#
@@ -242,8 +246,7 @@ if settings.bPerform_Sensitivity_Analysis
     println("Sensitivity analysis ...")
 
     #perform sensitivity analysis
-    Hydrograd.swe_2D_sensitivity(settings, my_mesh_2D, swe_2D_constants, ode_f, Q0, params_vector, active_range, param_ranges,
-            nodeCoordinates, zb_cells, case_path)
+    Hydrograd.swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_path)
 
 end
 
@@ -254,6 +257,6 @@ elapsed_seconds = Millisecond(elapsed_time).value / 1000
 println("Elapsed time in seconds: $elapsed_seconds")
 
 #restore the current directory
-cd(current_dir)
+#cd(current_dir)
 
 println("All done!")

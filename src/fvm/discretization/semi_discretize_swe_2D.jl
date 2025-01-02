@@ -11,7 +11,7 @@
 
 #using JuliaInterpreter
 
-function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T})::Matrix{T} where {T}
+function swe_2d_rhs(Q::Matrix{T1}, params_vector::Vector{T1}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T2})::Matrix{promote_type(T1, T2)} where {T1,T2}
 
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
@@ -20,7 +20,12 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
     srh_all_Dict = p_extra.srh_all_Dict
     boundary_conditions = p_extra.boundary_conditions
     swe_2D_constants = p_extra.swe_2D_constants
-    ManningN_cells_local = p_extra.ManningN_cells
+
+    # These are the arguments that are passed to the function. They may be only 
+    # used for forward simulations. For inversion and sensitivity analysis, 
+    # ManningN_cells, inletQ_TotalQ, exitH_WSE, or
+    # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector (computed later in the function)
+    ManningN_cells_local = p_extra.ManningN_cells          #get a reference to these vectors
     inletQ_Length_local = p_extra.inletQ_Length
     inletQ_TotalQ_local = p_extra.inletQ_TotalQ
     exitH_WSE_local = p_extra.exitH_WSE
@@ -28,27 +33,14 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
     zb_ghostCells_local = p_extra.zb_ghostCells
     zb_faces_local = p_extra.zb_faces
     S0_local = p_extra.S0
-   
 
-    # These are the arguments that are passed to the function. They are only 
-    # used for forward simulations. For inversion and sensitivity analysis, 
-    # ManningN_cells, inletQ_TotalQ, exitH_WSE, 
-    # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector (computed later in the function)
-    #ManningN_cells_local = deepcopy(ManningN_cells_passed)             #create a reference to ManningN_cells_passed. This makes Zygote happy (Don't know why)
-    #inletQ_Length_local = deepcopy(inletQ_Length_passed)
-    #inletQ_TotalQ_local = deepcopy(inletQ_TotalQ_passed)
-    #exitH_WSE_local = deepcopy(exitH_WSE_passed)
-    #zb_cells_local = deepcopy(zb_cells_passed)                #not used for anything
-    #zb_ghostCells_local = deepcopy(zb_ghostCells_passed)
-    #zb_faces_local = deepcopy(zb_faces_passed)
-    #S0_local = deepcopy(S0_passed)
-
+    #other variables from swe_2D_constants
     g = swe_2D_constants.g
     h_small = swe_2D_constants.h_small
     RiemannSolver = swe_2D_constants.RiemannSolver
 
-    #get the data type of Q
-    data_type = eltype(Q)
+    # Use promote_type to ensure consistent types for computations
+    data_type = promote_type(T1, T2)
 
     Zygote.ignore() do
         if settings.bVerbose
@@ -61,16 +53,20 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 
     Zygote.ignore() do
         if settings.bVerbose
-            #@show typeof(params_vector)
-            @show params_vector
+            if eltype(params_vector) <: ForwardDiff.Dual
+                println("params_vector contains dual numbers")
+                @show ForwardDiff.value.(params_vector)  # Get values from all dual numbers
+            else
+                println("params_vector contains regular numbers")
+                @show params_vector
+            end
         end
-
     end
 
     h = @view Q[:, 1]  # water depth      #view of 2D array does not create a new array; only a reference
     q_x = @view Q[:, 2]  # discharge in x
     q_y = @view Q[:, 3]  # discharge in y
-    
+
     # For the case of inversion or sensitivity analysis, and if zb is the active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
     if ((settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "zb")
@@ -86,11 +82,11 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(zb_ghostCells_local)
-            @show typeof(zb_faces_local)
-            @show typeof(S0_local)
-            @show size(S0_local)
-            @show S0_local
+            #@show typeof(zb_ghostCells_local)
+            #@show typeof(zb_faces_local)
+            #@show typeof(S0_local)
+            #@show size(S0_local)
+            #@show S0_local
         end
     end
 
@@ -105,19 +101,18 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
         end
 
         ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
-        #ManningN_cells_local = params_vector
     end
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(ManningN_cells_local)
-            @show size(ManningN_cells_local)
-            @show ManningN_cells_local
+            #@show typeof(ManningN_cells_local)
+            #@show size(ManningN_cells_local)
+            #@show ManningN_cells_local
         end
     end
 
     #For the case of inversion or sensitivity analysis, and if Q is the active parameter, 
-    # we need to update inletQ_TotalQ based on the provided data
+    # we need to update inletQ_TotalQ based on the provided params_vector
     if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "Q"
 
         Zygote.ignore() do
@@ -131,8 +126,8 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(inletQ_TotalQ_local)
-            @show inletQ_TotalQ_local
+            #@show typeof(inletQ_TotalQ_local)
+            #@show inletQ_TotalQ_local
         end
     end
 
@@ -143,24 +138,26 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(h_ghost_local)
-            @show typeof(q_x_ghost_local)
-            @show typeof(q_y_ghost_local)
-            @show h_ghost_local
-            @show q_x_ghost_local
-            @show q_y_ghost_local
+            #@show typeof(h_ghost_local)
+            #@show typeof(q_x_ghost_local)
+            #@show typeof(q_y_ghost_local)
+            #@show h_ghost_local
+            #@show q_x_ghost_local
+            #@show q_y_ghost_local
         end
     end
 
-    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, my_mesh_2D, 
-                                               g, RiemannSolver, h_small, data_type)
+    #compute the contribution of inviscid fluxes
+    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, my_mesh_2D,
+        g, RiemannSolver, h_small, data_type)
 
+    #compute the contribution of source terms
     updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, g, h_small, data_type)
 
 
     #combine inviscid and source terms
     dQdt = updates_inviscid .+ updates_source
- 
+
     # Ensure output dQdt has same dimensions as Q
     @assert size(dQdt) == size(Q) "Dimension mismatch: dQdt $(size(dQdt)) ≠ Q $(size(Q))"
 
@@ -268,10 +265,10 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
     ]
 
     Zygote.ignore() do
-        if settings.bVerbose    
-            @show typeof(updates_inviscid)
-            @show size(updates_inviscid)
-            @show updates_inviscid
+        if settings.bVerbose
+            #@show typeof(updates_inviscid)
+            #@show size(updates_inviscid)
+            #@show updates_inviscid
         end
     end
 
@@ -335,13 +332,13 @@ function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_ce
 
         end
         for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
-    ]    
+    ]
 
     Zygote.ignore() do
         if settings.bVerbose
-            @show typeof(updates_source)
-            @show size(updates_source)
-            @show updates_source
+            #@show typeof(updates_source)
+            #@show size(updates_source)
+            #@show updates_source
         end
     end
 

@@ -64,7 +64,7 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
                          scalar_data, scalar_names, vector_data, vector_names)    
     
-        println("inversion_results_iter_$i.vtk is saved to ", file_path)
+        println("       Inversion results for iteration $i is saved to ", file_path)
     end
 
     

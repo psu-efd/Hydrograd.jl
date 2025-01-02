@@ -1,16 +1,11 @@
 #Functions to process the forward simulation results: 
-#The process_forward_simulation_results function is used to plot the forward simulation results in Python.
+#The process_forward_simulation_results function is used to process the forward simulation results.
 
 function  postprocess_forward_simulation_results_swe_2D(settings, my_mesh_2D, zb_cell_truth, 
     ManningN_cell_truth, inlet_discharges_truth, zb_cells, nodeCoordinates, case_path)
 
     forward_simulation_results_file_name = joinpath(case_path, settings.forward_settings.save_file_name)
     forward_simulation_results = load(forward_simulation_results_file_name)["sol_data"]["u"]  #get the solution data (state variable)
-
-    #@show typeof(forward_simulation_results)
-    #@show size(forward_simulation_results)
-    #@show size(forward_simulation_results[end][:,:])
-    #@show forward_simulation_results[end][:,:]
 
     #save the simulation results (h, u, v) at the last time step to a json file (to be used as ground truth for inversion)
     h_truth = vec(forward_simulation_results)[end][:, 1]

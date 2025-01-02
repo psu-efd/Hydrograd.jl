@@ -55,6 +55,7 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         #TODO: implement the customized ODE solver
 
         println("   Performing 2D SWE simulation with MyOwn solver ...")
+        println("   This is not implemented yet.")
 
         #sol = custom_ODE_solve(params_vector, Q0, my_mesh_2D, swe_2D_constants.tspan, swe_2D_constants.dt)
 

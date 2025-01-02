@@ -3,6 +3,78 @@
 
 #using Debugger, JuliaInterpreter
 
+#main function for the inversion
+function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
+
+    #unpack the extra parameters
+    active_param_name = swe_extra_params.active_param_name
+    settings = swe_extra_params.settings
+    my_mesh_2D = swe_extra_params.my_mesh_2D
+    swe_2D_constants = swe_extra_params.swe_2D_constants
+
+    nodeCoordinates = swe_extra_params.nodeCoordinates
+
+    if settings.bVerbose
+        println("       inversion parameter name = ", active_param_name)
+    end
+
+    #open the forward simulation result (as the ground truth)
+    sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String,Vector{Float64}})
+
+    if settings.bVerbose
+        #@show typeof(sol_truth)
+        #@show length(sol_truth)
+        #@show sol_truth
+    end
+
+    WSE_truth = vec(sol_truth["wse_truth"])
+    h_truth = vec(sol_truth["h_truth"])
+    u_truth = vec(sol_truth["u_truth"])
+    v_truth = vec(sol_truth["v_truth"])
+    zb_cell_truth = vec(sol_truth["zb_cell_truth"])
+    ManningN_cell_truth = vec(sol_truth["ManningN_cell_truth"])
+    inlet_discharges_truth = vec(sol_truth["inlet_discharges_truth"])
+
+    println("   Loading inversion data ...")
+
+    #combine the truth data into a dictionary
+    observed_data = Dict{String,Vector{Float64}}("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth,
+        "zb_cell_truth" => zb_cell_truth, "ManningN_cell_truth" => ManningN_cell_truth, "inlet_discharges_truth" => inlet_discharges_truth)
+
+    #debug AD correctness
+    #debug start
+    #debug_AD(ode_f, Q0, swe_2D_constants, params_vector, swe_extra_params)
+    #return
+    #debug end
+
+    Zygote.ignore() do
+        if settings.bVerbose
+            @show typeof(Q0)
+            @show typeof(swe_2D_constants.tspan)
+            @show typeof(observed_data)
+            @show typeof(params_vector)
+
+            @show size(params_vector)
+            @show params_vector
+        end
+    end
+
+    #perform the inversion
+    println("   Performing inversion ...\n")
+    sol, LOSS, PRED, PARS = optimize_parameters(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name)
+
+    #save the inversion results
+    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)
+
+    #process the inversion results
+    println("   Post-processing inversion results ...")
+
+    #process inversion results
+    Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+
+end
+
+
 # Define the loss function
 function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
     # Solve the ODE (forward pass)
@@ -247,22 +319,9 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
                 loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
         end
 
-        #@show typeof(prediction)
-        #@show size(prediction)
-        #@show prediction[:, 1, end]  
-
         append!(PRED, [prediction[:, 1, end]])
 
-        #@show loss_total
-        #@show loss_pred
-        #@show loss_pred_WSE
-        #@show loss_pred_uv
-        #@show loss_slope
-
         append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope]])
-
-        #@show typeof(θ)
-        #@show θ
 
         if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
             #println("theta.u = ", θ.u)
@@ -300,73 +359,3 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
     return sol, LOSS, PRED, PARS
 end
 
-#main function for the inversion
-function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
-
-    #unpack the extra parameters
-    active_param_name = swe_extra_params.active_param_name
-    settings = swe_extra_params.settings
-    my_mesh_2D = swe_extra_params.my_mesh_2D
-    swe_2D_constants = swe_extra_params.swe_2D_constants
-
-    nodeCoordinates = swe_extra_params.nodeCoordinates
-
-    if settings.bVerbose
-        println("       inversion parameter name = ", active_param_name)
-    end
-
-    #open the forward simulation result (as the ground truth)
-    sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String,Vector{Float64}})
-
-    if settings.bVerbose
-        #@show typeof(sol_truth)
-        #@show length(sol_truth)
-        #@show sol_truth
-    end
-
-    WSE_truth = vec(sol_truth["wse_truth"])
-    h_truth = vec(sol_truth["h_truth"])
-    u_truth = vec(sol_truth["u_truth"])
-    v_truth = vec(sol_truth["v_truth"])
-    zb_cell_truth = vec(sol_truth["zb_cell_truth"])
-    ManningN_cell_truth = vec(sol_truth["ManningN_cell_truth"])
-    inlet_discharges_truth = vec(sol_truth["inlet_discharges_truth"])
-
-    println("   Loading inversion data ...")
-
-    #combine the truth data into a dictionary
-    observed_data = Dict{String,Vector{Float64}}("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth,
-        "zb_cell_truth" => zb_cell_truth, "ManningN_cell_truth" => ManningN_cell_truth, "inlet_discharges_truth" => inlet_discharges_truth)
-
-    #debug AD correctness
-    #debug start
-    #debug_AD(ode_f, Q0, swe_2D_constants, params_vector, swe_extra_params)
-    #return
-    #debug end
-
-    Zygote.ignore() do
-        if settings.bVerbose
-            @show typeof(Q0)
-            @show typeof(swe_2D_constants.tspan)
-            @show typeof(observed_data)
-            @show typeof(params_vector)
-
-            @show size(params_vector)
-            @show params_vector
-        end
-    end
-
-    #perform the inversion
-    println("   Performing inversion ...\n")
-    #sol, LOSS, PRED, PARS = optimize_parameters(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name)
-
-    #save the inversion results
-    #jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)
-
-    #process the inversion results
-    println("   Post-processing inversion results ...")
-
-    #process inversion results
-    Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
-
-end

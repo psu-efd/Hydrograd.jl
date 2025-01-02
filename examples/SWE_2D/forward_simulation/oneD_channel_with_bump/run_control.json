@@ -4,8 +4,8 @@
     "control_variables": {
         "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": false,
-        "bPerform_Inversion": true,
+        "bPerform_Forward_Simulation": true,
+        "bPerform_Inversion": false,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
@@ -30,7 +30,7 @@
         "forward_simulation_save_solution_truth_file_name": "forward_simulation_solution_truth.json"
     },
     "inversion_options": {
-        "comment": "Options for the inversion. zb_initial_values_options is the option for the zb initial values: constant, from_file.",
+        "comment": "Options for the inversion.parameter_initial_values_options is the option for the parameter initial values: constant or from_file.",
         "active_param_names": ["ManningN"],
         "inversion_parameter_initial_values_options": "constant",
         "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
@@ -61,8 +61,8 @@
         "inversion_save_loss_history_file_name": "inversion_loss_history.csv"
     },
     "sensitivity_analysis_options": {
-        "comment": "Options for the sensitivity analysis. zb_initial_values_options is the option for the zb initial values: zero, from_file.",
-        "active_param_names": ["Q"],
+        "comment": "Options for the sensitivity analysis. parameter_values_options is the option for the parameter values: constant or from_file.",
+        "active_param_names": ["ManningN"],
         "sensitivity_parameter_values_options": "constant",
         "sensitivity_parameter_values_file_name": "sensitivity_parameter_values.json",
         "sensitivity_zb_values": [0.0],

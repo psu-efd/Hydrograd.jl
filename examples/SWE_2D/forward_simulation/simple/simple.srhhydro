@@ -4,7 +4,7 @@ Description "Simple open channel flow for debugging"
 RunType FLOW
 ModelTemp OFF
 UnsteadyOutput UNSTEADY
-SimTime 0.0 1.0 0.1
+SimTime 0.0 0.02 0.1
 TurbulenceModel PARABOLIC
 ParabolicTurbulence 0.7
 InitCondOption DRY
