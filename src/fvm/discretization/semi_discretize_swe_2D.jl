@@ -69,6 +69,9 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 
     end
 
+    #hack for debugging
+    ManningN_cells_local = params_vector
+
     #return zeros(size(Q)) #zeros(data_type, size(Q))
     #return Q .* 1.0
 
@@ -183,507 +186,113 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
         end
     end
 
-    # Loop through all cells to calculate the fluxes on faces
-    # updates = [
-    #     let
-    #         cell_area = my_mesh_2D.cell_areas[iCell]
-
-    #         # Initialize flux accumulation
-    #         flux_sum = zeros(data_type, 3)
-
-    #         for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
-    #             faceID = abs(my_mesh_2D.cellFacesList[iCell, :][iFace])
-    #             left_cellID = iCell
-    #             right_cellID = abs(my_mesh_2D.cellNeighbors_Dict[iCell][iFace])
-
-    #             faceBoundaryID = my_mesh_2D.faceBoundaryID_Dict[faceID]
-    #             face_normal = my_mesh_2D.cell_normals[iCell][iFace]
-
-    #             if faceBoundaryID == 0  # internal face
-    #                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-    #                 hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
-    #             else  # boundary face
-    #                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-    #                 hR = h_ghost_local[right_cellID]
-    #                 huR = q_x_ghost_local[right_cellID]
-    #                 hvR = q_y_ghost_local[right_cellID]
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == -1  # Print for first cell only
-    #                     println("Before Riemann solver:")
-    #                     @show typeof(hL), typeof(huL), typeof(hvL)
-    #                     @show hL, huL, hvL
-    #                     @show typeof(hR), typeof(huR), typeof(hvR)
-    #                     @show hR, huR, hvR
-    #                     @show typeof(face_normal)
-    #                     @show face_normal
-    #                 end
-    #             end
-
-    #             if RiemannSolver == "Roe"
-    #                 flux = Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
-    #             elseif RiemannSolver == "HLL"
-    #                 error("HLL solver not implemented yet")
-    #             elseif RiemannSolver == "HLLC"
-    #                 error("HLLC solver not implemented yet")
-    #             else
-    #                 error("Wrong choice of RiemannSolver")
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == -1  # Print for first cell only
-    #                     println("After Riemann solver:")
-    #                     @show typeof(flux)
-    #                     @show flux
-    #                 end
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == -1  # Print for first cell only
-    #                     println("before accumulating flux_sum")
-    #                     @show typeof(my_mesh_2D.face_lengths)
-    #                     @show my_mesh_2D.face_lengths
-    #                     @show typeof(my_mesh_2D.face_lengths[faceID])
-    #                     @show my_mesh_2D.face_lengths[faceID]
-    #                     @show typeof(flux_sum)
-    #                     @show flux_sum
-    #                 end
-    #             end
-
-    #             # Accumulate flux contribution
-    #             flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
-
-    #             Zygote.ignore() do
-    #                 if settings.bVerbose
-    #                     if iCell == -1  # Print for first cell only
-    #                         println("after accumulating flux_sum")
-    #                         @show typeof(flux_sum)
-    #                         @show flux_sum
-    #                     end
-    #                 end
-    #             end
-    #         end
-
-    #         Zygote.ignore() do
-    #             if settings.bVerbose
-    #                 if iCell == -1
-    #                     @show typeof(flux_sum)
-    #                     @show flux_sum
-    #                 end
-    #             end
-    #         end
-
-    #         # Source terms
-    #         source_terms = if h[iCell] <= h_small
-    #             [zero(data_type),
-    #                 g * h[iCell] * S0_local[iCell, 1] * cell_area,
-    #                 g * h[iCell] * S0_local[iCell, 2] * cell_area]
-    #         else
-    #             u_temp = q_x[iCell] / h[iCell]
-    #             v_temp = q_y[iCell] / h[iCell]
-    #             u_mag = sqrt(u_temp^2 + v_temp^2 + eps(data_type))
-
-    #             #manning_term = g * convert(data_type, ManningN_cells_local[iCell]^2.0) / h[iCell]^(1.0/3.0)
-    #             #friction_x = manning_term * u_mag * u_temp
-    #             #friction_y = manning_term * u_mag * v_temp
-
-    #             #friction_x = g * ManningN_cells_local[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
-    #             #friction_y = g * ManningN_cells_local[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
-
-    #             #hack for debugging
-    #             #friction_x = 0.0
-    #             #friction_y = 0.0
-    #             friction_x = ManningN_cells_local[iCell]
-    #             friction_y = 0.0
-
-    #             Zygote.ignore() do
-    #                 if iCell == 1  # Print for first cell only
-    #                     @show typeof(ManningN_cells_local)
-    #                     @show typeof(ManningN_cells_local[iCell])
-    #                     @show ManningN_cells_local[iCell]
-    #                     #@show typeof(manning_term)
-    #                     #@show manning_term
-    #                     @show typeof(friction_x)
-    #                     @show friction_x
-    #                     @show typeof(friction_y)
-    #                     @show friction_y
-    #                 end
-    #             end
-
-    #             [zero(data_type),
-    #                 (g * h[iCell] * S0_local[iCell, 1] - friction_x) * cell_area,
-    #                 (g * h[iCell] * S0_local[iCell, 2] - friction_y) * cell_area]
-    #         end
-
-
-    #         Zygote.ignore() do
-    #             if iCell == -1  # Print for first cell only
-    #                 if settings.bVerbose
-    #                     @show flux_sum
-    #                     @show source_terms
-    #                     @show cell_area
-    #                     @show (-flux_sum .+ source_terms) ./ cell_area
-    #                 end
-    #             end
-    #         end
-
-    #         # Return the update for this cell (without in-place mutation)
-    #         #Array((-flux_sum .+ source_terms) ./ cell_area)
-    #         (-flux_sum + source_terms) ./ cell_area
-
-    #     end
-    #     for iCell in 1:my_mesh_2D.numOfCells
-    # ]
-
-        # #debug_AD
-        # try
-        #     Zygote.ignore() do
-        #         println("debug_AD within rhs ...")
-        #         println("  ")
-        #     end
-    
-        #     function my_function(u, p)
-        #         flux_temp = compute_inviscid_fluxes(settings, u, q_x, q_y, h_ghost_local, p, q_y_ghost_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
-    
-        #         tot = sum(flux_temp)
-    
-        #         Zygote.ignore() do
-        #             @show typeof(tot)
-        #             @show size(tot)
-        #             @show tot
-        #         end
-    
-        #         return tot
-        #     end
-    
-    
-        #     λ = one(data_type) #zero(prob.u0)
-    
-        #     #Zygote.pullback takes two arguments:
-        #     #  First argument: a function that we want to differentiate
-        #     #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
-        #     #_dy is the result of the forward pass; back is the gradient function
-        #     #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
-        #     #_dy, back = Zygote.pullback((u, p) -> Array(swe_2d_rhs(u, p, t, swe_extra_params)), y, p)
-        #     _dy, back = Zygote.pullback((u, p) -> my_function(u, p), h, q_x_ghost_local)
-                  
-        #     #_dy, back = Zygote.pullback(y, p) do u, p  
-        #     #    #vec(f(u, p, t))
-        #     #    f(u, p, t)
-        #     #end
-        #     println("\nPullback creation successful\n")
-        #     @show typeof(_dy)
-        #     @show size(_dy)
-        #     @show _dy
-    
-        #     try
-        #          # Convert λ to match _dy type
-        #         #λ = convert(typeof(_dy), λ)
-    
-        #         tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
-        #         println("\nBackward pass is successful\n")
-        #         @show typeof(tmp1)
-        #         @show size(tmp1)
-        #         @show typeof(tmp2)
-        #         @show size(tmp2)
-        #         @show tmp1
-        #         @show tmp2
-        #     catch e
-        #         println("\nBackward pass failed\n")
-        #         @show e
-        #         @show typeof(λ)
-        #         @show size(λ)
-        #         @show λ
-    
-        #         #stop here
-        #         #return
-        #         @assert false "stop after backward pass debug"
-        #     end
-        # catch e
-        #     println("\nPullback creation failed\n")
-        #     @show e
-    
-        #     throw(error("Pullback creation failed"))
-    
-        #     #stop here
-        #     @assert false "stop after pullback creation debug"
-        # end
-    
-        # throw(error("stop after rhs debug"))
-    
-    
-        # #debug_AD end
-    
-
-    #updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
-
-    # updates_inviscid = [
-    #     let
-    #         cell_area = my_mesh_2D.cell_areas[iCell]
-
-    #         # Initialize flux accumulation
-    #         flux_sum = zeros(data_type, 3)
-
-    #         for iFace in 1:my_mesh_2D.cellNodesCount[iCell]
-    #             faceID = my_mesh_2D.cellFacesList[iCell, :][iFace]
-    #             left_cellID = iCell
-    #             right_cellID = my_mesh_2D.cellNeighbors_Dict[iCell][iFace]
-
-    #             faceBoundaryID = my_mesh_2D.faceBoundaryID_Dict[faceID]
-    #             face_normal = my_mesh_2D.cell_normals[iCell][iFace]
-
-    #             if faceBoundaryID == 0  # internal face
-    #                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-    #                 hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
-    #             else  # boundary face
-    #                 hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-    #                 hR = h_ghost_local[right_cellID]
-    #                 huR = q_x_ghost_local[right_cellID]
-    #                 hvR = q_y_ghost_local[right_cellID]
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == 1  # Print for first cell only
-    #                     println("Before Riemann solver:")
-    #                     @show typeof(hL), typeof(huL), typeof(hvL)
-    #                     @show hL, huL, hvL
-    #                     @show typeof(hR), typeof(huR), typeof(hvR)
-    #                     @show hR, huR, hvR
-    #                     @show typeof(face_normal)
-    #                     @show face_normal
-    #                 end
-    #             end
-
-    #             if RiemannSolver == "Roe"
-    #                 flux = Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
-    #             elseif RiemannSolver == "HLL"
-    #                 error("HLL solver not implemented yet")
-    #             elseif RiemannSolver == "HLLC"
-    #                 error("HLLC solver not implemented yet")
-    #             else
-    #                 error("Wrong choice of RiemannSolver")
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == 1  # Print for first cell only
-    #                     println("After Riemann solver:")
-    #                     @show typeof(flux)
-    #                     @show flux
-    #                 end
-    #             end
-
-    #             Zygote.ignore() do
-    #                 if iCell == -1  # Print for first cell only
-    #                     println("before accumulating flux_sum")
-    #                     @show typeof(my_mesh_2D.face_lengths)
-    #                     @show my_mesh_2D.face_lengths
-    #                     @show typeof(my_mesh_2D.face_lengths[faceID])
-    #                     @show my_mesh_2D.face_lengths[faceID]
-    #                     @show typeof(flux_sum)
-    #                     @show flux_sum
-    #                 end
-    #             end
-
-    #             # Accumulate flux contribution
-    #             flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
-
-    #             Zygote.ignore() do
-    #                 if settings.bVerbose
-    #                     if iCell == -1  # Print for first cell only
-    #                         println("after accumulating flux_sum")
-    #                         @show typeof(flux_sum)
-    #                         @show flux_sum
-    #                     end
-    #                 end
-    #             end
-    #         end
-
-    #         Zygote.ignore() do
-    #             if settings.bVerbose
-    #                 if iCell == -1
-    #                     @show typeof(flux_sum)
-    #                     @show flux_sum
-    #                 end
-    #             end
-    #         end
-
-    #         # Return the update for this cell (without in-place mutation)
-    #         #Array((-flux_sum .+ source_terms) ./ cell_area)
-    #         -flux_sum[j] / cell_area
-
-    #     end
-    #     for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
-    # ]
-
+   
 
     #debug_AD
-    try
-        Zygote.ignore() do
-            println("debug_AD within rhs ...")
-            println("  ")
-        end
+    # try
+    #     Zygote.ignore() do
+    #         println("debug_AD within rhs ...")
+    #         println("  ")
+    #     end
 
-        function my_function(u, p)
-            flux_temp = compute_source_terms(settings, my_mesh_2D, h, u, q_y, S0_local, p, g, h_small, data_type)
+    #     function my_function(u, p)
 
-            tot = sum(flux_temp)
+    #         Zygote.ignore() do
+    #             println("Input u (q_x): ", u)
+    #             println("Input p (Manning): ", p)
+    #         end
 
-            Zygote.ignore() do
-                @show typeof(tot)
-                @show size(tot)
-                @show tot
-            end
+    #         #flux_temp = compute_source_terms(settings, my_mesh_2D, h, u, q_y, S0_local, p, g, h_small, data_type)
+    #         #flux_temp = combined_functions(settings, h, u, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, my_mesh_2D, S0_local, p, g, RiemannSolver, h_small, data_type)
+    #                    #combined_functions(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, my_mesh_2D, S0, ManningN_cells, g, RiemannSolver, h_small, data_type)
 
-            return flux_temp
-        end
+    #         flux_temp = compute_inviscid_fluxes(settings, h, u, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, p, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+    #                 #compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+
+    #         tot = sum(flux_temp)
+
+    #         Zygote.ignore() do
+    #             @show typeof(flux_temp)
+    #             @show size(flux_temp)
+    #             @show flux_temp
+
+    #             @show typeof(tot)
+    #             @show size(tot)
+    #             @show tot
+    #         end
+
+    #         return tot
+    #     end
 
 
-        #λ = one(data_type) #zero(prob.u0)
-        λ = ones(size(Q))
+    #     λ = one(data_type) #zero(prob.u0)
+    #     #λ = ones(size(Q))
 
-        #Zygote.pullback takes two arguments:
-        #  First argument: a function that we want to differentiate
-        #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
-        #_dy is the result of the forward pass; back is the gradient function
-        #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
-        #_dy, back = Zygote.pullback((u, p) -> Array(swe_2d_rhs(u, p, t, swe_extra_params)), y, p)
-        _dy, back = Zygote.pullback((u, p) -> my_function(u, p), q_x, ManningN_cells_local)
+    #     #Zygote.pullback takes two arguments:
+    #     #  First argument: a function that we want to differentiate
+    #     #  Remaining arguments: the values at which to evaluate the function (y and p in this case)
+    #     #_dy is the result of the forward pass; back is the gradient function
+    #     #_dy, back = Zygote.pullback((u, p) -> f(u, p, t), y, p)
+    #     #_dy, back = Zygote.pullback((u, p) -> Array(swe_2d_rhs(u, p, t, swe_extra_params)), y, p)
+    #     _dy, back = Zygote.pullback((u, p) -> my_function(u, p), q_x, ManningN_cells_local)
               
-        #_dy, back = Zygote.pullback(y, p) do u, p  
-        #    #vec(f(u, p, t))
-        #    f(u, p, t)
-        #end
-        println("\nPullback creation successful\n")
-        @show typeof(_dy)
-        @show size(_dy)
-        @show _dy
+    #     #_dy, back = Zygote.pullback(y, p) do u, p  
+    #     #    #vec(f(u, p, t))
+    #     #    f(u, p, t)
+    #     #end
+    #     println("\nPullback creation successful\n")
+    #     @show typeof(_dy)
+    #     @show size(_dy)
+    #     @show _dy
 
-        try
-             # Convert λ to match _dy type
-            #λ = convert(typeof(_dy), λ)
+    #     try
+    #          # Convert λ to match _dy type
+    #         #λ = convert(typeof(_dy), λ)
 
-            tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
-            println("\nBackward pass is successful\n")
-            @show typeof(tmp1)
-            @show size(tmp1)
-            @show typeof(tmp2)
-            @show size(tmp2)
-            @show tmp1
-            @show tmp2
-        catch e
-            println("\nBackward pass failed\n")
-            @show e
-            @show typeof(λ)
-            @show size(λ)
-            @show λ
+    #         tmp1, tmp2 = back(λ)                  #tmp1 is the gradient of the state variables; tmp2 is the gradient of the parameters
+    #         println("\nBackward pass is successful\n")
+    #         @show typeof(tmp1)
+    #         @show size(tmp1)
+    #         @show tmp1
 
-            #stop here
-            #return
-            @assert false "stop after backward pass debug"
-        end
-    catch e
-        println("\nPullback creation failed\n")
-        @show e
+    #         @show typeof(tmp2)
+    #         if tmp2 !== nothing
+    #             @show size(tmp2)
+    #             @show tmp2
+    #         end
+    #     catch e
+    #         println("\nBackward pass failed\n")
+    #         @show e
+    #         @show typeof(λ)
+    #         @show size(λ)
+    #         @show λ
 
-        throw(error("Pullback creation failed"))
+    #         #stop here
+    #         #return
+    #         @assert false "stop after backward pass debug"
+    #     end
+    # catch e
+    #     println("\nPullback creation failed\n")
+    #     @show e
 
-        #stop here
-        @assert false "stop after pullback creation debug"
-    end
+    #     throw(error("Pullback creation failed"))
 
-    throw(error("stop after rhs debug"))
+    #     #stop here
+    #     @assert false "stop after pullback creation debug"
+    # end
+
+    # throw(error("stop after rhs debug"))
 
 
     #debug_AD end
 
-    #updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_cells, g, h_small, data_type)
+    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
-    # updates_source = [
-    #     let
-    #         cell_area = my_mesh_2D.cell_areas[iCell]
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, g, h_small, data_type)
 
-    #         # Source terms
-    #         source_terms = if h[iCell] <= h_small
-    #             [zero(data_type),
-    #                 g * h[iCell] * S0_local[iCell, 1] * cell_area,
-    #                 g * h[iCell] * S0_local[iCell, 2] * cell_area]
-    #         else
-    #             u_temp = q_x[iCell] / h[iCell]
-    #             v_temp = q_y[iCell] / h[iCell]
-    #             u_mag = sqrt(u_temp^2 + v_temp^2 + eps(data_type))
-
-    #             #manning_term = g * convert(data_type, ManningN_cells_local[iCell]^2.0) / h[iCell]^(1.0/3.0)
-    #             #friction_x = manning_term * u_mag * u_temp
-    #             #friction_y = manning_term * u_mag * v_temp
-
-    #             friction_x = g * ManningN_cells_local[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
-    #             friction_y = g * ManningN_cells_local[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
-
-    #             #hack for debugging
-    #             #friction_x = 0.0
-    #             #friction_y = 0.0
-    #             #friction_x = ManningN_cells_local[iCell]
-    #             #friction_y = 0.0
-
-    #             Zygote.ignore() do
-    #                 if iCell == 1  # Print for first cell only
-    #                     @show typeof(ManningN_cells_local)
-    #                     @show typeof(ManningN_cells_local[iCell])
-    #                     @show ManningN_cells_local[iCell]
-    #                     #@show typeof(manning_term)
-    #                     #@show manning_term
-    #                     @show typeof(friction_x)
-    #                     @show friction_x
-    #                     @show typeof(friction_y)
-    #                     @show friction_y
-    #                 end
-    #             end
-
-    #             [zero(data_type),
-    #                 (g * h[iCell] * S0_local[iCell, 1] - friction_x) * cell_area,
-    #                 (g * h[iCell] * S0_local[iCell, 2] - friction_y) * cell_area]
-    #         end
-
-
-    #         Zygote.ignore() do
-    #             if iCell == -1  # Print for first cell only
-    #                 if settings.bVerbose
-    #                     @show flux_sum
-    #                     @show source_terms
-    #                     @show cell_area
-    #                     @show (-flux_sum .+ source_terms) ./ cell_area
-    #                 end
-    #             end
-    #         end
-
-    #         # Return the update for this cell (without in-place mutation)
-    #         #Array((-flux_sum .+ source_terms) ./ cell_area)
-    #         source_terms[j] / cell_area
-
-    #     end
-    #     for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
-    # ]    
 
     #combine inviscid and source terms
     dQdt = updates_inviscid .+ updates_source
-
-    Zygote.ignore() do
-        if settings.bVerbose
-
-            @show typeof(updates_inviscid)
-            @show size(updates_inviscid)
-            @show updates_inviscid
-
-            @show typeof(updates_source)
-            @show size(updates_source)
-            @show updates_source
-
-            @show typeof(dQdt)
-            @show size(dQdt)
-            @show dQdt
-        end
-    end
  
     # Ensure output dQdt has same dimensions as Q
     @assert size(dQdt) == size(Q) "Dimension mismatch: dQdt $(size(dQdt)) ≠ Q $(size(Q))"
@@ -692,7 +301,7 @@ function swe_2d_rhs(Q::Matrix{T}, params_vector::Vector{T}, t::Float64, p_extra:
 end
 
 #function to compute the inviscid fluxes
-function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     updates_inviscid = [
         let
@@ -720,7 +329,7 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 end
 
                 Zygote.ignore() do
-                    if iCell == 1  # Print for first cell only
+                    if iCell == -1  # Print for first cell only
                         println("Before Riemann solver:")
                         @show typeof(hL), typeof(huL), typeof(hvL)
                         @show hL, huL, hvL
@@ -742,7 +351,7 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 end
 
                 Zygote.ignore() do
-                    if iCell == 1  # Print for first cell only
+                    if iCell == -1  # Print for first cell only
                         println("After Riemann solver:")
                         @show typeof(flux)
                         @show flux
@@ -792,6 +401,14 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
         for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
     ]
 
+    Zygote.ignore() do
+        if settings.bVerbose    
+            @show typeof(updates_inviscid)
+            @show size(updates_inviscid)
+            @show updates_inviscid
+        end
+    end
+
     return updates_inviscid
 
 end
@@ -827,7 +444,7 @@ function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_ce
                 #friction_y = 0.0
 
                 Zygote.ignore() do
-                    if iCell == 1  # Print for first cell only
+                    if iCell == -1  # Print for first cell only
                         @show typeof(ManningN_cells)
                         @show typeof(ManningN_cells[iCell])
                         @show ManningN_cells[iCell]
@@ -849,7 +466,6 @@ function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_ce
             Zygote.ignore() do
                 if iCell == -1  # Print for first cell only
                     if settings.bVerbose
-                        @show flux_sum
                         @show source_terms
                         @show cell_area
                         @show (-flux_sum .+ source_terms) ./ cell_area
@@ -865,5 +481,25 @@ function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_ce
         for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
     ]    
 
+    Zygote.ignore() do
+        if settings.bVerbose
+            @show typeof(updates_source)
+            @show size(updates_source)
+            @show updates_source
+        end
+    end
+
     return updates_source
 end
+
+#combine functions for AD debugging
+function combined_functions(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, my_mesh_2D, S0, ManningN_cells, g, RiemannSolver, h_small, data_type)
+
+    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_cells, g, h_small, data_type)
+
+    updates = updates_inviscid .+ updates_source
+
+    return updates
+
+end 

@@ -28,6 +28,13 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
     #define the ODE problem
     prob = ODEProblem(ode_f, Q0, swe_2D_constants.tspan, params_vector)
 
+    #debug AD correctness
+    #debug start
+    params_vector_debug = [0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]
+    debug_AD(ode_f, Q0, swe_2D_constants, params_vector_debug, swe2d_extra_params)
+    #return
+    #debug end
+
     if settings.forward_settings.solver == "SciML"
 
         println("       with SciML solver ...")

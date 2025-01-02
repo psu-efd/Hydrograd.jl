@@ -107,9 +107,9 @@ function initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinat
     symm_A = nSymm_BCs > 0 ? Vector{Vector{Float64}}(undef, nSymm_BCs) : [[0.0]]
 
     #preprocess all boundary conditions
-    preprocess_all_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices, 
-                        symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ, 
-                        inletQ_H, inletQ_A, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
+    preprocess_all_boundaries_2D(settings, srh_all_Dict, nInletQ_BCs, nExitH_BCs, nWall_BCs, nSymm_BCs, inletQ_BC_indices, exitH_BC_indices, wall_BC_indices,
+        symm_BC_indices, inletQ_faceIDs, inletQ_ghostCellIDs, inletQ_internalCellIDs, inletQ_faceOutwardNormals, inletQ_Length, inletQ_TotalQ,
+        inletQ_H, inletQ_A, inletQ_TotalA, inletQ_DryWet, exitH_faceIDs, exitH_ghostCellIDs, exitH_internalCellIDs, exitH_faceOutwardNormals, exitH_WSE, exitH_H, exitH_A, wall_faceIDs, wall_ghostCellIDs, wall_internalCellIDs, wall_faceCentroids, wall_outwardNormals, wall_H, wall_A, symm_faceIDs, symm_ghostCellIDs, symm_internalCellIDs, symm_faceCentroids, symm_outwardNormals, symm_H, symm_A, nodeCoordinates)
 
     boundary_conditions = BoundaryConditions2D(
         nInletQ_BCs=nInletQ_BCs,
@@ -582,16 +582,6 @@ end
         end
     end
 
-    #get views of the Q_cells array
-    #h = @view Q_cells[:, 1]         
-    #q_x = @view Q_cells[:, 2]
-    #q_y = @view Q_cells[:, 3]
-
-    #make copy of the Q_cells array
-    #h = copy(Q_cells[:, 1])         
-    #q_x = copy(Q_cells[:, 2])
-    #q_y = copy(Q_cells[:, 3])
-
     h_ghost_local = zeros(eltype(h), my_mesh_2D.numOfAllBounaryFaces)
     q_x_ghost_local = zeros(eltype(q_x), my_mesh_2D.numOfAllBounaryFaces)
     q_y_ghost_local = zeros(eltype(q_y), my_mesh_2D.numOfAllBounaryFaces)
@@ -612,9 +602,9 @@ end
 
         iBoundary = boundary_conditions.inletQ_BC_indices[iInletQ]
 
-        if settings.bVerbose
-            Zygote.ignore() do
-                println("Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
+        Zygote.ignore() do
+            if settings.bVerbose
+                println("   Processing INLET-Q boundary ", iInletQ, " with index in BC list ", iBoundary)
             end
         end
 
@@ -640,21 +630,19 @@ end
             end
         end
 
-
         # First pass: compute total_A and dry/wet status
-        # current_inletQ_DryWet: 1 for wet, 0 for dry
-        current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1 : 0, current_internalCellIDs)  #does this break AD?
-        #current_inletQ_DryWet = map(internalCellID -> 1, current_internalCellIDs)
-        #current_inletQ_DryWet = Int.(h[current_internalCellIDs] .> swe_2D_constants.h_small)
-        #current_inletQ_DryWet = [1 for iCell in 1:length(current_internalCellIDs)]
+        # current_inletQ_DryWet: 1.0 for wet, 0.0 for dry
+        current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1.0 : 0.0, current_internalCellIDs)  #does this break AD?
+        #current_inletQ_DryWet = map(internalCellID -> 1, current_internalCellIDs)        
+        #current_inletQ_DryWet = [1.0 for iCell in 1:length(current_internalCellIDs)]
 
         # Compute total_A only for wet faces
-        #total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]]
-        #for iFace in 1:length(current_internalCellIDs) if current_inletQ_DryWet[iFace] == 1
-       # )
+        total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]] * current_inletQ_DryWet[iFace]
+                        for iFace in eachindex(current_internalCellIDs) 
+                     )
 
         #hack for debugging
-        total_A = 100.0
+        #total_A = 100.0
 
         # After total_A calculation
         Zygote.ignore() do
@@ -672,37 +660,32 @@ end
         end
 
         # Second pass: compute ghost cell values
+        # For inlet-q boundaries, the ghost cell h values are the same as the internal cell values
         h_new = map(internalCellID -> h[internalCellID], current_internalCellIDs)
 
-        #compute intermediate values at faces
+        #compute intermediate values at faces for q_x and q_y
         h_internals = h[current_internalCellIDs]
         ManningN_faces = ManningN_cells[current_internalCellIDs]
         face_normals = boundary_conditions.inletQ_faceOutwardNormals[iInletQ]
-        velocity_normals = 1.1 * ManningN_faces[1]
+        velocity_normals = current_inletQ_TotalQ / total_A *
+                           current_inletQ_Length.^(2.0 / 3.0) ./ ManningN_faces
+        #velocity_normals = 1.1 * ManningN_faces[1]
         #velocity_normals = 0.03
 
         q_x_new = -h_internals .* velocity_normals .* face_normals[:, 1]
         q_y_new = -h_internals .* velocity_normals .* face_normals[:, 2]
 
         Zygote.ignore() do
-            @show q_x_new
-            @show q_y_new
+            if settings.bVerbose
+                @show q_x_new
+                @show q_y_new
+            end
         end
 
         # q_updates = [
         #     let
         #         ManningN_face = ManningN_cells[internalCellID]
         #         face_normal = boundary_conditions.inletQ_faceOutwardNormals[iInletQ][iFace, :]
-
-        #         Zygote.ignore() do
-        #             @show typeof(ManningN_cells)
-        #             @show typeof(ManningN_cells[internalCellID])
-        #             @show ManningN_cells[internalCellID]
-        #             @show iFace
-        #             @show internalCellID
-        #             @show ManningN_face
-        #             @show face_normal
-        #         end
 
         #         #velocity_normal = (current_inletQ_TotalQ / total_A *
         #         #                   current_inletQ_Length[iFace]^(2.0 / 3.0) / ManningN_face)
@@ -716,7 +699,7 @@ end
         #         h_internal = h[internalCellID]
         #         n_value = ManningN_cells[internalCellID]
         #         velocity_normal = one(eltype(ManningN_cells)) * n_value
-                
+
         #         if current_inletQ_DryWet[iFace] == 0
         #             [zero(eltype(Q_cells)), zero(eltype(Q_cells))]
         #         else
@@ -738,10 +721,10 @@ end
             #@show typeof(current_inletQ_Length)
             #@show typeof(ManningN_cells)
 
-            @show current_inletQ_TotalQ
-            @show total_A
-            @show current_inletQ_Length
-            @show ManningN_cells
+            #@show current_inletQ_TotalQ
+            #@show total_A
+            #@show current_inletQ_Length
+            #@show ManningN_cells
         end
 
         Zygote.ignore() do
@@ -824,7 +807,7 @@ end
         #h_new = convert.(eltype(h), max.(swe_2D_constants.h_small,
         #     exitH_WSE[iExitH] .- zb_faces[current_faceIDs]))
         h_new = convert.(eltype(h), max.(swe_2D_constants.h_small,
-             exitH_WSE[iExitH] .- zb_cells[current_internalCellIDs]))
+            exitH_WSE[iExitH] .- zb_cells[current_internalCellIDs]))
 
         # Update arrays using update_1d_array
         h_ghost_local = update_1d_array(h_ghost_local, current_ghostCellIDs, h_new)
@@ -931,7 +914,7 @@ end
             #println(" ")
         end
     end
-    
+
     return h_ghost_local, q_x_ghost_local, q_y_ghost_local
 end
 
