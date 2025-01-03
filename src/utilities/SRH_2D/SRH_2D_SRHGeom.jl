@@ -45,7 +45,7 @@ mutable struct SRH_2D_SRHGeom
     boundaryEdges::Dict{Int, Vector{Int}}
     allBoundaryEdgeIDs::Vector{Int}
 
-    function SRH_2D_SRHGeom(srhgeom_filename::String, bcDict::Dict{Int, String})
+    function SRH_2D_SRHGeom(settings, srhgeom_filename::String, bcDict::Dict{Int, String})
         # Initialize with default values
         obj = new(
             srhgeom_filename,
@@ -72,8 +72,8 @@ mutable struct SRH_2D_SRHGeom
             Int[] # allBoundaryEdgeIDs
         )
         
-        # First read to get number of elements and nodes
-        srhgeom_get_num_of_elements_nodes(obj)
+        # First read to compute number of elements and nodes
+        srhgeom_compute_num_of_elements_nodes(settings, obj)
         
         # Initialize arrays with correct sizes
         obj.elementNodesList = zeros(Int, obj.numOfElements, gMax_Nodes_per_Element)
@@ -84,24 +84,24 @@ mutable struct SRH_2D_SRHGeom
         obj.elementBedElevation = zeros(obj.numOfElements)
         
         # Read the full mesh information
-        srhgeom_read_srhgeom_file(obj)
+        srhgeom_read_srhgeom_file(settings, obj)
         
         # Build node-element connectivity
-        srhgeom_build_node_elements(obj)
+        srhgeom_build_node_elements(settings, obj)
         
         # Build edges and boundary edges
-        srhgeom_build_edges_and_boundary_edges(obj)
+        srhgeom_build_edges_and_boundary_edges(settings, obj)
         
         return obj
     end
 end
 
 """
-Get the number of elements and nodes in srhgeom mesh file
+Compute the number of elements and nodes in srhgeom mesh file
 """
-function srhgeom_get_num_of_elements_nodes(geom::SRH_2D_SRHGeom)
-    if gVerbose
-        println("Getting numbers of elements and nodes from the SRHGEOM file ...")
+function srhgeom_compute_num_of_elements_nodes(settings, geom::SRH_2D_SRHGeom)
+    if settings.bVerbose
+        println("Computing numbers of elements and nodes from the SRHGEOM file ...")
     end
 
     elemCount = 0
@@ -128,16 +128,27 @@ function srhgeom_get_num_of_elements_nodes(geom::SRH_2D_SRHGeom)
     geom.numOfNodes = nodeCount
     geom.numOfNodeStrings = nodeStringCount
 
-    if gVerbose
+    if settings.bVerbose
         println("There are $elemCount elements, $nodeCount nodes, and $nodeStringCount node strings in the mesh.")
     end
 end
 
 """
+Get the number of elements and nodes in srhgeom mesh file
+"""
+function srhgeom_get_num_of_elements_nodes(settings, geom::SRH_2D_SRHGeom)
+    if settings.bVerbose
+        println("Getting numbers of elements and nodes from the SRHGEOM file ...")
+    end
+
+    return geom.numOfElements, geom.numOfNodes
+end
+
+"""
 Read the SRHGEOM file and populate mesh information
 """
-function srhgeom_read_srhgeom_file(geom::SRH_2D_SRHGeom)
-    if gVerbose
+function srhgeom_read_srhgeom_file(settings, geom::SRH_2D_SRHGeom)
+    if settings.bVerbose
         println("Reading the SRHGEOM file ...")
     end
 
@@ -202,7 +213,7 @@ function srhgeom_read_srhgeom_file(geom::SRH_2D_SRHGeom)
         maximum(geom.nodeCoordinates[:, 3])   # zmax
     ]
 
-    if gVerbose
+    if settings.bVerbose
         println("2D mesh's bounding box = ", geom.twoDMeshBoundingbox)
     end
 end
@@ -210,8 +221,8 @@ end
 """
 Build node's element list for all nodes
 """
-function srhgeom_build_node_elements(geom::SRH_2D_SRHGeom)
-    if gVerbose
+function srhgeom_build_node_elements(settings, geom::SRH_2D_SRHGeom)
+    if settings.bVerbose
         println("Building mesh's node, elements, and topology ...")
     end
 
@@ -237,7 +248,7 @@ end
 """
 Build edges and boundaryEdges dictionaries
 """
-function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
+function srhgeom_build_edges_and_boundary_edges(settings, geom::SRH_2D_SRHGeom)
     current_edgeID = 1
 
     # Loop over all elements
@@ -253,8 +264,8 @@ function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
                 geom.elementNodesList[cellI, 1]
             end
 
-            if gVerbose
-                println("Cell: $cellI, edge: $i, node IDs: $nodeID_1, $nodeID_2")
+            if settings.bVerbose
+                #println("Cell: $cellI, edge: $i, node IDs: $nodeID_1, $nodeID_2")
             end
 
             curr_edge_node_IDs = Tuple(sort([nodeID_1, nodeID_2]))
@@ -278,15 +289,15 @@ function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
     # Find boundary edges (edges with only one element)
     geom.allBoundaryEdgeIDs = [edge for (edge, elements) in geom.edgeElements if length(elements) == 1]
 
-    if gVerbose
-        println("Boundary edges: ", geom.allBoundaryEdgeIDs)
+    if settings.bVerbose
+        #println("Boundary edges: ", geom.allBoundaryEdgeIDs)
     end
 
     # Initialize boundary edge usage flags
     allBoundaryEdgeUsageFlag = Dict(edgeID => false for edgeID in geom.allBoundaryEdgeIDs)
 
-    if gVerbose
-        println("Boundary edge usage flags: ", allBoundaryEdgeUsageFlag)
+    if settings.bVerbose
+        #println("Boundary edge usage flags: ", allBoundaryEdgeUsageFlag)
     end
 
     # Process boundaries from nodeStrings
@@ -319,15 +330,15 @@ function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
             end
         end
 
-        if gVerbose
-            println("Boundary edge list for NodeString $nodeString: ", current_boundary_edge_list)
+        if settings.bVerbose
+            #println("Boundary edge list for NodeString $nodeString: ", current_boundary_edge_list)
         end
 
         geom.boundaryEdges[nodeString] = current_boundary_edge_list
     end
 
-    if gVerbose
-        println("Boundary edges before adding default wall boundary: ", geom.boundaryEdges)
+    if settings.bVerbose
+        #println("Boundary edges before adding default wall boundary: ", geom.boundaryEdges)
     end
 
     # Handle unused boundary edges (default wall boundary)
@@ -337,8 +348,8 @@ function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
         geom.boundaryEdges[defaultWallBoundaryID] = unusedBoundaryEdges
     end
 
-    if gVerbose
-        println("Boundary edges after adding default wall boundary: ", geom.boundaryEdges)
+    if settings.bVerbose
+        #println("Boundary edges after adding default wall boundary: ", geom.boundaryEdges)
     end
 
     # Build elementEdgesList
@@ -365,8 +376,8 @@ function srhgeom_build_edges_and_boundary_edges(geom::SRH_2D_SRHGeom)
         end
     end
 
-    if gVerbose
-        println("Element edges list: ", geom.elementEdgesList)
+    if settings.bVerbose
+        #println("Element edges list: ", geom.elementEdgesList)
     end
 end
 

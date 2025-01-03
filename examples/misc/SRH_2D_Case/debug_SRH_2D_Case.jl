@@ -16,6 +16,9 @@ function main()
     
     # Create SRH_2D_Data object
     srh_data = SRH_2D_Case.SRH_2D_Data(srhhydro_file)
+
+    #dump the srh_data object
+    dump(srh_data)
     
     # Get basic information about the case
     case_name = SRH_2D_Case.srh_2D_Data_get_case_name(srh_data)

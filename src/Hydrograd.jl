@@ -2,7 +2,6 @@ module Hydrograd
 
 using InteractiveUtils #for @code_warntype
 
-using PyCall
 using JSON3
 using JLD2
 using LinearAlgebra
@@ -180,7 +179,6 @@ export preprocess_model_parameters_2D
 # Utilities
 export update_1d_array
 export save_ode_solution
-export process_SRH_2D_input 
 export smooth_abs
 export smooth_sign
 export smooth_max
@@ -194,6 +192,8 @@ export swe_1D_make_animation
 export swe_2D_calc_total_water_volume
 export swe_2D_save_results_SciML
 export swe_2D_save_results_custom
+
+export process_SRH_2D_input
 
 export export_to_vtk_2D
 export debug_AD

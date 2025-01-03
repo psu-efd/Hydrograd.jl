@@ -6,9 +6,6 @@ using Revise
 
 using DelimitedFiles
 
-# Constants
-const gVerbose = true
-
 include("SRH_2D_SRHHydro.jl")
 include("SRH_2D_SRHGeom.jl")
 include("SRH_2D_SRHMat.jl")
@@ -23,6 +20,7 @@ export SRH_2D_SRHHydro,
 
 # SRH_2D_SRHGeom
 export SRH_2D_SRHGeom,
+       srhgeom_compute_num_of_elements_nodes,
        srhgeom_get_num_of_elements_nodes,
        srhgeom_read_srhgeom_file,
        srhgeom_build_edges_and_boundary_edges,
@@ -46,6 +44,7 @@ export SRH_2D_Data,
        srh_2D_Data_get_mesh_size,
        srh_2D_Data_get_node_coordinates,
        srh_2D_Data_get_element_connectivity
+
 
 end # end of module SRH_2D_Case
 

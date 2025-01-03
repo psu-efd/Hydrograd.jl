@@ -23,7 +23,7 @@ For parameter inversion and sensitivity analysis, the package uses the automatic
 - Gudonov-type Riemann solver
 - Support for various boundary conditions
 
-- For 2D cases, the package directly supports the format of the [SRH-2D](https://www.usbr.gov/tsc/techreferences/computer%20software/models/srh2d/index.html) solver (USBR's Sedimentation and River Hydraulics - Two-Dimensional model; GUI with [SMS](https://aquaveo.com/software/sms/introduction)). The support of SRH-2D case format is through the [pyHMT2D](https://github.com/psu-efd/pyHMT2D) and [PyCall.jl](https://github.com/JuliaPy/PyCall.jl) packages. pyHMT2D also supports HEC-RAS 2D. However, currently HEC-RAS 2D cases are not supported in Hydrograd.
+- For 2D cases, the package directly supports the format of the [SRH-2D](https://www.usbr.gov/tsc/techreferences/computer%20software/models/srh2d/index.html) solver (USBR's Sedimentation and River Hydraulics - Two-Dimensional model; GUI with [SMS](https://aquaveo.com/software/sms/introduction)).
 
 ## Prerequisites
 - Julia 1.11 or later

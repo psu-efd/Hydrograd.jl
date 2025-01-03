@@ -2,37 +2,37 @@
 
 function process_SRH_2D_input(settings, case_path)
 
-    if settings.bVerbose
-        println("Python version: ", PyCall.pyversion)
-        println("Python path: ", PyCall.pyprogramname)
-    end
-    
-    pyHMT2D = pyimport("pyHMT2D")
-    pyHMT2D.gVerbose = true
-
     srhhydro_file_name = settings.srhhydro_file_name
-
-    
+        
     # Call a function from the custom package
     file_path = joinpath(case_path, srhhydro_file_name )
-    my_srh_2d_data = pyHMT2D.SRH_2D.SRH_2D_Data(file_path)
+    my_srh_2d_data = SRH_2D_Case.SRH_2D_Data(settings, file_path)
+   
     
-    #ManningN_cell = my_srh_2d_data.ManningN_cell
-    #ManningN_node = my_srh_2d_data.ManningN_node
-    
-    #println("ManningN_cell: ", ManningN_cell)
-    #println("ManningN_node: ", ManningN_node)
-    
-    # println("Result from Python function: ", my_srh_2d_data)
-    # for (k, v) in my_srh_2d_data.srhhydro_obj.srhhydro_content
-    #     println("$k => $v")
-    # end
+    if settings.bVerbose
+        ManningN_cell = my_srh_2d_data.ManningN_cell
+        
+        println("ManningN_cell: ", ManningN_cell)
+        
+        println("Content of srhhydro_obj: ", my_srh_2d_data)
+        for (k, v) in my_srh_2d_data.srhhydro_obj.srhhydro_content
+            println("$k => $v")
+        end
+
+        #dump the srh_data object
+        #dump(my_srh_2d_data)
+        #dump(my_srh_2d_data.srhhydro_obj)
+        #dump(my_srh_2d_data.srhgeom_obj)
+        #dump(my_srh_2d_data.srhmat_obj)
+    end
 
     if settings.bVerbose
-        #println("srhgeom file: ", my_srh_2d_data.srhgeom_obj.nodeCoordinates)
-        println("srhgeom file: ", typeof(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
-        println("srhgeom file: ", size(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
-        println("getNumOfElementsNodes: ", my_srh_2d_data.srhgeom_obj.getNumOfElementsNodes())
+        println("type of nodeCoordinates: ", typeof(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
+        println("size of nodeCoordinates: ", size(my_srh_2d_data.srhgeom_obj.nodeCoordinates))
+
+        numOfElements, numOfNodes = SRH_2D_Case.srhgeom_get_num_of_elements_nodes(settings, my_srh_2d_data.srhgeom_obj)
+        println("\nnumOfElements: $numOfElements")
+        println("numOfNodes: $numOfNodes \n")
     end 
     
     # Access the srhhydro data
@@ -43,12 +43,12 @@ function process_SRH_2D_input(settings, case_path)
     srhhydro_MONITORINGLines = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "MONITORING")
         if settings.bVerbose
-            println("Key MONITORING exists in the Python dictionary srhhydro_content.")
+            println("Key MONITORING exists in the dictionary srhhydro_content.")
         end
         srhhydro_MONITORINGLines = srhhydro_obj.srhhydro_content["MONITORING"]
     else
         if settings.bVerbose
-            println("Key MONITORING does not exist in the Python dictionary srhhydro_content.")
+            println("Key MONITORING does not exist in the dictionary srhhydro_content.")
         end
     end
     
@@ -71,12 +71,12 @@ function process_SRH_2D_input(settings, case_path)
     srhhydro_IQParams = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "IQParams")
         if settings.bVerbose
-            println("Key IQParams exists in the Python dictionary srhhydro_content.")
+            println("Key IQParams exists in the dictionary srhhydro_content.")
         end
         srhhydro_IQParams = srhhydro_obj.srhhydro_content["IQParams"]
     else
         if settings.bVerbose
-            println("Key IQParams does not exist in the Python dictionary srhhydro_content.")
+            println("Key IQParams does not exist in the dictionary srhhydro_content.")
         end
     end
     
@@ -86,12 +86,12 @@ function process_SRH_2D_input(settings, case_path)
     srhhydro_EWSParamsC = Dict()
     if haskey(srhhydro_obj.srhhydro_content, "EWSParamsC")
         if settings.bVerbose
-            println("Key EWSParamsC exists in the Python dictionary srhhydro_content.")
+            println("Key EWSParamsC exists in the dictionary srhhydro_content.")
         end
         srhhydro_EWSParamsC = srhhydro_obj.srhhydro_content["EWSParamsC"]
     else
         if settings.bVerbose
-            println("Key EWSParamsC does not exist in the Python dictionary srhhydro_content.")
+            println("Key EWSParamsC does not exist in the dictionary srhhydro_content.")
         end
     end
     
@@ -127,41 +127,10 @@ function process_SRH_2D_input(settings, case_path)
     srhmat_matNameList = srhmat_obj.matNameList
     srhmat_matZoneCells = srhmat_obj.matZoneCells
 
-    #Amend index-base: SRH-2D is 1-based; Julia is 0-based, as well as Python. PyHMT2D in Python is 0-based.
-    #Thus, we need to amend the index-base of srhmat_matNameList and srhmat_matZoneCells
-    # Create a new dictionary with modified keys
-    srhmat_matNameList_new = Dict{Int, String}()
-    for (k, v) in srhmat_matNameList
-        if settings.bVerbose
-            println("k: ", k, " v: ", v)
-        end
-        if parse(Int, k) == -1
-            new_key = 0
-        else
-            new_key = parse(Int, k)   #convert string to int, e.g., "1" -> 1
-        end
-        srhmat_matNameList_new[new_key] = v
-    end
-    srhmat_matNameList = srhmat_matNameList_new
-    srhmat_obj.srhmat_matNameList = srhmat_matNameList
-
     if settings.bVerbose
         println("srhmat_matNameList: ", srhmat_matNameList)
-        println("srhmat_matNameList_new: ", srhmat_matNameList_new)
+        println("srhmat_matZoneCells: ", srhmat_matZoneCells)
     end
-
-    srhmat_matZoneCells_new = Dict{Int, Vector{Int}}()
-    for (k, v) in srhmat_matZoneCells
-        if k == -1
-            new_key = 0
-        else
-            new_key = k   
-        end
-        srhmat_matZoneCells_new[new_key] = v
-    end
-    srhmat_matZoneCells = srhmat_matZoneCells_new
-    srhmat_obj.srhmat_matZoneCells = srhmat_matZoneCells
-
 
     #build material ID of each cell 
     matID_cells = zeros(Int, my_mesh_2D.numOfCells)
@@ -177,16 +146,18 @@ function process_SRH_2D_input(settings, case_path)
         end
 
         if !bFound
-            println("Cell ", iCell, " is not found in any material zone. Assign it to the default material zone 0.")
+            println("   Warning: Cell ", iCell, " is not found in any material zone. Assign it to the default material zone 0!!!")
             matID_cells[iCell] = 0     #0 means the cell is not in any material zone, i.e., it is in the default material zone
             push!(srhmat_matZoneCells[0], iCell)
         end
     end
     
-    # println("numOfMaterials: ", srhmat_numOfMaterials)
-    # println("matNameList: ", srhmat_matNameList)
-    # println("matZoneCells: ", srhmat_matZoneCells)
-    # println("matID_cells: ", matID_cells)
+    if settings.bVerbose
+        println("numOfMaterials: ", srhmat_numOfMaterials)
+        println("matNameList: ", srhmat_matNameList)
+        println("matZoneCells: ", srhmat_matZoneCells)
+        println("matID_cells: ", matID_cells)
+    end
 
     #assemble all data into a dictionary and return
     srh_all_Dict = Dict{String, Any}()

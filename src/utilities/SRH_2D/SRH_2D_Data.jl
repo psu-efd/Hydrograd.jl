@@ -1,3 +1,6 @@
+
+
+
 """
 A class for SRH-2D data I/O, manipulation, and format conversion
 """
@@ -14,14 +17,8 @@ mutable struct SRH_2D_Data
     # Manning's n values
     ManningN_cell::Vector{Float64}
     ManningN_node::Vector{Float64}
-    
-    # XMDF data
-    xmdfTimeArray_Nodal::Union{Vector{Float64}, Nothing}
-    xmdfAllData_Nodal::Dict{String, Array{Float64}}
-    xmdfTimeArray_Cell::Union{Vector{Float64}, Nothing}
-    xmdfAllData_Cell::Dict{String, Array{Float64}}
 
-    function SRH_2D_Data(srhhydro_filename::String)
+    function SRH_2D_Data(settings, srhhydro_filename::String)
         # Check file existence
         if !isfile(srhhydro_filename)
             throw(ErrorException("The SRHHYDRO file $srhhydro_filename does not exist"))
@@ -31,7 +28,7 @@ mutable struct SRH_2D_Data
         file_path = dirname(srhhydro_filename)
 
         # Create SRH_2D_SRHHydro object
-        srhhydro_obj = SRH_2D_SRHHydro(srhhydro_filename)
+        srhhydro_obj = SRH_2D_SRHHydro(settings, srhhydro_filename)
 
         # Get the srhgeom_filename and srhmat_filename and strip any extra quotes
         srhgeom_filename = if isempty(file_path)
@@ -46,12 +43,17 @@ mutable struct SRH_2D_Data
             joinpath(file_path, String(strip(srhhydro_get_mat_file_name(srhhydro_obj), ['"', ' '])))
         end
 
-        @show typeof(srhgeom_filename)
-        @show srhgeom_filename
+        if settings.bVerbose
+            println("srhgeom_filename: ", srhgeom_filename)
+            println("srhmat_filename: ", srhmat_filename)
+        
+            @show typeof(srhgeom_filename)
+            @show srhgeom_filename
+        end
 
         # Create SRH_2D_SRHGeom and SRH_2D_SRHMat objects
-        srhgeom_obj = SRH_2D_SRHGeom(srhgeom_filename, srhhydro_obj.srhhydro_content["BC"])
-        srhmat_obj = SRH_2D_SRHMat(srhmat_filename)
+        srhgeom_obj = SRH_2D_SRHGeom(settings, srhgeom_filename, srhhydro_obj.srhhydro_content["BC"])
+        srhmat_obj = SRH_2D_SRHMat(settings, srhmat_filename)
 
         # Initialize Manning's n arrays
         ManningN_cell = zeros(srhgeom_obj.numOfElements)
@@ -66,15 +68,11 @@ mutable struct SRH_2D_Data
             srhgeom_obj,
             srhmat_obj,
             ManningN_cell,
-            ManningN_node,
-            nothing,  # xmdfTimeArray_Nodal
-            Dict{String, Array{Float64}}(),  # xmdfAllData_Nodal
-            nothing,  # xmdfTimeArray_Cell
-            Dict{String, Array{Float64}}()   # xmdfAllData_Cell
+            ManningN_node
         )
 
         # Build Manning's n values
-        srh_2D_Data_build_manningN_cells_nodes(obj)
+        srh_2D_Data_build_manningN_cells_nodes(settings, obj)
 
         return obj
     end
@@ -83,21 +81,21 @@ end
 """
 Build Manning's n values at cell centers and nodes
 """
-function srh_2D_Data_build_manningN_cells_nodes(data::SRH_2D_Data)
-    if gVerbose
+function srh_2D_Data_build_manningN_cells_nodes(settings, data::SRH_2D_Data)
+    if settings.bVerbose
         println("Building Manning's n values for cells and nodes in SRH-2D mesh ...")
     end
 
     # Manning's n dictionary in srhhydro
     nDict = data.srhhydro_obj.srhhydro_content["ManningsN"]
-    if gVerbose
+    if settings.bVerbose
         println("nDict = ", nDict)
     end
 
     # Loop over all cells in the mesh
     for cellI in 1:data.srhgeom_obj.numOfElements
         # Get the material ID of current cell
-        matID = srhmat_find_cell_material_ID(data.srhmat_obj, cellI)  # -1 for 0-based indexing
+        matID = srhmat_find_cell_material_ID(settings, data.srhmat_obj, cellI)  # -1 for 0-based indexing
         data.ManningN_cell[cellI] = nDict[matID]
     end
 
@@ -127,8 +125,8 @@ end
 """
 Read SRH-2D result file in SRHC (cell center) or SRH (point) format
 """
-function srh_2D_Data_read_srh_file(data::SRH_2D_Data, srhFileName::String)
-    if gVerbose
+function srh_2D_Data_read_srh_file(settings, data::SRH_2D_Data, srhFileName::String)
+    if settings.bVerbose
         println("Reading the SRH/SRHC result file ...")
     end
 

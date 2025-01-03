@@ -7,14 +7,14 @@ mutable struct SRH_2D_SRHHydro
     srhhydro_filename::String
     srhhydro_content::Dict{String, Any}
 
-    function SRH_2D_SRHHydro(srhhydro_filename::String)
+    function SRH_2D_SRHHydro(settings, srhhydro_filename::String)
         # Constructor
         if !isfile(srhhydro_filename)
             throw(ErrorException("The SRHHYDRO file $srhhydro_filename does not exist. Exiting..."))
         end
         
         obj = new(srhhydro_filename, Dict{String, Any}())
-        parse_srhhydro_file(obj)  # Call parse immediately after creation
+        parse_srhhydro_file(settings, obj)  # Call parse immediately after creation
         return obj
     end
 end
@@ -22,7 +22,7 @@ end
 """
 Parse the SRHHydro file and build the dictionary self.srhhydro_content
 """
-function parse_srhhydro_file(hydro::SRH_2D_SRHHydro)
+function parse_srhhydro_file(settings, hydro::SRH_2D_SRHHydro)
     res_all = Dict{String, Any}()
     res_ManningsN = Dict{Int, Float64}()
     res_BC = Dict{Int, String}()
