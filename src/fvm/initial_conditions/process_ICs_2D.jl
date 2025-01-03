@@ -81,7 +81,7 @@ function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb
         
         file_path = joinpath(case_path, "initial_conditions.vtk" ) 
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
-                         scalar_data, scalar_names, vector_data, vector_names)    
+                         "",  "float", 0.0, scalar_data, scalar_names, vector_data, vector_names)    
 
         if settings.bVerbose
             println("initial conditions are saved to ", file_path)

@@ -10,6 +10,8 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_pat
     swe_2D_constants = swe_extra_params.swe_2D_constants
     nodeCoordinates = swe_extra_params.nodeCoordinates
 
+    println("   Active parameter name = ", active_param_name)
+
     #define the time for saving the results (for sensitivity analysis, which may be different from the time for saving the results in forward simulation)
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.sensitivity_analysis_settings.ode_solver_nSave
     t_save = swe_2D_constants.tspan[1]:dt_save:swe_2D_constants.tspan[2]

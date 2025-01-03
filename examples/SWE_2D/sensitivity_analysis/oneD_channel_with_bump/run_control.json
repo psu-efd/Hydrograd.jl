@@ -4,9 +4,9 @@
     "control_variables": {
         "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": true,
+        "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": false,
-        "bPerform_Sensitivity_Analysis": false
+        "bPerform_Sensitivity_Analysis": true
     },
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
@@ -31,10 +31,10 @@
     },
     "inversion_options": {
         "comment": "Options for the inversion.parameter_initial_values_options is the option for the parameter initial values: constant or from_file.",
-        "active_param_names": ["ManningN"],
+        "active_param_names": ["zb"],
         "inversion_parameter_initial_values_options": "constant",
         "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
-        "inversion_zb_initial_values": [0.01],
+        "inversion_zb_initial_values": [0.0],
         "inversion_ManningN_initial_values": [0.02, 0.03],
         "inversion_inlet_discharge_initial_values": [0.2],
         "inversion_bInversion_slope_loss": false,
@@ -43,12 +43,15 @@
         "inversion_upper_bound_zb": 0.3,
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
-        "inversion_max_iterations": 2,
+        "inversion_max_iterations": 100,
+        "inversion_save_frequency": 1,
+        "inversion_save_checkpoint": true,
+        "inversion_checkpoint_frequency": 10,
         "inversion_sensealg": "AutoZygote()",
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "constant",
         "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "inversion_forward_simulation_initial_condition_constant_values": [1.0, 0.1, 0.0],
+        "inversion_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
         "inversion_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
@@ -58,7 +61,8 @@
             "ode_solver_nSave": 10
         },
         "inversion_save_file_name": "inversion_results.jld2",
-        "inversion_save_loss_history_file_name": "inversion_loss_history.csv"
+        "inversion_save_loss_history_file_name": "inversion_loss_history.csv",
+        "inversion_save_parameters_file_name": "inversion_parameters_history.csv"
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. parameter_values_options is the option for the parameter values: constant or from_file.",
@@ -70,7 +74,7 @@
         "sensitivity_inlet_discharge_values": [0.2],
         "sensitivity_forward_simulation_initial_condition_options": "constant",
         "sensitivity_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "sensitivity_forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
+        "sensitivity_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
         "sensitivity_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",

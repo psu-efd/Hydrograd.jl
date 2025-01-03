@@ -2,16 +2,16 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": false,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
+        "srhhydro_file_name": "simple.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
-        "bPerform_Forward_Simulation": true,
-        "bPerform_Inversion": false,
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": true,
         "bPerform_Sensitivity_Analysis": false
     },
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 10.0],
+        "tspan": [0.0, 1.0],
         "dt": 0.1,
         "dt_save": 0.1,
         "nSave": 10
@@ -25,7 +25,7 @@
         "forward_simulation_nSave": 10,
         "forward_simulation_initial_condition_options": "constant",
         "forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
+        "forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
         "forward_simulation_save_file_name": "forward_simulation_solution.jld2",
         "forward_simulation_save_solution_truth_file_name": "forward_simulation_solution_truth.json"
     },
@@ -44,6 +44,7 @@
         "inversion_optimizer": "Adam",
         "inversion_learning_rate": 0.01,
         "inversion_max_iterations": 2,
+        "inversion_save_frequency": 1,
         "inversion_sensealg": "AutoZygote()",
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "constant",
@@ -58,7 +59,8 @@
             "ode_solver_nSave": 10
         },
         "inversion_save_file_name": "inversion_results.jld2",
-        "inversion_save_loss_history_file_name": "inversion_loss_history.csv"
+        "inversion_save_loss_history_file_name": "inversion_loss_history.csv",
+        "inversion_save_parameters_history_file_name": "inversion_parameters_history.csv"
     },
     "sensitivity_analysis_options": {
         "comment": "Options for the sensitivity analysis. parameter_values_options is the option for the parameter values: constant or from_file.",

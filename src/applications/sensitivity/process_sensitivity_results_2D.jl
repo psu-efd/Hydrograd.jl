@@ -40,6 +40,10 @@ function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordi
             dhu_dparam[j] = sol[idx+1, i]   # hu sensitivity
             dhv_dparam[j] = sol[idx+2, i]   # hv sensitivity
         end
+
+        field_name = "parameter_number"
+        field_type = "integer"
+        field_value = i
    
         vector_data = []
         vector_names = []
@@ -47,11 +51,13 @@ function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordi
         scalar_data = [dh_dparam, dhu_dparam, dhv_dparam]
         scalar_names = ["dh_dparam", "dhu_dparam", "dhv_dparam"]
 
-        file_path = joinpath(case_path, "sensitivity_results_iParam_$i.vtk")
-        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount,
-            scalar_data, scalar_names, vector_data, vector_names)
+        file_path = joinpath(case_path, "sensitivity_results_$(active_param_name)_$i.vtk")
 
-        println("       Sensitivity results for parameter $i is saved to ", file_path)
+        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, 
+            field_name, field_type, field_value, 
+            scalar_data, scalar_names, vector_data, vector_names)    
+
+        println("       Sensitivity results for parameter $(active_param_name) = $i) is saved to ", file_path)
     end
 
 end

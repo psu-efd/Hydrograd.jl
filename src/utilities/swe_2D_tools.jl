@@ -89,7 +89,18 @@ function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell
 end
 
 
-function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)
+function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)
+
+    #check if field_name, field_type, field_value are valid
+    if !isa(field_name, String) || !isa(field_type, String) || !isa(field_value, Number)
+        println("field_name, field_type, field_value are not valid")
+        println("field_name: ", field_name)
+        println("field_type: ", field_type)
+        println("field_value: ", field_value)
+        
+        return
+    end
+
     # Open the file for writing
     open(filename, "w") do file
         # Write the VTK header
@@ -97,6 +108,13 @@ function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCou
         println(file, "2D Unstructured Mesh")
         println(file, "ASCII")
         println(file, "DATASET UNSTRUCTURED_GRID")
+
+        # Write the field name and value (if it is not empty)
+        if field_name != ""
+            println(file, "FIELD FieldData 1")
+            println(file, "$field_name 1 1 $field_type")
+            println(file, "$field_value")
+        end
         
         # Write the nodes
         num_nodes = size(nodeCoordinates, 1)

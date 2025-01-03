@@ -5,7 +5,7 @@ A Julia-based computational hydrodynamics package with automatic differentiation
 Hydrograd heavily relies on [SciML.jl](https://github.com/SciML/SciML.jl), which is a collection of tools for scientific machine learning and differential equation solving. 
 
 ## Overview
-Hydrograd solves the hydrodynamics governing equations using finite volume methods. It supports:
+Hydrograd provides ***differentiable models*** for solving the hydrodynamics governing equations with finite volume methods. It supports:
 - Forward simulation of flow dynamics
 - Parameter inversion 
 - Sensitivity analysis through automatic differentiation
@@ -47,7 +47,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
 This will automatically install all required Julia dependencies specified in `Project.toml`.
 
-3. Run an example: See [Running Instructions](examples/README.md) for detailed usage.
+3. Run an example: See [Running Instructions](examples/SWE_2D/README.md) for detailed usage.
 
 ## License
 MIT License

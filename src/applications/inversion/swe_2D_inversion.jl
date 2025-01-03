@@ -1,5 +1,6 @@
 
 #perform inversion for 2D SWE
+using Dates
 
 #using Debugger, JuliaInterpreter
 
@@ -61,10 +62,10 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    sol, LOSS, PRED, PARS = optimize_parameters(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name)
+    sol, ITER, LOSS, PRED, PARS = optimize_parameters(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
 
     #save the inversion results
-    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); LOSS, PRED, PARS)
+    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PRED, PARS)
 
     #process the inversion results
     println("   Post-processing inversion results ...")
@@ -147,6 +148,7 @@ function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constant
     loss_pred = zero(data_type)
     loss_pred_WSE = zero(data_type)
     loss_pred_uv = zero(data_type)
+    loss_bound = zero(data_type)
     loss_slope = zero(data_type)
 
     if pred.retcode == SciMLBase.ReturnCode.Success
@@ -165,13 +167,15 @@ function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constant
         l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
 
         #loss for free surface elevation mismatch
-        loss_pred_WSE = sum(abs2, l)
+        if settings.inversion_settings.bInversion_WSE_loss
+            loss_pred_WSE = sum(abs2, l)
+        end
 
         #loss for velocity mismatch
         # Add small epsilon to prevent division by zero
         ϵ = sqrt(eps(data_type))
 
-        if settings.inversion_settings.bInversion_u_loss      #if also include u in the loss 
+        if settings.inversion_settings.bInversion_uv_loss      #if also include u in the loss 
             l_u = pred[:, 2, end] ./ (pred[:, 1, end] .+ ϵ) .- u_truth
             l_v = pred[:, 3, end] ./ (pred[:, 1, end] .+ ϵ) .- v_truth
 
@@ -181,13 +185,18 @@ function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constant
         #combined loss due to free surface elevation mismatch and velocity mismatch
         loss_pred = loss_pred_WSE + loss_pred_uv
 
+        #loss for parameter bound regularization
+        if settings.inversion_settings.bInversion_bound_loss
+            loss_bound = compute_bound_loss(p, settings.inversion_settings.parameter_value_lower_bound, settings.inversion_settings.parameter_value_upper_bound)
+        end
+
         #loss for bed slope regularization
         if settings.inversion_settings.bInversion_slope_loss    #if bed slope is included in the loss 
-            loss_slope = calc_slope_loss(zb_cells_temp, my_mesh_2D)
+            loss_slope = calc_slope_loss(zb_cells_temp, settings, my_mesh_2D)
         end
 
         #combined loss due to free surface elevation mismatch, velocity mismatch, and bed slope regularization
-        loss_total = loss_pred + loss_slope
+        loss_total = loss_pred + loss_bound + loss_slope
     else
         loss_total = convert(data_type, Inf)
     end
@@ -202,10 +211,13 @@ function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constant
         end
     end
 
-    return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
+    return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred
 end
 
-function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name)
+function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    #start the timer for the inversion
+    inversion_start_time = now()  # Current date and time
+
     # Loss function for optimization
     function opt_loss(θ, p)  # Add p argument even if unused
 
@@ -219,7 +231,7 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
             #println("p_init = ", p_init)
         end
 
-        loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred = compute_loss(ode_f, Q0, tspan, θ, settings,
+        loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred = compute_loss(ode_f, Q0, tspan, θ, settings,
             my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
         # Call callback with all values (but outside gradient calculation)
@@ -227,7 +239,7 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
             #callback(θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred)
         end
 
-        return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred
+        return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred
     end
 
     # Define AD type choice for optimization's gradient computation
@@ -299,9 +311,10 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
     end
 
     #define the accumulators for the inversion results
-    LOSS = []                              # Loss accumulator
-    PRED = []                                  # prediction accumulator
-    PARS = []                      # parameters accumulator
+    ITER = []        #iteration number accumulator
+    LOSS = []        # Loss accumulator
+    PRED = []        # prediction accumulator
+    PARS = []        # parameters accumulator
 
     # Define the callback to handle both vector and OptimizationState inputs
     #callback = function (state_or_θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred)
@@ -311,23 +324,42 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
     #    return false  # continue optimization
     #end
 
-    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, prediction) #callback function to observe training
-        iter = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, prediction) #callback function to observe training
+
+        inversion_current_time = now()  # Current date and time
+        inversion_elapsed_time = inversion_current_time - inversion_start_time
+        inversion_elapsed_seconds = Millisecond(inversion_elapsed_time).value / 1000
+
+        #reset the inversion start time
+        inversion_start_time = inversion_current_time
+
+        iter_number = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
 
         Zygote.ignore() do
-            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope = ", iter, ", ",
-                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_slope)
+            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope = ", iter_number, ", ",
+                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_bound, ", ", loss_slope)
+            println("      inversion iteration elapsed seconds = ", inversion_elapsed_seconds)
         end
 
-        append!(PRED, [prediction[:, 1, end]])
+        #save the inversion results
+        if iter_number % settings.inversion_settings.save_frequency == 0
+            append!(ITER, iter_number)
 
-        append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope]])
+            append!(PRED, [prediction[:, 1, end]])
 
-        if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
-            #println("theta.u = ", θ.u)
-            append!(PARS, [copy(θ.u)])
-        else
-            append!(PARS, θ)
+            append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
+
+            if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
+                #println("theta.u = ", θ.u)
+                append!(PARS, [copy(θ.u)])
+            else
+                append!(PARS, θ)
+            end
+        end
+
+        #checkpoint the inversion results (in case the inversion is interrupted)
+        if settings.inversion_settings.save_checkpoint && iter_number % settings.inversion_settings.checkpoint_frequency == 0
+            jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
         end
 
         #if l > 1e-9
@@ -356,6 +388,37 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
     #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
     #@enter sol = @interpret solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
 
-    return sol, LOSS, PRED, PARS
+    return sol, ITER, LOSS, PRED, PARS
 end
 
+# Bound loss function compatible with both Zygote and ForwardDiff
+function compute_bound_loss(params::Vector{T}, lower_bound::Real, upper_bound::Real) where {T}
+    loss = zero(T)
+    lb = convert(float(T), lower_bound)  # Convert bounds to parameter type
+    ub = convert(float(T), upper_bound)
+    for p in params
+        loss += sum(abs2, max(zero(T), lb - p)) +  # Lower bound violation
+                sum(abs2, max(zero(T), p - ub))    # Upper bound violation
+    end
+    return loss
+end
+
+#loss due to slope (gradient) regularization
+function calc_slope_loss(params::Vector{T}, settings, my_mesh_2D) where {T}
+
+    #make sure params is a field (defined at cell centers)
+    if length(params) != my_mesh_2D.numOfCells
+        throw(ArgumentError("params must be a field (defined at cell centers)"))
+    end
+
+    # Compute gradient at cell centers 
+    S0 = compute_scalar_gradients(my_mesh_2D, params)
+
+    #compute the magnitude of S0
+    S0_mag = sqrt.(S0[:, 1] .^ 2 + S0[:, 2] .^ 2 .+ eps(T))
+
+    #compute the loss due to slope regularization
+    loss = compute_bound_loss(S0_mag, 0.0, settings.inversion_settings.parameter_slope_upper_bound)
+
+    return loss
+end

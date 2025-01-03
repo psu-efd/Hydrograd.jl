@@ -30,13 +30,19 @@ struct InversionSettings
     zb_initial_values::Vector{Float64}
     ManningN_initial_values::Vector{Float64}
     inlet_discharge_initial_values::Vector{Float64}
+    bInversion_WSE_loss::Bool    
+    bInversion_uv_loss::Bool    
+    bInversion_bound_loss::Bool
     bInversion_slope_loss::Bool
-    bInversion_u_loss::Bool
-    lower_bound_zb::Float64
-    upper_bound_zb::Float64
+    parameter_value_lower_bound::Float64
+    parameter_value_upper_bound::Float64
+    parameter_slope_upper_bound::Float64
     optimizer::String
     learning_rate::Float64
     max_iterations::Int
+    save_frequency::Int
+    save_checkpoint::Bool
+    checkpoint_frequency::Int
     inversion_sensealg::String
     inversion_truth_file_name::String
     forward_simulation_initial_condition_options::String
@@ -50,6 +56,7 @@ struct InversionSettings
     ode_solver_nSave::Int
     save_file_name::String
     save_loss_history_file_name::String
+    save_parameters_history_file_name::String
 end
 
 struct SensitivityAnalysisSettings
@@ -178,13 +185,21 @@ function parse_control_file(control_file::String)
                 error("Invalid inversion_parameter_initial_values_options: $(settings.inversion_settings.parameter_initial_values_options). Supported options: from_file, constant.")
             end
 
+            println("    inversion_bInversion_WSE_loss = ", settings.inversion_settings.bInversion_WSE_loss)
+            println("    inversion_bInversion_uv_loss = ", settings.inversion_settings.bInversion_uv_loss)
+            println("    inversion_bInversion_bound_loss = ", settings.inversion_settings.bInversion_bound_loss)
             println("    inversion_bInversion_slope_loss = ", settings.inversion_settings.bInversion_slope_loss)
-            println("    inversion_bInversion_u_loss = ", settings.inversion_settings.bInversion_u_loss)
-            println("    inversion_lower_bound_zb = ", settings.inversion_settings.lower_bound_zb)
-            println("    inversion_upper_bound_zb = ", settings.inversion_settings.upper_bound_zb)
+            
+            println("    inversion_bInversion_parameter_value_lower_bound = ", settings.inversion_settings.parameter_value_lower_bound)
+            println("    inversion_bInversion_parameter_value_upper_bound = ", settings.inversion_settings.parameter_value_upper_bound)
+            println("    inversion_bInversion_parameter_slope_upper_bound = ", settings.inversion_settings.parameter_slope_upper_bound)
+              
             println("    optimizer = ", settings.inversion_settings.optimizer)
             println("    learning_rate = ", settings.inversion_settings.learning_rate)
             println("    max_iterations = ", settings.inversion_settings.max_iterations)
+            println("    save_frequency = ", settings.inversion_settings.save_frequency)
+            println("    save_checkpoint = ", settings.inversion_settings.save_checkpoint)
+            println("    checkpoint_frequency = ", settings.inversion_settings.checkpoint_frequency)
             println("    inversion_sensealg = ", settings.inversion_settings.inversion_sensealg)
             println("    inversion_truth_file_name = ", settings.inversion_settings.inversion_truth_file_name)
             println("    inversion_forward_simulation_initial_condition_options = ", settings.inversion_settings.forward_simulation_initial_condition_options)
@@ -197,6 +212,7 @@ function parse_control_file(control_file::String)
             println("    ode_solver_nSave = ", settings.inversion_settings.ode_solver_nSave)
             println("    save_file_name = ", settings.inversion_settings.save_file_name)
             println("    save_loss_history_file_name = ", settings.inversion_settings.save_loss_history_file_name)
+            println("    save_parameters_history_file_name = ", settings.inversion_settings.save_parameters_history_file_name)
         else
             println("No inversion is to be performed.")
         end
@@ -282,13 +298,19 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         Float64.(options["inversion_zb_initial_values"]),      # zb_initial_values
         Float64.(options["inversion_ManningN_initial_values"]), # ManningN_initial_values
         Float64.(options["inversion_inlet_discharge_initial_values"]), # inlet_discharge_initial_values
-        options["inversion_bInversion_slope_loss"],            # bInversion_slope_loss
-        options["inversion_bInversion_u_loss"],                # bInversion_u_loss
-        Float64(options["inversion_lower_bound_zb"]),          # lower_bound_zb
-        Float64(options["inversion_upper_bound_zb"]),          # upper_bound_zb
+        options["inversion_bInversion_WSE_loss"],                    # bInversion_WSE_loss
+        options["inversion_bInversion_uv_loss"],                    # bInversion_uv_loss
+        options["inversion_bInversion_bound_loss"],                  # bInversion_bound_loss
+        options["inversion_bInversion_slope_loss"],                  # bInversion_slope_loss
+        Float64.(options["inversion_parameter_value_lower_bound"]),  # parameter_value_lower_bound
+        Float64.(options["inversion_parameter_value_upper_bound"]),  # parameter_value_upper_bound
+        Float64.(options["inversion_parameter_slope_upper_bound"]),  # parameter_slope_upper_bound
         options["inversion_optimizer"],                        # optimizer
         Float64(options["inversion_learning_rate"]),           # learning_rate
         Int(options["inversion_max_iterations"]),              # max_iterations
+        Int(options["inversion_save_frequency"]),           # save_frequency
+        options["inversion_save_checkpoint"],                # save_checkpoint
+        Int(options["inversion_checkpoint_frequency"]),     # checkpoint_frequency
         options["inversion_sensealg"],                       # inversion_sensealg
         options["inversion_truth_file_name"],         # inversion_truth_file_name
         options["inversion_forward_simulation_initial_condition_options"], # forward_simulation_initial_condition_options
@@ -301,7 +323,8 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         options["inversion_ode_solver_options"]["ode_solver_b_jac_sparsity"], # ode_solver_b_jac_sparsity
         Int(options["inversion_ode_solver_options"]["ode_solver_nSave"]), # ode_solver_nSave
         options["inversion_save_file_name"],                   # save_file_name
-        get(options, "inversion_save_loss_history_file_name", "loss_history.jld2") # save_loss_history_file_name
+        get(options, "inversion_save_loss_history_file_name", "loss_history.jld2"), # save_loss_history_file_name
+        get(options, "inversion_save_parameters_history_file_name", "parameters_history.csv") # save_parameters_history_file_name
     )
 end
 
