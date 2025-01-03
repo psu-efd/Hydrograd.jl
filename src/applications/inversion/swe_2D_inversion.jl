@@ -19,6 +19,11 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
         println("       inversion parameter name = ", active_param_name)
     end
 
+    #some sanity check
+    if settings.inversion_settings.bInversion_slope_loss && active_param_name !== "zb"
+        throw(ArgumentError("The slope regularization is only applicable to the bed elevation parameter (zb). No inversion is performed. Please check the inversion settings."))
+    end
+
     #open the forward simulation result (as the ground truth)
     sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String,Vector{Float64}})
 

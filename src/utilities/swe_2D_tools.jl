@@ -14,6 +14,10 @@ function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, sa
     #calculate total volume of water 
     for (index, state) in enumerate(sol)
 
+        field_name = "forward_simulation_saved_index"
+        field_type = "integer"
+        field_value = index
+
         # Extract solution components
         h_array = state[:, 1]
         q_x_array = state[:, 2]
@@ -37,7 +41,7 @@ function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, sa
         vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             
         file_path = joinpath(save_path, vtk_fileName ) 
-        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
     
     end
         
@@ -55,6 +59,10 @@ function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell
     #calculate total volume of water 
     #for index in 1:size(sol, 3)
     for index in axes(sol, 3)
+
+        field_name = "forward_simulation_saved_index"
+        field_type = "integer"
+        field_value = index
 
         Q = @view sol[:,:,index]  # Q will be a view of the 2D slice at timestep index
 
@@ -75,7 +83,7 @@ function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell
         vtk_fileName = @sprintf("solution_%04d_AdHydraulics.vtk", index)
             
         file_path = joinpath(save_path, vtk_fileName ) 
-        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
     
     end
 
@@ -97,7 +105,7 @@ function export_to_vtk_2D(filename, nodeCoordinates, cellNodesList, cellNodesCou
         println("field_name: ", field_name)
         println("field_type: ", field_type)
         println("field_value: ", field_value)
-        
+
         return
     end
 

@@ -95,7 +95,20 @@ function parse_control_file(control_file::String)
     control_dict = JSON3.read(open(control_file), Dict)
     control_file_dir = dirname(control_file)  # Get directory of control file
 
-    # Parse time settings
+    # check whether any of the task flags are present
+    if !(haskey(control_dict["control_variables"], "bPerform_Forward_Simulation") &&
+         haskey(control_dict["control_variables"], "bPerform_Inversion") &&
+         haskey(control_dict["control_variables"], "bPerform_Sensitivity_Analysis"))
+        error("None of the task flags (bPerform_Forward_Simulation, bPerform_Inversion, and bPerform_Sensitivity_Analysis) are present. Please set at least one of the task flags to true.")
+    end
+
+    if !any([control_dict["control_variables"]["bPerform_Forward_Simulation"],
+            control_dict["control_variables"]["bPerform_Inversion"],
+            control_dict["control_variables"]["bPerform_Sensitivity_Analysis"]])
+        error("No task flag is set true. Please set at least one of the task flags to true.")
+    end
+
+    # Parse time settings (always required)
     time_settings = TimeSettings(
         control_dict["time_settings"]["bUse_srhhydro_time_settings"],
         Tuple(Float64.(control_dict["time_settings"]["tspan"])),

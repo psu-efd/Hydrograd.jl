@@ -1,0 +1,23 @@
+SRHHYDRO 30
+Case "simple"
+Description "Simple open channel flow for debugging"
+RunType FLOW
+ModelTemp OFF
+UnsteadyOutput UNSTEADY
+SimTime 0.0 0.02 0.1
+TurbulenceModel PARABOLIC
+ParabolicTurbulence 0.7
+InitCondOption DRY
+Grid "simple.srhgeom"
+HydroMat "simple.srhmat"
+OutputFormat XMDFC SI
+OutputOption 1
+OutputInterval 1.0
+ManningsN 0 0.03
+ManningsN 1 0.03
+BC 1 INLET-Q
+BC 2 EXIT-H
+BC 3 MONITORING
+BC 4 MONITORING
+IQParams 1 0.3 SI CONVEYANCE
+EWSParamsC 2 1.0 SI C

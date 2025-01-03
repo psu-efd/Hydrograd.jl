@@ -58,6 +58,10 @@ function greet_your_package_name()
     return "Hello from Hydrograd!"
 end
 
+#submodule for SRH-2D
+include("utilities/SRH_2D/module_SRH_2D_case.jl")
+export SRH_2D_Case
+
 #controls
 include("controls/control_settings_2D.jl")
 
