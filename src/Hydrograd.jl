@@ -12,6 +12,8 @@ using Printf
 using Plots
 using SparseArrays
 
+using StableRNGs
+
 #SciML related 
 using SciMLSensitivity
 using OrdinaryDiffEq
@@ -95,6 +97,9 @@ include("parameters/process_model_parameters_2D.jl")
 include("parameters/process_ManningN_2D.jl")
 include("parameters/process_bed_2D.jl")
 
+#UDE
+include("UDE/process_UDE.jl")
+
 #utilities
 include("utilities/misc_tools.jl")
 include("utilities/process_SRH_2D_input.jl")
@@ -110,6 +115,7 @@ include("applications/inversion/swe_2D_inversion.jl")
 include("applications/inversion/process_inversion_results_2D.jl")
 include("applications/sensitivity/swe_2D_sensitivity.jl")
 include("applications/sensitivity/process_sensitivity_results_2D.jl")
+include("applications/UDE/swe_2D_UDE.jl")
 
 
 export print_banner
@@ -175,6 +181,10 @@ export custom_ODE_update_cells
 export setup_model_parameters_2D
 export preprocess_model_parameters_2D
 
+# UDE
+export create_NN_model
+export save_NN_model
+export load_NN_model
 
 # Utilities
 export update_1d_array
@@ -205,6 +215,7 @@ export swe_2D_inversion
 export postprocess_inversion_results_swe_2D
 export swe_2D_sensitivity
 export postprocess_sensitivity_results_swe_2D
+export swe_2D_UDE
 
 
 end

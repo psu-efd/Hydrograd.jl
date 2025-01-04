@@ -59,3 +59,12 @@ function update_ManningN(my_mesh_2D::mesh_2D,
 
     return ManningN_cells
 end
+
+#update Manning's n values from the UDE model's neural network
+function update_ManningN_UDE(h, ude_model, ude_model_params, ude_model_state)
+
+    #only take the first output (need to update the state too?)
+    ManningN_cells = [ude_model(h[iCell], ude_model_params, ude_model_state)[1] for iCell in 1:my_mesh_2D.numOfCells]
+
+    return ManningN_cells
+end

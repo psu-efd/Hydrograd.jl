@@ -78,16 +78,46 @@ struct SensitivityAnalysisSettings
     save_file_name::String
 end
 
+struct UDESettings
+    UDE_choice::String
+    UDE_NN_config::Dict
+    UDE_bWSE_loss::Bool
+    UDE_b_uv_loss::Bool
+    UDE_optimizer::String
+    UDE_learning_rate::Float64
+    UDE_max_iterations::Int
+    UDE_save_frequency::Int
+    UDE_save_checkpoint::Bool
+    UDE_checkpoint_frequency::Int
+    UDE_sensealg::String
+    UDE_truth_file_name::String
+    forward_simulation_initial_condition_options::String
+    forward_simulation_initial_condition_file_name::String
+    forward_simulation_initial_condition_constant_values::Vector{Float64}
+    forward_simulation_initial_condition_values_from_file::Union{Dict,Nothing}
+    UDE_ode_solver::String
+    UDE_ode_solver_adaptive::Bool
+    UDE_ode_solver_sensealg::String
+    UDE_ode_solver_b_jac_sparsity::Bool
+    UDE_ode_solver_nSave::Int
+    UDE_save_file_name::String
+    UDE_save_loss_history_file_name::String
+    UDE_save_parameters_history_file_name::String
+end
+
+
 struct ControlSettings
     bVerbose::Bool
     srhhydro_file_name::String
     bPerform_Forward_Simulation::Bool
     bPerform_Inversion::Bool
     bPerform_Sensitivity_Analysis::Bool
+    bPerform_UDE::Bool
     time_settings::TimeSettings
     forward_settings::Union{ForwardSimulationSettings,Nothing}
     inversion_settings::Union{InversionSettings,Nothing}
     sensitivity_analysis_settings::Union{SensitivityAnalysisSettings,Nothing}
+    UDE_settings::Union{UDESettings,Nothing}
 end
 
 # Function to parse control file and create settings
@@ -98,13 +128,15 @@ function parse_control_file(control_file::String)
     # check whether any of the task flags are present
     if !(haskey(control_dict["control_variables"], "bPerform_Forward_Simulation") &&
          haskey(control_dict["control_variables"], "bPerform_Inversion") &&
-         haskey(control_dict["control_variables"], "bPerform_Sensitivity_Analysis"))
-        error("None of the task flags (bPerform_Forward_Simulation, bPerform_Inversion, and bPerform_Sensitivity_Analysis) are present. Please set at least one of the task flags to true.")
+         haskey(control_dict["control_variables"], "bPerform_Sensitivity_Analysis") &&
+         haskey(control_dict["control_variables"], "bPerform_UDE"))
+        error("None of the task flags (bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, and bPerform_UDE) are present. Please set at least one of the task flags to true.")
     end
 
     if !any([control_dict["control_variables"]["bPerform_Forward_Simulation"],
             control_dict["control_variables"]["bPerform_Inversion"],
-            control_dict["control_variables"]["bPerform_Sensitivity_Analysis"]])
+            control_dict["control_variables"]["bPerform_Sensitivity_Analysis"],
+            control_dict["control_variables"]["bPerform_UDE"]])
         error("No task flag is set true. Please set at least one of the task flags to true.")
     end
 
@@ -133,6 +165,12 @@ function parse_control_file(control_file::String)
         sensitivity_analysis_settings = parse_sensitivity_analysis_settings(control_dict["sensitivity_analysis_options"], control_file_dir)
     end
 
+    # Parse UDE settings if needed
+    UDE_settings = nothing
+    if control_dict["control_variables"]["bPerform_UDE"]
+        UDE_settings = parse_UDE_settings(control_dict["UDE_options"], control_file_dir)
+    end
+
     # Create main control settings
     settings = ControlSettings(
         control_dict["bVerbose"],
@@ -140,15 +178,17 @@ function parse_control_file(control_file::String)
         control_dict["control_variables"]["bPerform_Forward_Simulation"],
         control_dict["control_variables"]["bPerform_Inversion"],
         control_dict["control_variables"]["bPerform_Sensitivity_Analysis"],
+        control_dict["control_variables"]["bPerform_UDE"],
         time_settings,
         forward_settings,
         inversion_settings,
-        sensitivity_analysis_settings
+        sensitivity_analysis_settings,
+        UDE_settings
     )
 
     # Validate settings
-    if settings.bPerform_Forward_Simulation + settings.bPerform_Inversion + settings.bPerform_Sensitivity_Analysis != 1
-        error("Currently only one at a time: forward simulation, inversion, or sensitivity analysis.")
+    if settings.bPerform_Forward_Simulation + settings.bPerform_Inversion + settings.bPerform_Sensitivity_Analysis + settings.bPerform_UDE != 1
+        error("Currently only one at a time: forward simulation, inversion, sensitivity analysis, or UDE.")
     end
 
     # Use settings throughout the code
@@ -159,6 +199,7 @@ function parse_control_file(control_file::String)
         println("   bPerform_Forward_Simulation = ", settings.bPerform_Forward_Simulation)
         println("   bPerform_Inversion = ", settings.bPerform_Inversion)
         println("   bPerform_Sensitivity_Analysis = ", settings.bPerform_Sensitivity_Analysis)
+        println("   bPerform_UDE = ", settings.bPerform_UDE)
 
         println("Time settings (overwrite SRH-2D case if bUse_srhhydro_time_settings is false):")
         println("    bUse_srhhydro_time_settings = ", settings.time_settings.bUse_srhhydro_time_settings)
@@ -253,6 +294,34 @@ function parse_control_file(control_file::String)
             println("    save_file_name = ", settings.sensitivity_analysis_settings.save_file_name)
         else
             println("No sensitivity analysis is to be performed.")
+        end
+
+        if settings.bPerform_UDE
+            println("UDE is to be performed.")
+            println("UDE options:")
+            println("    UDE_choice = ", settings.UDE_settings.UDE_choice)
+            println("    UDE_NN_config = ", settings.UDE_settings.UDE_NN_config)
+            println("    UDE_bWSE_loss = ", settings.UDE_settings.UDE_bWSE_loss)
+            println("    UDE_b_uv_loss = ", settings.UDE_settings.UDE_b_uv_loss)
+            println("    UDE_optimizer = ", settings.UDE_settings.UDE_optimizer)
+            println("    UDE_learning_rate = ", settings.UDE_settings.UDE_learning_rate)
+            println("    UDE_max_iterations = ", settings.UDE_settings.UDE_max_iterations)
+            println("    UDE_save_frequency = ", settings.UDE_settings.UDE_save_frequency)
+            println("    UDE_save_checkpoint = ", settings.UDE_settings.UDE_save_checkpoint)
+            println("    UDE_checkpoint_frequency = ", settings.UDE_settings.UDE_checkpoint_frequency)
+            println("    UDE_sensealg = ", settings.UDE_settings.UDE_sensealg)
+            println("    UDE_truth_file_name = ", settings.UDE_settings.UDE_truth_file_name)
+            println("    UDE_forward_simulation_initial_condition_options = ", settings.UDE_settings.UDE_forward_simulation_initial_condition_options)
+            println("    UDE_forward_simulation_initial_condition_file_name = ", settings.UDE_settings.UDE_forward_simulation_initial_condition_file_name)
+            println("    UDE_forward_simulation_initial_condition_constant_values = ", settings.UDE_settings.UDE_forward_simulation_initial_condition_constant_values)
+            println("    ode_solver = ", settings.UDE_settings.UDE_ode_solver)
+            println("    ode_solver_adaptive = ", settings.UDE_settings.UDE_ode_solver_adaptive)
+            println("    ode_solver_sensealg = ", settings.UDE_settings.UDE_ode_solver_sensealg)
+            println("    ode_solver_b_jac_sparsity = ", settings.UDE_settings.UDE_ode_solver_b_jac_sparsity)
+            println("    ode_solver_nSave = ", settings.UDE_settings.UDE_ode_solver_nSave)
+            println("    save_file_name = ", settings.UDE_settings.save_file_name)
+        else
+            println("No UDE is to be performed.")
         end
 
         println("--------------------------------")
@@ -372,6 +441,70 @@ function parse_sensitivity_analysis_settings(options::Dict, control_file_dir::St
         options["sensitivity_ode_solver_options"]["ode_solver_b_jac_sparsity"],
         Int(options["sensitivity_ode_solver_options"]["ode_solver_nSave"]),
         options["sensitivity_save_file_name"]
+    )
+end
+
+function parse_UDE_settings(options::Dict, control_file_dir::String)
+
+    #sanity check
+    if !haskey(options, "UDE_choice")
+        error("UDE_choice is not present in the control file.")
+    end
+
+    #for the option of ManningN_h, the input dimension must be 1 (h) and the output dimension must be 1 (ManningN)
+    if options["UDE_choice"] == "ManningN_h" 
+
+        input_dim = options["UDE_NN_config"]["input_dim"]
+        output_dim = options["UDE_NN_config"]["output_dim"]
+
+        if input_dim != 1 || output_dim != 1
+            error("For ManningN_h, the input dimension must be 1 and the output dimension must be 1.")
+        end
+
+    end
+
+    #for the option of FlowResistance, the input dimension must be 3 (h, hu, hv) and the output dimension must be 1 (tau_b)
+    if options["UDE_choice"] == "FlowResistance" 
+
+        input_dim = options["UDE_NN_config"]["input_dim"]
+        output_dim = options["UDE_NN_config"]["output_dim"]
+
+        if input_dim != 3 || output_dim != 1
+            error("For FlowResistance, the input dimension must be 3 and the output dimension must be 1.")
+        end
+    end
+
+    forward_simulation_initial_condition_values_from_file = nothing
+    if options["UDE_forward_simulation_initial_condition_options"] == "from_file"
+        file_path = joinpath(control_file_dir, options["UDE_forward_simulation_initial_condition_file_name"])
+        forward_simulation_initial_condition_values_from_file = JSON3.read(open(file_path), Dict)
+    end
+
+    UDESettings(
+        String(options["UDE_choice"]),
+        Dict(options["UDE_NN_config"]),
+        Bool(options["UDE_bWSE_loss"]),
+        Bool(options["UDE_b_uv_loss"]),
+        String(options["UDE_optimizer"]),
+        Float64(options["UDE_learning_rate"]),
+        Int(options["UDE_max_iterations"]),
+        Int(options["UDE_save_frequency"]),
+        Bool(options["UDE_save_checkpoint"]),
+        Int(options["UDE_checkpoint_frequency"]),
+        String(options["UDE_sensealg"]),
+        String(options["UDE_truth_file_name"]),
+        String(options["UDE_forward_simulation_initial_condition_options"]),
+        String(options["UDE_forward_simulation_initial_condition_file_name"]),
+        Float64.(options["UDE_forward_simulation_initial_condition_constant_values"]),
+        forward_simulation_initial_condition_values_from_file,
+        String(options["UDE_ode_solver_options"]["ode_solver"]),
+        Bool(options["UDE_ode_solver_options"]["ode_solver_adaptive"]),
+        String(options["UDE_ode_solver_options"]["ode_solver_sensealg"]),
+        Bool(options["UDE_ode_solver_options"]["ode_solver_b_jac_sparsity"]),
+        Int(options["UDE_ode_solver_options"]["ode_solver_nSave"]),
+        String(options["UDE_save_file_name"]),
+        String(options["UDE_save_loss_history_file_name"]),
+        String(options["UDE_save_parameters_history_file_name"])
     )
 end
 

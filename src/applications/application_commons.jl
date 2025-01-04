@@ -1,4 +1,5 @@
 #some common structs and functions for all applications
+using Lux
 
 # Create a struct to hold all the constant parameters for the SWE2D RHS function
 # These parameters are "extra", meaning, they are not part of the inversion/sensitivity analysis parameters, 
@@ -19,4 +20,7 @@ struct SWE2D_Extra_Parameters{T}
     zb_ghostCells::Vector{T}
     zb_faces::Vector{T}
     S0::Matrix{T}
+    ude_model::Union{Nothing, Lux.Chain}
+    ude_model_params::Union{Nothing, NamedTuple}
+    ude_model_state::Union{Nothing, NamedTuple}
 end

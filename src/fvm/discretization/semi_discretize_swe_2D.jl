@@ -103,6 +103,12 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::Vector{T1}, t::Float64, p_extr
         ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
     end
 
+    #for the case of UDE, we need to update ManningN or flow resistance based on the UDE model
+    #In this case, params_vector is the trainable NN parameters
+    if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
+        ManningN_cells_local = update_ManningN_UDE(h, ude_model, ude_model_params, ude_model_state)
+    end
+
     Zygote.ignore() do
         if settings.bVerbose
             #@show typeof(ManningN_cells_local)

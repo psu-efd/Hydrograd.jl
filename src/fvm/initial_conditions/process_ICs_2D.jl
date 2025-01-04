@@ -20,8 +20,12 @@ function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb
         initial_condition_options = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_options
         initial_condition_constant_values = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_constant_values
         initial_condition_values_from_file = settings.sensitivity_analysis_settings.forward_simulation_initial_condition_values_from_file
+    elseif settings.bPerform_UDE
+        initial_condition_options = settings.UDE_settings.forward_simulation_initial_condition_options
+        initial_condition_constant_values = settings.UDE_settings.forward_simulation_initial_condition_constant_values
+        initial_condition_values_from_file = settings.UDE_settings.forward_simulation_initial_condition_values_from_file
     else
-        error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis. No initial condition is to be setup.")
+        error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, or bPerform_UDE. No initial condition is to be setup.")
     end
 
     if settings.bVerbose

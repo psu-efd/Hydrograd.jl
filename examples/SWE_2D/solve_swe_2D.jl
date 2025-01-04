@@ -174,6 +174,9 @@ Q0 = hcat(h, q_x, q_y)
 
 Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
+# Define the UDE model (if not performing UDE, ude_model, ude_model_params, ude_model_state will not be used)
+ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(settings)
+
 # Create the extra parameters struct
 swe_extra_params = SWE2D_Extra_Parameters(
     active_param_name,
@@ -190,10 +193,11 @@ swe_extra_params = SWE2D_Extra_Parameters(
     zb_cells,
     zb_ghostCells,
     zb_faces,
-    S0
+    S0,
+    ude_model,
+    ude_model_params,
+    ude_model_state
 )
-
-
 
 # Create the ODEFunction with the extra parameters struct passed in.
 ode_f = ODEFunction((u, p, t) -> begin
@@ -207,6 +211,7 @@ ode_f = ODEFunction((u, p, t) -> begin
 
     swe_2d_rhs(u, p, t, swe_extra_params)
 end; jac_prototype=jac_sparsity)
+
 
 #########################
 #Forward Simulation part#
@@ -248,6 +253,19 @@ if settings.bPerform_Sensitivity_Analysis
     #perform sensitivity analysis
     Hydrograd.swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_path)
 
+end
+
+
+#########################
+#UDE part               # 
+#########################
+
+if settings.bPerform_UDE
+
+    println("UDE ...")
+
+    #perform UDE
+    Hydrograd.swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
 end
 
 #Timing 
