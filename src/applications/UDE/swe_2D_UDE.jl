@@ -6,22 +6,20 @@ using Dates
 
 #main function for the UDE
 function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
-   
 
     #unpack the extra parameters
     settings = swe_extra_params.settings
-    ude_model = swe_extra_params.ude_model
     my_mesh_2D = swe_extra_params.my_mesh_2D
     swe_2D_constants = swe_extra_params.swe_2D_constants
 
     nodeCoordinates = swe_extra_params.nodeCoordinates
 
-    if settings.bVerbose        
+    if settings.bVerbose
         println("UDE choice: ", settings.UDE_settings.UDE_choice)
     end
 
     #open the forward simulation result (as the ground truth)
-    sol_truth = JSON3.read(open(joinpath(case_path, settings.inversion_settings.inversion_truth_file_name)), Dict{String,Vector{Float64}})
+    sol_truth = JSON3.read(open(joinpath(case_path, settings.UDE_settings.UDE_truth_file_name)), Dict{String,Vector{Float64}})
 
     if settings.bVerbose
         #@show typeof(sol_truth)
@@ -57,32 +55,48 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
         end
     end
 
+    #p_init is the initial weights for the UDE's NN model
+    p_init = ComponentVector{Float64}(swe_extra_params.ude_model_params)
+
     #perform the UDE
-    println("   Performing UDE ...\n")
-    sol, ITER, LOSS, PRED, PARS = UDE_training(ode_f, ude_model, rng, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    sol, ITER, LOSS, PRED, PARS = nothing, nothing, nothing, nothing, nothing
+    if settings.UDE_settings.UDE_mode == "training"
+        println("   Performing UDE training ...\n")
+        sol, ITER, LOSS, PRED, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
 
-    #save the UDE results
-    jldsave(joinpath(case_path, settings.UDE_settings.save_file_name); ITER, LOSS, PRED, PARS)
+        #save the UDE results
+        jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PRED, PARS,
+            ude_model_params=sol.u, ude_model_state=swe_extra_params.ude_model_state)
 
-    #process the UDE results
-    println("   Post-processing UDE results ...")
+        #process the UDE results
+        println("   Post-processing UDE results ...")
 
-    #process UDE results
-    #Hydrograd.postprocess_UDE_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+        #process UDE results
+        Hydrograd.postprocess_UDE_training_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+    elseif settings.UDE_settings.UDE_mode == "inference"
+        println("   Performing UDE inference ...\n")
+        sol = UDE_inference(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
+
+        #save the UDE results
+        jldsave(joinpath(case_path, settings.UDE_settings.UDE_inference_save_file_name); sol)
+
+        #process the UDE results
+        println("   Post-processing UDE results ...")
+
+        #process UDE results
+        Hydrograd.postprocess_UDE_inference_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+    else
+        error("Invalid UDE mode: $(settings.UDE_settings.UDE_mode). Supported options: training, inference.")
+    end
 
 end
 
 #train the UDE
-function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
     #start the timer for the UDE
     UDE_start_time = now()  # Current date and time
 
-    # Ge the inital parameters and state variables of the NN model 
-    #p_NN, st_NN = Lux.setup(rng, ude_model)
-
-    #const _st_NN = st_NN
-
-    # Loss function for optimization
+    # Loss function for optimization: θ is the trainable parameters (NN weights), p is not used
     function opt_loss(θ, p)  # Add p argument even if unused
 
         data_type = eltype(θ)
@@ -93,7 +107,7 @@ function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mes
             #println("p_init = ", p_init)
         end
 
-        loss_total, loss_pred_WSE, loss_pred_uv, pred = compute_loss(ode_f, ude_model, Q0, tspan, θ, settings,
+        loss_total, loss_pred_WSE, loss_pred_uv, pred = compute_loss_UDE(ode_f, Q0, tspan, θ, settings,
             my_mesh_2D, swe_2D_constants, observed_data, data_type)
 
         # Call callback with all values (but outside gradient calculation)
@@ -115,17 +129,17 @@ function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mes
     #  AutoEnzyme(): Highly performant AD choice for type stable and optimized code
 
     adtype = nothing
-    if settings.inversion_settings.inversion_sensealg == "AutoZygote()"
+    if settings.UDE_settings.UDE_sensealg == "AutoZygote()"
         adtype = Optimization.AutoZygote()
-    elseif settings.inversion_settings.inversion_sensealg == "AutoReverseDiff()"
+    elseif settings.UDE_settings.UDE_sensealg == "AutoReverseDiff()"
         adtype = Optimization.AutoReverseDiff(compile=false)
-    elseif settings.inversion_settings.inversion_sensealg == "AutoForwardDiff()"
+    elseif settings.UDE_settings.UDE_sensealg == "AutoForwardDiff()"
         adtype = Optimization.AutoForwardDiff()
-    elseif settings.inversion_settings.inversion_sensealg == "AutoReverseDiff()"
+    elseif settings.UDE_settings.UDE_sensealg == "AutoReverseDiff()"
         adtype = Optimization.AutoReverseDiff(compile=false)
     else
-        println("       settings.inversion_settings.inversion_sensealg = ", settings.inversion_settings.inversion_sensealg)
-        throw(ArgumentError("Invalid sensealg choice. Supported sensealg: AutoZygote(), AutoReverseDiff(), AutoForwardDiff(), AutoFiniteDiff(), AutoModelingToolkit(), AutoEnzyme(). No inversion is performed."))
+        println("       settings.UDE_settings.UDE_sensealg = ", settings.UDE_settings.UDE_sensealg)
+        throw(ArgumentError("Invalid sensealg choice. Supported sensealg: AutoZygote(), AutoReverseDiff(), AutoForwardDiff(), AutoFiniteDiff(), AutoModelingToolkit(), AutoEnzyme(). No UDE is performed."))
     end
 
     # Define the optimization function and problem
@@ -164,29 +178,26 @@ function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mes
     #ub_p .= 0.3
 
     #create the optimizer
-    if settings.inversion_settings.optimizer == "Adam"
-        optimizer = Adam(settings.inversion_settings.learning_rate)
-    elseif settings.inversion_settings.optimizer == "LBFGS"
+    if settings.UDE_settings.UDE_optimizer == "Adam"
+        optimizer = Adam(settings.UDE_settings.UDE_learning_rate)
+    elseif settings.UDE_settings.UDE_optimizer == "LBFGS"
         optimizer = LBFGS()
     else
-        throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed."))
+        throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No UDE is performed."))
     end
 
-    #define the accumulators for the inversion results
+    #define the accumulators for the UDE results
     ITER = []        #iteration number accumulator
     LOSS = []        # Loss accumulator
     PRED = []        # prediction accumulator
     PARS = []        # parameters accumulator
 
-    # Define the callback to handle both vector and OptimizationState inputs
-    #callback = function (state_or_θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred)
-    #    θ = state_or_θ isa Optimization.OptimizationState ? state_or_θ.u : state_or_θ
-    #    println("Loss: ", loss_total)
-    #    println("Parameters: ", θ)
-    #    return false  # continue optimization
-    #end
+    # Define the callback 
+    # The first argument is the state of the optimizer, which is an OptimizationState object
+    callback = function (state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
 
-    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
+        # Extract the parameters from the state
+        θ = state.u
 
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
@@ -195,32 +206,29 @@ function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mes
         #reset the UDE start time
         UDE_start_time = UDE_current_time
 
-        iter_number = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+        iter_number = size(LOSS)[1]  #get the UDE iteration number (=length of LOSS array)
 
         Zygote.ignore() do
-            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv = ", iter_number, ", ",
-                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv)
+            println("      iter, loss_total, loss_pred_WSE, loss_pred_uv = ", iter_number, ", ",
+                loss_total, ", ", loss_pred_WSE, ", ", loss_pred_uv)
             println("      UDE iteration elapsed seconds = ", UDE_elapsed_seconds)
         end
 
         #save the UDE results
-        if iter_number % settings.UDE_settings.save_frequency == 0
+        if iter_number % settings.UDE_settings.UDE_training_save_frequency == 0
             append!(ITER, iter_number)
 
             append!(PRED, [prediction[:, 1, end]])
 
-            append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv]])
+            append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
 
-            if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
-                #println("theta.u = ", θ.u)
-                append!(PARS, [copy(θ.u)])
-            else
-                append!(PARS, θ)
-            end
+            append!(PARS, θ)
         end
 
-        #checkpoint the inversion results (in case the inversion is interrupted)
-        if settings.UDE_settings.save_checkpoint && iter_number % settings.UDE_settings.checkpoint_frequency == 0
+        #checkpoint the UDE results (in case the UDE training is interrupted)
+        if settings.UDE_settings.UDE_training_save_checkpoint &&
+           iter_number % settings.UDE_settings.UDE_training_checkpoint_frequency == 0 &&
+           iter_number > 0
             jldsave(joinpath(case_path, "checkpoint_UDE_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
         end
 
@@ -246,23 +254,83 @@ function UDE_training(ode_f, ude_model, rng, Q0, tspan, p_init, settings, my_mes
     #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
     #   stats: statistics of the solver, such as the number of function evaluations required.
 
-    sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.max_iterations)
+    sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations)
 
     return sol, ITER, LOSS, PRED, PARS
 end
 
 
-
-
 # Define the loss function
-function compute_loss(ode_f, ude_model, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type)
+function compute_loss_UDE(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type)
     # Solve the ODE (forward pass)
 
-    # Create ODEProblem        
+
+    #compute the loss
+    # Ensure type stability in loss computation
+    loss_total = zero(data_type)
+    loss_pred_WSE = zero(data_type)
+    loss_pred_uv = zero(data_type)
+
+    if pred.retcode == SciMLBase.ReturnCode.Success
+        WSE_truth = Vector{Float64}(observed_data["WSE_truth"])
+        #h_truth = Vector{Float64}(observed_data["h_truth"])
+        u_truth = Vector{Float64}(observed_data["u_truth"])
+        v_truth = Vector{Float64}(observed_data["v_truth"])
+
+        zb_cells_temp = observed_data["zb_cell_truth"]
+
+        l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
+
+        #loss for free surface elevation mismatch
+        if settings.UDE_settings.UDE_bWSE_loss
+            loss_pred_WSE = sum(abs2, l)
+        end
+
+        #loss for velocity mismatch
+        # Add small epsilon to prevent division by zero
+        ϵ = sqrt(eps(data_type))
+
+        if settings.UDE_settings.UDE_b_uv_loss      #if also include u in the loss 
+            l_u = pred[:, 2, end] ./ (pred[:, 1, end] .+ ϵ) .- u_truth
+            l_v = pred[:, 3, end] ./ (pred[:, 1, end] .+ ϵ) .- v_truth
+
+            loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
+        end
+
+        #combined loss due to free surface elevation mismatch and velocity mismatch
+        loss_total = loss_pred_WSE + loss_pred_uv
+    else
+        loss_total = convert(data_type, Inf)
+    end
+
+    Zygote.ignore() do
+        if settings.bVerbose
+            #@show loss_total
+            #@show loss_pred
+            #@show loss_pred_WSE
+            #@show loss_pred_uv
+            #@show loss_slope
+        end
+    end
+
+    return loss_total, loss_pred_WSE, loss_pred_uv, pred
+end
+
+
+
+#inference from the trained UDE
+function UDE_inference(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
+
+end
+
+#perform forward simulation
+function UDE_forward_simulation(ode_f, Q0, tspan, p, settings, swe_2D_constants)
+
+    # Create ODEProblem: p should be the weights of the NN model         
     prob = ODEProblem(ode_f, Q0, tspan, p)
 
     # Create ODE solver
-    if settings.UDE_options.ode_solver == "Tsit5()"
+    if settings.UDE_settings.UDE_ode_solver == "Tsit5()"
         ode_solver = Tsit5()
     else
         error("Not implemented yet")
@@ -292,25 +360,25 @@ function compute_loss(ode_f, ude_model, Q0, tspan, p, settings, my_mesh_2D, swe_
     # 8. InterpolatingVJP()                          #not tested
     # 9. BacksolveVJP()                              #not tested
     # 10. Default (unspecified): working, but no control on sensealg
-    if settings.UDE_options.ode_solver_sensealg == "ZygoteVJP()"
+    if settings.UDE_settings.UDE_ode_solver_sensealg == "ZygoteVJP()"
         ode_solver_sensealg = ZygoteVJP()
-    elseif settings.UDE_options.ode_solver_sensealg == "InterpolatingAdjoint(autojacvec=ZygoteVJP())"
+    elseif settings.UDE_settings.UDE_ode_solver_sensealg == "InterpolatingAdjoint(autojacvec=ZygoteVJP())"
         ode_solver_sensealg = InterpolatingAdjoint(autojacvec=ZygoteVJP())
-    elseif settings.UDE_options.ode_solver_sensealg == "ForwardDiffSensitivity()"
+    elseif settings.UDE_settings.UDE_ode_solver_sensealg == "ForwardDiffSensitivity()"
         ode_solver_sensealg = ForwardDiffSensitivity()
-    elseif settings.UDE_options.ode_solver_sensealg == "BacksolveAdjoint(autojacvec=ZygoteVJP())"
+    elseif settings.UDE_settings.UDE_ode_solver_sensealg == "BacksolveAdjoint(autojacvec=ZygoteVJP())"
         ode_solver_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
     else
         error("Not implemented yet")
     end
 
     #define the time for saving the results for the ODE solver
-    dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.UDE_options.ode_solver_nSave
+    dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.UDE_settings.UDE_ode_solver_nSave
     t_save = swe_2D_constants.tspan[1]:dt_save:swe_2D_constants.tspan[2]
 
     # Solve the ODE
-    pred = solve(prob, ode_solver, adaptive=settings.UDE_options.ode_solver_adaptive, dt=swe_2D_constants.dt, 
-                    saveat=t_save, sensealg=ode_solver_sensealg)
+    pred = solve(prob, ode_solver, adaptive=settings.UDE_settings.UDE_ode_solver_adaptive, dt=swe_2D_constants.dt,
+        saveat=t_save, sensealg=ode_solver_sensealg)
 
     Zygote.ignore() do
         if settings.bVerbose
@@ -321,56 +389,5 @@ function compute_loss(ode_f, ude_model, Q0, tspan, p, settings, my_mesh_2D, swe_
         end
     end
 
-    #compute the loss
-    # Ensure type stability in loss computation
-    loss_total = zero(data_type)
-    loss_pred_WSE = zero(data_type)
-    loss_pred_uv = zero(data_type)
-
-    if pred.retcode == SciMLBase.ReturnCode.Success
-        WSE_truth = Vector{Float64}(observed_data["WSE_truth"])
-        #h_truth = Vector{Float64}(observed_data["h_truth"])
-        u_truth = Vector{Float64}(observed_data["u_truth"])
-        v_truth = Vector{Float64}(observed_data["v_truth"])
-
-        zb_cells_temp = observed_data["zb_cell_truth"]
-
-        l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
-
-        #loss for free surface elevation mismatch
-        if settings.UDE_options.UDE_bWSE_loss
-            loss_pred_WSE = sum(abs2, l)
-        end
-
-        #loss for velocity mismatch
-        # Add small epsilon to prevent division by zero
-        ϵ = sqrt(eps(data_type))
-
-        if settings.UDE_options.UDE_b_uv_loss      #if also include u in the loss 
-            l_u = pred[:, 2, end] ./ (pred[:, 1, end] .+ ϵ) .- u_truth
-            l_v = pred[:, 3, end] ./ (pred[:, 1, end] .+ ϵ) .- v_truth
-
-            loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
-        end
-
-        #combined loss due to free surface elevation mismatch and velocity mismatch
-        loss_total = loss_pred_WSE + loss_pred_uv
-    else
-        loss_total = convert(data_type, Inf)
-    end
-
-    Zygote.ignore() do
-        if settings.bVerbose
-            #@show loss_total
-            #@show loss_pred
-            #@show loss_pred_WSE
-            #@show loss_pred_uv
-            #@show loss_slope
-        end
-    end
-
-    return loss_total, loss_pred_WSE, loss_pred_uv, pred
+    return pred
 end
-
-
-

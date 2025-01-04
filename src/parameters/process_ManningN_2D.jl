@@ -61,10 +61,23 @@ function update_ManningN(my_mesh_2D::mesh_2D,
 end
 
 #update Manning's n values from the UDE model's neural network
-function update_ManningN_UDE(h, ude_model, ude_model_params, ude_model_state)
+function update_ManningN_UDE(h, ude_model, NN_model_params, ude_model_state, my_mesh_2D)
+    # Need to convert scalar input (h) to matrices for Lux
+    ManningN_cells = [
+        let
+            # Reshape scalar h[iCell] into a 1×1 matrix
+            h_matrix = reshape([h[iCell]], 1, 1)
+            # Apply model and extract scalar result
+            ude_model(h_matrix, NN_model_params, ude_model_state)[1][1]
+        end
+        for iCell in 1:my_mesh_2D.numOfCells
+    ]
 
-    #only take the first output (need to update the state too?)
-    ManningN_cells = [ude_model(h[iCell], ude_model_params, ude_model_state)[1] for iCell in 1:my_mesh_2D.numOfCells]
+    Zygote.ignore() do
+        #@show typeof(ManningN_cells)
+        #@show size(ManningN_cells)
+        #@show ManningN_cells
+    end
 
     return ManningN_cells
 end

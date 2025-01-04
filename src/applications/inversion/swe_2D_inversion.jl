@@ -67,7 +67,7 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    sol, ITER, LOSS, PRED, PARS = optimize_parameters(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    sol, ITER, LOSS, PRED, PARS = optimize_parameters_inversion(ode_f, Q0, swe_2D_constants.tspan, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
 
     #save the inversion results
     jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PRED, PARS)
@@ -82,7 +82,7 @@ end
 
 
 # Define the loss function
-function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+function compute_loss_inversion(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
     # Solve the ODE (forward pass)
 
     # Create ODEProblem        
@@ -219,7 +219,7 @@ function compute_loss(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constant
     return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred
 end
 
-function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
     #start the timer for the inversion
     inversion_start_time = now()  # Current date and time
 
@@ -236,7 +236,7 @@ function optimize_parameters(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe
             #println("p_init = ", p_init)
         end
 
-        loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred = compute_loss(ode_f, Q0, tspan, θ, settings,
+        loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred = compute_loss_inversion(ode_f, Q0, tspan, θ, settings,
             my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
         # Call callback with all values (but outside gradient calculation)

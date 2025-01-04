@@ -4,14 +4,18 @@
 # dQdt (= dhdt dq_xdt dq_ydt)
 # Q = [h, q_x, q_y] is the solution vector. q_x = h*u_x, q_y = h*u_y
 
-# Arguments with "_passed" are passed to the function. They are only 
-# used for forward simulations. For inversion and sensitivity analysis, 
-# ManningN_cells, ManningN_ghostCells, inletQ_TotalQ, exitH_WSE, 
-# zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector.
+# Notes on the arguments and params_vector:
+# For forward simulations: params_vector is not used at all. Model parameters (ManningN, zb, inletQ, etc.) are passed within extra parameters (p_extra).
+# For inversion and sensitivity analysis: params_vector is the trainable parameters (ManningN, zb, or inletQ.) that are optimized or whose sensitivities are computed. In 
+#          addition to the trainable parameters, other parameters are passed within extra parameters (p_extra).
+# For UDE: params_vector is the trainable NN parameters. For ManningN_h option, the output of UDE(params_vector) gives the ManningN values for a given h. The ManningN 
+#          values within p_extra are used.  
+#          For flow_resistance option, the output of UDE(params_vector) directly gives the flow resistance values for a given (h, u_x, u_y; no need of ManningN at all).
+#          ude_model, ude_model_params, and ude_model_state are passed within p_extra.
 
 #using JuliaInterpreter
 
-function swe_2d_rhs(Q::Matrix{T1}, params_vector::Vector{T1}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T2})::Matrix{promote_type(T1, T2)} where {T1,T2}
+function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T2})::Matrix{promote_type(T1, T2)} where {T1,T2}
 
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
@@ -103,10 +107,11 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::Vector{T1}, t::Float64, p_extr
         ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
     end
 
-    #for the case of UDE, we need to update ManningN or flow resistance based on the UDE model
+    #For the case of UDE, we need to update ManningN or flow resistance based on the UDE model
     #In this case, params_vector is the trainable NN parameters
     if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
-        ManningN_cells_local = update_ManningN_UDE(h, ude_model, ude_model_params, ude_model_state)
+        #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
+        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, my_mesh_2D)
     end
 
     Zygote.ignore() do

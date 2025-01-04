@@ -79,6 +79,7 @@ struct SensitivityAnalysisSettings
 end
 
 struct UDESettings
+    UDE_mode::String
     UDE_choice::String
     UDE_NN_config::Dict
     UDE_bWSE_loss::Bool
@@ -86,9 +87,9 @@ struct UDESettings
     UDE_optimizer::String
     UDE_learning_rate::Float64
     UDE_max_iterations::Int
-    UDE_save_frequency::Int
-    UDE_save_checkpoint::Bool
-    UDE_checkpoint_frequency::Int
+    UDE_training_save_frequency::Int
+    UDE_training_save_checkpoint::Bool
+    UDE_training_checkpoint_frequency::Int
     UDE_sensealg::String
     UDE_truth_file_name::String
     forward_simulation_initial_condition_options::String
@@ -100,9 +101,11 @@ struct UDESettings
     UDE_ode_solver_sensealg::String
     UDE_ode_solver_b_jac_sparsity::Bool
     UDE_ode_solver_nSave::Int
-    UDE_save_file_name::String
-    UDE_save_loss_history_file_name::String
-    UDE_save_parameters_history_file_name::String
+    UDE_training_save_file_name::String
+    UDE_training_save_loss_history_file_name::String
+    UDE_training_save_parameters_history_file_name::String
+    UDE_training_save_NN_weights_state_file_name::String
+    UDE_inference_save_file_name::String
 end
 
 
@@ -299,6 +302,7 @@ function parse_control_file(control_file::String)
         if settings.bPerform_UDE
             println("UDE is to be performed.")
             println("UDE options:")
+            println("    UDE_mode = ", settings.UDE_settings.UDE_mode)
             println("    UDE_choice = ", settings.UDE_settings.UDE_choice)
             println("    UDE_NN_config = ", settings.UDE_settings.UDE_NN_config)
             println("    UDE_bWSE_loss = ", settings.UDE_settings.UDE_bWSE_loss)
@@ -306,9 +310,9 @@ function parse_control_file(control_file::String)
             println("    UDE_optimizer = ", settings.UDE_settings.UDE_optimizer)
             println("    UDE_learning_rate = ", settings.UDE_settings.UDE_learning_rate)
             println("    UDE_max_iterations = ", settings.UDE_settings.UDE_max_iterations)
-            println("    UDE_save_frequency = ", settings.UDE_settings.UDE_save_frequency)
-            println("    UDE_save_checkpoint = ", settings.UDE_settings.UDE_save_checkpoint)
-            println("    UDE_checkpoint_frequency = ", settings.UDE_settings.UDE_checkpoint_frequency)
+            println("    UDE_training_save_frequency = ", settings.UDE_settings.UDE_training_save_frequency)
+            println("    UDE_training_save_checkpoint = ", settings.UDE_settings.UDE_training_save_checkpoint)
+            println("    UDE_training_checkpoint_frequency = ", settings.UDE_settings.UDE_training_checkpoint_frequency)
             println("    UDE_sensealg = ", settings.UDE_settings.UDE_sensealg)
             println("    UDE_truth_file_name = ", settings.UDE_settings.UDE_truth_file_name)
             println("    UDE_forward_simulation_initial_condition_options = ", settings.UDE_settings.UDE_forward_simulation_initial_condition_options)
@@ -319,7 +323,11 @@ function parse_control_file(control_file::String)
             println("    ode_solver_sensealg = ", settings.UDE_settings.UDE_ode_solver_sensealg)
             println("    ode_solver_b_jac_sparsity = ", settings.UDE_settings.UDE_ode_solver_b_jac_sparsity)
             println("    ode_solver_nSave = ", settings.UDE_settings.UDE_ode_solver_nSave)
-            println("    save_file_name = ", settings.UDE_settings.save_file_name)
+            println("    UDE_training_save_file_name = ", settings.UDE_settings.UDE_training_save_file_name)
+            println("    UDE_training_save_loss_history_file_name = ", settings.UDE_settings.UDE_training_save_loss_history_file_name)
+            println("    UDE_training_save_parameters_history_file_name = ", settings.UDE_settings.UDE_training_save_parameters_history_file_name)
+            println("    UDE_training_save_NN_weights_state_file_name = ", settings.UDE_settings.UDE_training_save_NN_weights_state_file_name)
+            println("    UDE_inference_save_file_name = ", settings.UDE_settings.UDE_inference_save_file_name)
         else
             println("No UDE is to be performed.")
         end
@@ -447,6 +455,25 @@ end
 function parse_UDE_settings(options::Dict, control_file_dir::String)
 
     #sanity check
+    if !haskey(options, "UDE_mode")
+        error("UDE_mode is not present in the control file.")
+    end
+
+    if options["UDE_mode"] != "training" && options["UDE_mode"] != "inference"
+        error("Invalid UDE_mode: $(options["UDE_mode"]). Supported options: training, inference.")
+    end
+
+    # if it is for inference, we need to check if the NN_weights_state_file_name is provided
+    if options["UDE_mode"] == "inference"
+        if options["UDE_choice"]["how_to_initialize_NN"] !== "from_pretrained"
+            error("For inference, how_to_initialize_NN must be from_pretrained. Does not make sense to use a random NN for inference.")
+        end
+
+        if !haskey(options["UDE_NN_config"], "NN_weights_state_file_name")
+            error("NN_weights_state_file_name is not present in the control file.")
+        end
+    end
+
     if !haskey(options, "UDE_choice")
         error("UDE_choice is not present in the control file.")
     end
@@ -481,6 +508,7 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
     end
 
     UDESettings(
+        String(options["UDE_mode"]),
         String(options["UDE_choice"]),
         Dict(options["UDE_NN_config"]),
         Bool(options["UDE_bWSE_loss"]),
@@ -488,9 +516,9 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
         String(options["UDE_optimizer"]),
         Float64(options["UDE_learning_rate"]),
         Int(options["UDE_max_iterations"]),
-        Int(options["UDE_save_frequency"]),
-        Bool(options["UDE_save_checkpoint"]),
-        Int(options["UDE_checkpoint_frequency"]),
+        Int(options["UDE_training_save_frequency"]),
+        Bool(options["UDE_training_save_checkpoint"]),
+        Int(options["UDE_training_checkpoint_frequency"]),
         String(options["UDE_sensealg"]),
         String(options["UDE_truth_file_name"]),
         String(options["UDE_forward_simulation_initial_condition_options"]),
@@ -502,9 +530,11 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
         String(options["UDE_ode_solver_options"]["ode_solver_sensealg"]),
         Bool(options["UDE_ode_solver_options"]["ode_solver_b_jac_sparsity"]),
         Int(options["UDE_ode_solver_options"]["ode_solver_nSave"]),
-        String(options["UDE_save_file_name"]),
-        String(options["UDE_save_loss_history_file_name"]),
-        String(options["UDE_save_parameters_history_file_name"])
+        String(options["UDE_training_save_file_name"]),
+        String(options["UDE_training_save_loss_history_file_name"]),
+        String(options["UDE_training_save_parameters_history_file_name"]),
+        String(options["UDE_training_save_NN_weights_state_file_name"]),
+        String(options["UDE_inference_save_file_name"])
     )
 end
 

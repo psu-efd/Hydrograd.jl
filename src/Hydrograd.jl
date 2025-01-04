@@ -6,12 +6,14 @@ using JSON3
 using JLD2
 using LinearAlgebra
 using Statistics 
+using Random
 using CSV
 using DataFrames
 using Printf
 using Plots
 using SparseArrays
 
+#for reproducible random numbers
 using StableRNGs
 
 #SciML related 
@@ -35,6 +37,12 @@ using Enzyme
 
 #for Bayesian estimation
 #using Turing
+
+using ComponentArrays #match arrays of parameters between Lux and SciML
+
+using Lux  #framework for neural networks
+
+
 
 
 function print_banner()
