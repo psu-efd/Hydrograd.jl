@@ -421,7 +421,9 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
 end
 
 # Function to compute geometric and topological properties
-function compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
+function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Integer, numOfNodes::Integer, nodeCoordinates::Matrix{T}, 
+    cellNodesList::Matrix{Int}, cellNodesCount::Vector{Int}, faceNodes_r_Dict::Dict{Int, Tuple{Int64, Int64}}) where T <: Real
+
     cell_areas = zeros(Float64, numOfCells)
     cell_centroids = zeros(Float64, numOfCells, 2)
     cell_normals = Vector{Vector{Vector{Float64}}}(undef, numOfCells)

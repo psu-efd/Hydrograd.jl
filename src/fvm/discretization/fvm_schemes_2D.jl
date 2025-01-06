@@ -1,12 +1,12 @@
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
-function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
+function update_ghost_cells_scalar(my_mesh_2D::mesh_2D, scalar_cells::AbstractVector{T})::Vector{T} where T<:Real
 
     # Check if scalar_cells is an AbstractArray
-    @assert isa(scalar_cells, AbstractArray) "scalar_cells must be an AbstractArray"
+    #@assert isa(scalar_cells, AbstractArray) "scalar_cells must be an AbstractArray"
 
     # Check if scalar_cells can handle dual numbers
-    @assert eltype(scalar_cells) <: Real "scalar_cells must have elements of a real number type"
+    #@assert eltype(scalar_cells) <: Real "scalar_cells must have elements of a real number type"
 
     scalar_ghostCells = [
         let faceID = my_mesh_2D.allBoundaryFacesIDs_List[iBoundaryFace]
@@ -15,10 +15,10 @@ function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
             # Check validity
             #length(faceCells) == 1 || throw(error("Error: the number of cells for boundary face $(faceID) is not 1."))
 
-            @assert length(faceCells) == 1 "Error: the number of cells for boundary face $(faceID) is not 1."
+            #@assert length(faceCells) == 1 "Error: the number of cells for boundary face $(faceID) is not 1."
 
             # Ensure index is within bounds
-            @assert 1 <= faceCells[1] <= length(scalar_cells) "Index out of bounds for scalar_cells"
+            #@assert 1 <= faceCells[1] <= length(scalar_cells) "Index out of bounds for scalar_cells"
             
             # Get value from neighboring cell (for boundary faces, the neighboring cell is the same as the current cell)
             scalar_cells[faceCells[1]]
@@ -30,7 +30,7 @@ function update_ghost_cells_scalar(my_mesh_2D, scalar_cells)
 end
 
 # computer gradient of a scalar field
-function compute_scalar_gradients(my_mesh_2D, scalar_variable)
+function compute_scalar_gradients(my_mesh_2D::mesh_2D, scalar_variable::AbstractVector{T})::Matrix{T} where T<:Real
 
     # Construct the gradient matrix directly
     grad_scalar_variable = [compute_cell_gradient(iCell, my_mesh_2D, scalar_variable) 
@@ -41,9 +41,10 @@ function compute_scalar_gradients(my_mesh_2D, scalar_variable)
     return gradients
 end
 
-function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
+function compute_cell_gradient(iCell::Int, my_mesh_2D::mesh_2D, scalar_variable::AbstractVector{T})::Vector{T} where T<:Real
     # ... cell gradient computation logic ...
-    cell_gradient = eltype(scalar_variable).([0.0, 0.0])  # Gradient accumulator for this cell
+    #cell_gradient = [zero(T), zero(T)]  # Gradient accumulator for this cell
+    cell_gradient = SVector{2,T}(zero(T), zero(T))
         
     #neighbor cells of the current cell
     cellNeighbors = my_mesh_2D.cellNeighbors_Dict[iCell]
@@ -67,7 +68,7 @@ function compute_cell_gradient(iCell, my_mesh_2D, scalar_variable)
         end
         
         # Compute the variable value on face (average of cell and neighbor for now; can be improved with interpolation)
-        variable_f = (variable_c + variable_n) / 2.0
+        variable_f = T((variable_c + variable_n) / 2.0)
         
         # Compute flux contribution
         flux_temp = my_mesh_2D.cell_normals[iCell][iFace] * variable_f * my_mesh_2D.face_lengths[faceID]
@@ -81,7 +82,7 @@ end
 
 # interpolate a scalar field from cell centers to face centers
 # The boundary condition is not considered here.
-function cells_to_faces_scalar(my_mesh_2D, scalar_variable_c)
+function cells_to_faces_scalar(my_mesh_2D::mesh_2D, scalar_variable_c::AbstractVector{T})::Vector{T} where T<:Real
 
     scalar_variable_f = [
         if length(my_mesh_2D.faceCells_Dict[iFace]) == 2

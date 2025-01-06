@@ -14,9 +14,9 @@ y_train = my_sigmoid.(x_train)              # True values using the sigmoid func
 
 # Define the neural network model
 model = Lux.Chain(
-    Lux.Dense(1, 16, tanh),  # First hidden layer: 1 input -> 16 units with tanh activation
-    Lux.Dense(16, 16, tanh), # Second hidden layer: 16 units -> 16 units with tanh activation
-    Lux.Dense(16, 1)         # Output layer: 16 units -> 1 output
+    Lux.Dense(1, 3, tanh),  # First hidden layer: 1 input -> 16 units with tanh activation
+    Lux.Dense(3, 3, tanh), # Second hidden layer: 16 units -> 16 units with tanh activation
+    Lux.Dense(3, 1)         # Output layer: 16 units -> 1 output
 )
 
 # Initialize model parameters and state

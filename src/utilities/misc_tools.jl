@@ -1,6 +1,6 @@
 #misc tools
 
-function update_1d_array(arr, idx, values)
+function update_1d_array(arr::AbstractVector{T}, idx::AbstractVector{Int}, values::AbstractVector{T}) where T<:Real
     #update a 1D array with a sparse update and avoid breaking the computational graph by creating a new array
     #arr is the array to update
     #idx is the array of indices to update

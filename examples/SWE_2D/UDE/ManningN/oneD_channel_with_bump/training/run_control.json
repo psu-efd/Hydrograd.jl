@@ -31,16 +31,17 @@
             "input_dim": 1,
             "output_dim": 1,
             "hidden_layers": [3, 3],
-            "activations": ["relu", "relu"],
+            "activations": ["tanh", "tanh"],
+            "h_bounds": [0.1, 0.5],
             "output_bounds": [0.03, 0.06]
         },
         
         "UDE_bWSE_loss": true,
-        "UDE_b_uv_loss": true,
+        "UDE_b_uv_loss": false,
                 
         "UDE_optimizer": "Adam",
-        "UDE_learning_rate": 0.01,
-        "UDE_max_iterations": 100,
+        "UDE_learning_rate": 0.1,
+        "UDE_max_iterations": 50,
         "UDE_training_save_frequency": 1,
         "UDE_training_save_checkpoint": true,
         "UDE_training_checkpoint_frequency": 10,

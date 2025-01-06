@@ -1,4 +1,5 @@
 using Lux, Random, Zygote, Optimisers, ComponentArrays, Plots, Statistics
+using JLD2
 
 # Define the sigmoid function
 my_sigmoid(x) = 1 / (1 + exp(-x))
@@ -52,12 +53,12 @@ end
  ps, st = train_model!(model, x_train, y_train)
 
 #save the model
-jldsave("model.jld", ps=ps, st=st)
+#jldsave("model.jld", ps=ps, st=st)
 
 #load the model
-ps_loaded, st_loaded = jldopen("model.jld", "r") do file
-    file["ps"], file["st"]
-end
+#ps_loaded, st_loaded = jldopen("model.jld", "r") do file
+#    file["ps"], file["st"]
+#end
 
 #@show typeof(ps)
 #@show typeof(st)

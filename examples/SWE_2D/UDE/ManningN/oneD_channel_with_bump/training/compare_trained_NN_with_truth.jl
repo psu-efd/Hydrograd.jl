@@ -1,3 +1,7 @@
+using Revise
+
+using Hydrograd
+
 using JLD2
 using Lux
 using Zygote
@@ -47,7 +51,7 @@ function truth_n_h(h_values)
 end
 
 #trained n(h) is from the NN
-function NN_n_h(h_values)
+function NN_n_h(h_values, settings)
     # read the control file
     control_file = "run_control.json"
     control_dict = JSON3.read(open(control_file), Dict)
@@ -57,34 +61,28 @@ function NN_n_h(h_values)
     UDE_training_results_file_name = "UDE_training_results.jld2"
     UDE_training_results = load(UDE_training_results_file_name)
 
+    PARS = UDE_training_results["PARS"]
+    @show typeof(PARS)
+    @show size(PARS)
+    #@show PARS
+
+    #loop over PARS 
+    for i in eachindex(PARS)
+        println("i = $i \n")
+        @show PARS[i]
+    end
+
     #Load the UDE model, parameters (only the last iteration), and state
     UDE_model_params_pretrained = UDE_training_results["ude_model_params"]
     UDE_model_state_pretrained = UDE_training_results["ude_model_state"]
 
-    # Set a random seed for reproducible behaviour
-    rng = StableRNG(1111)
+    UDE_model, UDE_model_params, UDE_model_state = Hydrograd.create_NN_model(settings)
 
-    # NN configuration
-    input_dim = control_dict["UDE_options"]["UDE_NN_config"]["input_dim"]
-    output_dim = control_dict["UDE_options"]["UDE_NN_config"]["output_dim"]
-    hidden_layers = control_dict["UDE_options"]["UDE_NN_config"]["hidden_layers"]
-    activations = control_dict["UDE_options"]["UDE_NN_config"]["activations"]
-    output_bounds = control_dict["UDE_options"]["UDE_NN_config"]["output_bounds"]
+    @show UDE_model_params
+    @show UDE_model_state
 
-    # Construct the model
-    layers = []
-    in_dim = input_dim
-    for (i, h_dim) in enumerate(hidden_layers)
-        push!(layers, Dense(in_dim, h_dim, get_activation(activations[i])))
-        in_dim = h_dim
-    end
-    push!(layers, Dense(in_dim, output_dim))  # Output layer without activation
-
-    # Wrap model to enforce output bounds
-    UDE_model = Chain(layers..., (x -> output_bounds[1] .+ (output_bounds[2] - output_bounds[1]) .* sigmoid(x)))
-
-    # Randomly initialize the NN model
-    UDE_model_params, UDE_model_state = Lux.setup(rng, UDE_model)
+    @show UDE_model_params_pretrained
+    @show UDE_model_state_pretrained
 
     #use the pretrained parameters and state to make the NN prediction
     n_h_NN = update_ManningN_UDE(h_values, UDE_model, UDE_model_params_pretrained, UDE_model_state_pretrained, length(h_values))
@@ -92,43 +90,6 @@ function NN_n_h(h_values)
     return n_h_NN
 end
 
-
-# Function to map activation function names to Lux activation functions
-function get_activation(name::String)
-    if name == "relu"
-        return relu
-    elseif name == "sigmoid"
-        return sigmoid
-    elseif name == "tanh"
-        return tanh
-    elseif name == "softplus"
-        return softplus
-    else
-        error("Unsupported activation function: $name")
-    end
-end
-
-#update Manning's n values from the UDE model's neural network
-function update_ManningN_UDE(h, ude_model, NN_model_params, ude_model_state, num_of_cells)
-    # Need to convert scalar input (h) to matrices for Lux
-    ManningN_cells = [
-        let
-            # Reshape scalar h[iCell] into a 1×1 matrix
-            h_matrix = reshape([h[iCell]], 1, 1)
-            # Apply model and extract scalar result
-            ude_model(h_matrix, NN_model_params, ude_model_state)[1][1]
-        end
-        for iCell in 1:num_of_cells
-    ]
-
-    Zygote.ignore() do
-        #@show typeof(ManningN_cells)
-        #@show size(ManningN_cells)
-        #@show ManningN_cells
-    end
-
-    return ManningN_cells
-end
 
 #plot and compare the truth and the trained n(h)
 function plot_and_compare_n_h(h_values, truth_n_h_values, NN_n_h_values)
@@ -169,6 +130,15 @@ function plot_and_compare_n_h(h_values, truth_n_h_values, NN_n_h_values)
 end
 
 
+#main 
+case_path = pwd()
+
+# Read and parse control file
+println("Reading control file...")
+control_file = joinpath(case_path, "run_control.json")
+settings = Hydrograd.parse_control_file(control_file)
+
+
 #define the h values
 h_values = collect(range(0.001, 1.0, length=100))
 
@@ -176,7 +146,7 @@ h_values = collect(range(0.001, 1.0, length=100))
 truth_n_h_values = truth_n_h(h_values)
 
 #get the trained n(h)
-NN_n_h_values = NN_n_h(h_values)
+NN_n_h_values = NN_n_h(h_values, settings)
 
 @show size(h_values)
 @show h_values

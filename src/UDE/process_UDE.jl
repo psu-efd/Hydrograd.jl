@@ -20,20 +20,28 @@ function create_NN_model(settings)
         error("The number of hidden layers must match the number of activation functions.")
     end
 
+    #input_dim = 1
+    #output_dim = 1
+    #hidden_layers = [3, 3]
+    #activations = ["leakyrelu", "leakyrelu"]
+
     # Construct the model
     layers = []
     in_dim = input_dim
-    for (i, h_dim) in enumerate(hidden_layers)
-        push!(layers, Dense(in_dim, h_dim, get_activation(activations[i])))
-        in_dim = h_dim
+    for (i, hidden_dim) in enumerate(hidden_layers)
+        push!(layers, Dense(in_dim, hidden_dim, get_activation(activations[i]); init_weight = Lux.glorot_uniform, init_bias = Lux.zeros64))
+        push!(layers, LayerNorm(hidden_dim))  # Add normalization
+        in_dim = hidden_dim
     end
-    push!(layers, Dense(in_dim, output_dim))  # Output layer without activation
+    push!(layers, Dense(in_dim, output_dim; init_weight = Lux.glorot_uniform, init_bias = Lux.zeros64))  # Output layer without activation
 
      # Wrap model to enforce output bounds
      UDE_model = Chain(layers..., (x -> output_bounds[1] .+ (output_bounds[2] - output_bounds[1]) .* sigmoid(x)))
 
      # Randomly initialize the NN model
      UDE_model_params, UDE_model_state = Lux.setup(rng, UDE_model)
+
+     print_lux_network_structure(UDE_model, UDE_model_params)
 
     if settings.UDE_settings.UDE_NN_config["how_to_initialize_NN"] == "random"
         # do nothing (it is already randomly initialized above)        
@@ -56,10 +64,35 @@ function create_NN_model(settings)
      return UDE_model, UDE_model_params, UDE_model_state
 end
 
+function print_lux_network_structure(model, UDE_model_params)
+    println("\nLux Neural Network Structure:")
+    println("-------------------------")
+    
+    if model isa Lux.Chain
+        for (i, layer) in enumerate(model.layers)
+            println("Layer $i: ", typeof(layer))
+            if layer isa Lux.Dense
+                println("  Input size:  ", layer.in_dims)
+                println("  Output size: ", layer.out_dims)
+                println("  Activation:  ", layer.activation)
+            end
+        end
+    end
+    
+    # Print parameter shapes
+    println("\nParameter shapes:")
+    for (k, v) in pairs(UDE_model_params)
+        println("  $k: ", v)
+    end
+    println("-------------------------")
+end
+
 # Function to map activation function names to Lux activation functions
 function get_activation(name::String)
     if name == "relu"
         return relu
+    elseif name == "leakyrelu"
+        return leakyrelu
     elseif name == "sigmoid"
         return sigmoid
     elseif name == "tanh"

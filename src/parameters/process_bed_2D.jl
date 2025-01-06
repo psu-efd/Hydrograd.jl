@@ -6,7 +6,7 @@
 #Set up the bed elevation: assuming the nodes coordinates already have the bed elevation
 #   interpolate the bed elevation from nodes to cells, then cells to faces, then compute the bed slope at cells
 #   
-function setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, bPlotBed::Bool=false)
+function setup_bed(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, case_path::String, bPlotBed::Bool=false) where T <: Real
 
      # Initialize bed elevation at cell centers
      zb_cells = zeros(Float64, my_mesh_2D.numOfCells)  # zb at cell centers 
@@ -46,7 +46,7 @@ function setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, bPlotBed::B
 end
 
 #interpolate zb from cell to face and compute the bed slope at cells
-function interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_cells)
+function interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where T <: Real
 
      # Setup zb_ghostCells
      zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)

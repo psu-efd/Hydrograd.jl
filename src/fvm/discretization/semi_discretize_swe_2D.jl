@@ -115,7 +115,7 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
     #In this case, params_vector is the trainable NN parameters
     elseif settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
         #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
-        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, my_mesh_2D.numOfCells)
+        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, settings.UDE_settings.h_bounds, my_mesh_2D.numOfCells)
     end
 
     Zygote.ignore() do

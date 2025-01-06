@@ -2,7 +2,7 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cell, h, q_x, q_y,swe_2D_constants, case_path, bPlot::Bool=false)
+function setup_initial_condition!(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, wse::AbstractVector{T}, zb_cell::AbstractVector{T}, h::AbstractVector{T}, q_x::AbstractVector{T}, q_y::AbstractVector{T},swe_2D_constants::swe_2D_consts, case_path::String, bPlot::Bool=false) where T <: Real
 
     initial_condition_options = nothing
     initial_condition_constant_values = nothing

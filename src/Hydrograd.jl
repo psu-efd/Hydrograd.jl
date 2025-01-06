@@ -2,6 +2,11 @@ module Hydrograd
 
 using InteractiveUtils #for @code_warntype
 
+using Profile
+using StatProfilerHTML
+
+using ProfileView
+
 using JSON3
 using JLD2
 using LinearAlgebra
@@ -12,6 +17,7 @@ using DataFrames
 using Printf
 using Plots
 using SparseArrays
+using StaticArrays
 
 #for reproducible random numbers
 using StableRNGs

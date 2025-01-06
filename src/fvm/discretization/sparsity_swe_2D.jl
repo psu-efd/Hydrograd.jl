@@ -1,6 +1,6 @@
 
 #define the Jacobian sparsity pattern
-function define_sparsity_swe_2D(settings, my_mesh_2D)
+function define_sparsity_swe_2D(settings::ControlSettings, my_mesh_2D::mesh_2D)
 
     if settings.bVerbose
         println("define_sparsity_swe_2D")

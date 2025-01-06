@@ -11,6 +11,9 @@ using IterTools
 using PyCall
 
 using Profile
+using StatProfilerHTML
+
+using ProfileView
 
 using Hydrograd
 
@@ -47,6 +50,7 @@ using InteractiveUtils
 #get the current directory
 #current_dir = pwd()
 #cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D")
+#cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D\\forward_simulation\\oneD_channel_with_bump_ManningN_h")
 
 # Add some warnings/info for gradient computation
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
@@ -225,8 +229,20 @@ if settings.bPerform_Forward_Simulation
     println("Forward simulation (2D SWE) ...")
 
     #perform forward simulation
+    #Profile.clear()
+    #@profile
     Hydrograd.swe_2D_forward_simulation(ode_f, Q0, params_vector, swe_extra_params, 
             zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
+
+    #StatProfilerHTML.statprofilehtml()
+
+            #Profile.print()
+
+    #ProfileView.view()
+
+    #ProfileView.save("profile.svg")  # Save as SVG
+
+    #readline()
 end
 
 

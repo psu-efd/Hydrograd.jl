@@ -109,17 +109,26 @@ function sigmoid_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T, h_mid::T) 
 end
 
 #update Manning's n values from the UDE model's neural network
-function update_ManningN_UDE(h, ude_model, NN_model_params, ude_model_state, num_of_cells)
-    # Need to convert scalar input (h) to matrices for Lux
-    ManningN_cells = [
-        let
-            # Reshape scalar h[iCell] into a 1×1 matrix
-            h_matrix = reshape([h[iCell]], 1, 1)
-            # Apply model and extract scalar result
-            ude_model(h_matrix, NN_model_params, ude_model_state)[1][1]
-        end
-        for iCell in 1:num_of_cells
-    ]
+function update_ManningN_UDE(h::AbstractVector{T}, 
+                           ude_model::Lux.Chain, 
+                           NN_model_params, 
+                           ude_model_state,
+                           h_bounds::Vector{T},
+                           num_of_cells::Integer) where T <: Real
+    
+    #ManningN_cells = [
+    #    ude_model(@SMatrix([h[iCell];;]), NN_model_params, ude_model_state)[1][1]
+    #    for iCell in 1:num_of_cells
+    #]
+
+    # Create batch of inputs and normalize to [-1, 1]
+    h_normalized = @. 2.0 * (h - h_bounds[1]) / (h_bounds[2] - h_bounds[1]) - 1.0
+
+    # Reshape for Lux
+    h_matrix = reshape(h_normalized, 1, num_of_cells)
+    
+    # Apply model to entire batch
+    outputs = ude_model(h_matrix, NN_model_params, ude_model_state)[1]
 
     Zygote.ignore() do
         #@show typeof(ManningN_cells)
@@ -127,5 +136,6 @@ function update_ManningN_UDE(h, ude_model, NN_model_params, ude_model_state, num
         #@show ManningN_cells
     end
 
-    return ManningN_cells
+    #return ManningN_cells
+    return vec(outputs)
 end

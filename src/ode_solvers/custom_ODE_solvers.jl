@@ -2,26 +2,25 @@
 
 
 # Finite Volume Update
-function custom_ODE_update_cells(Q, para, t, swe_2D_constants, my_mesh_2D)
+function custom_ODE_update_cells(ode_f, Q, params_vector, t, dt, swe2d_extra_params)
 
     #dQdt = zeros(eltype(para), my_mesh_2D.numOfCells, 3)
     
     # compute dQdt 
     #swe_2d_ode!(dQdt, Q, para, t)
-    #dQdt = swe_2d_ode(Q, para, t)
-    dQdt = 0.0
+    dQdt = ode_f(Q, params_vector, t)
     
      # Vectorized update of Q
-    Q_new = Q + swe_2D_constants.dt * dQdt
+    Q_new = Q + dt * dQdt
     
     # Create mask for dry cells
-    dry_mask = Q_new[:, 1] .< swe_2D_constants.h_small
+    dry_mask = Q_new[:, 1] .< swe2d_extra_params.swe_2D_constants.h_small
     
     # Create new array with all updates at once
     Q_new = hcat(
-        ifelse.(dry_mask, swe_2D_constants.h_small, Q_new[:, 1]),
-        ifelse.(dry_mask, zero(eltype(para)), Q_new[:, 2]),
-        ifelse.(dry_mask, zero(eltype(para)), Q_new[:, 3])
+        ifelse.(dry_mask, swe2d_extra_params.swe_2D_constants.h_small, Q_new[:, 1]),
+        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[:, 2]),
+        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[:, 3])
     )
    
     # Update WSE using broadcasting
@@ -32,10 +31,11 @@ function custom_ODE_update_cells(Q, para, t, swe_2D_constants, my_mesh_2D)
 end
 
 # Main Solver Function (equivalent to solve(prob, Euler(), adaptive=false, p=para, dt=dt, saveat=t_save))
-function custom_ODE_solve(para, Q0, my_mesh_2D, swe_2D_constants)
-    t_start = swe_2D_constants.tspan[1]
-    t_end = swe_2D_constants.tspan[2]
-    time_steps = t_start:swe_2D_constants.dt:t_end
+function custom_ODE_solve(ode_f, Q0, params_vector, swe2d_extra_params)
+    t_start = swe2d_extra_params.swe_2D_constants.tspan[1]
+    t_end = swe2d_extra_params.swe_2D_constants.tspan[2]
+    dt = swe2d_extra_params.swe_2D_constants.dt
+    time_steps = t_start:dt:t_end
 
     nTimeSteps = length(time_steps)
 
@@ -66,7 +66,7 @@ function custom_ODE_solve(para, Q0, my_mesh_2D, swe_2D_constants)
         end
         
         #update Q
-        Q = custom_ODE_update_cells(Q, para, t, swe_2D_constants, my_mesh_2D)
+        Q = custom_ODE_update_cells(ode_f, Q, params_vector, t, dt, swe2d_extra_params)
 
         #save the solution
         if (iStep+1) % save_freq == 0

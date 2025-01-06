@@ -4,7 +4,7 @@ using Lux
 # Create a struct to hold all the constant parameters for the SWE2D RHS function
 # These parameters are "extra", meaning, they are not part of the inversion/sensitivity analysis parameters, 
 # such as Manning's n, zb, inletQ, etc. (These are part of the params_array)
-struct SWE2D_Extra_Parameters{T}
+struct SWE2D_Extra_Parameters{T<:Real}
     case_path::String
     active_param_name::String
     settings::Hydrograd.ControlSettings

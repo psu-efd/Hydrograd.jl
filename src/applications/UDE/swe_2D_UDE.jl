@@ -210,6 +210,51 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
         #@show typeof(θ)
         #@show θ
 
+        # Print gradient norms per layer
+        # gs = first(Zygote.gradient(θ) do p
+        #     loss_total, _, _, _ = opt_loss(p, nothing)
+        #     return loss_total
+        # end)
+
+        # println("Structure of gs: ", keys(gs))
+        # for (k, v) in pairs(gs)
+        #     println("Key: ", k)
+        #     println("Value type: ", typeof(v))
+        #     if v isa NamedTuple
+        #         println("  Subfields: ", keys(v))
+        #     end
+        # end
+        
+        # # Analyze gradients by layer
+        # println("\nGradient analysis by layer:")
+        
+        # # Layer 1 gradients
+        # layer1_weights = gs.layer_1.weight
+        # layer1_bias = gs.layer_1.bias
+        # println("Layer 1:")
+        # println("  weights gradient = ", layer1_weights)
+        # println("  bias gradient = ", layer1_bias)
+        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer1_weights)))
+        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer1_bias)))
+        
+        # # Layer 2 gradients
+        # layer3_weights = gs.layer_3.weight
+        # layer3_bias = gs.layer_3.bias
+        # println("Layer 2:")
+        # println("  weights gradient = ", layer3_weights)
+        # println("  bias gradient = ", layer3_bias)
+        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer3_weights)))
+        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer3_bias)))
+        
+        # # Layer 3 gradients
+        # layer5_weights = gs.layer_5.weight
+        # layer5_bias = gs.layer_5.bias
+        # println("Layer 3:")
+        # println("  weights gradient = ", layer5_weights)
+        # println("  bias gradient = ", layer5_bias)
+        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer5_weights)))
+        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer5_bias)))
+
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
