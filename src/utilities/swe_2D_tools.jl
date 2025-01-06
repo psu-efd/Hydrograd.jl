@@ -7,7 +7,15 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
 end
 
 #save results (sol is a solution from SciML ODE solver)
-function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, save_path)  
+function swe_2D_save_results_SciML(swe2d_extra_params, sol)
+    
+    settings = swe2d_extra_params.settings
+    my_mesh_2D = swe2d_extra_params.my_mesh_2D
+    nodeCoordinates = swe2d_extra_params.nodeCoordinates
+    zb_cells = swe2d_extra_params.zb_cells
+    save_path = swe2d_extra_params.case_path
+
+    ManningN_cells = swe2d_extra_params.ManningN_cells
 
     total_water_volume = []
 
@@ -23,6 +31,11 @@ function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, sa
         q_x_array = state[:, 2]
         q_y_array = state[:, 3]
 
+        #If ManningN_option is variable_as_function_of_h, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
+        if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
+            ManningN_cells = update_ManningN_forward_simulation(h_array, settings)
+        end
+
         #calculate total volume of water
         push!(total_water_volume, swe_2D_calc_total_water_volume(h_array, my_mesh_2D))
 
@@ -33,10 +46,10 @@ function swe_2D_save_results_SciML(sol, my_mesh_2D, nodeCoordinates, zb_cell, sa
         vector_data = [U_vector] 
         vector_names = ["U"]
 
-        WSE = h_array + zb_cell
+        WSE = h_array + zb_cells
             
-        scalar_data = [h_array, q_x_array, q_y_array, zb_cell, WSE]
-        scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
+        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE]
+        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE"]
 
         vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             

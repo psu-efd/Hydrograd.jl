@@ -5,12 +5,13 @@ using Dates
 #using Debugger, JuliaInterpreter
 
 #main function for the UDE
-function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
+function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
 
     #unpack the extra parameters
     settings = swe_extra_params.settings
     my_mesh_2D = swe_extra_params.my_mesh_2D
     swe_2D_constants = swe_extra_params.swe_2D_constants
+    case_path = swe_extra_params.case_path
 
     nodeCoordinates = swe_extra_params.nodeCoordinates
 
@@ -58,11 +59,17 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
     #p_init is the initial weights for the UDE's NN model
     p_init = ComponentVector{Float64}(swe_extra_params.ude_model_params)
 
+    #@show typeof(p_init)
+    #@show p_init
+
     #perform the UDE
     sol, ITER, LOSS, PRED, PARS = nothing, nothing, nothing, nothing, nothing
     if settings.UDE_settings.UDE_mode == "training"
         println("   Performing UDE training ...\n")
         sol, ITER, LOSS, PRED, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
+
+        #@show typeof(sol.u)
+        #@show sol.u
 
         #save the UDE results
         jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PRED, PARS,
@@ -72,7 +79,8 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
         println("   Post-processing UDE results ...")
 
         #process UDE results
-        Hydrograd.postprocess_UDE_training_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+        #so.u is the trained NN weights (ude_model_params)
+        Hydrograd.postprocess_UDE_training_results_swe_2D(swe_extra_params, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth)
     elseif settings.UDE_settings.UDE_mode == "inference"
         println("   Performing UDE inference ...\n")
         sol = UDE_inference(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
@@ -194,10 +202,13 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
 
     # Define the callback 
     # The first argument is the state of the optimizer, which is an OptimizationState object
-    callback = function (state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
+    callback = function (optimizer_state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
 
         # Extract the parameters from the state
-        θ = state.u
+        θ = optimizer_state.u
+
+        #@show typeof(θ)
+        #@show θ
 
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
@@ -222,7 +233,7 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
 
             append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
 
-            append!(PARS, θ)
+            append!(PARS, [θ])
         end
 
         #checkpoint the UDE results (in case the UDE training is interrupted)
@@ -263,7 +274,7 @@ end
 # Define the loss function
 function compute_loss_UDE(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type)
     # Solve the ODE (forward pass)
-
+    pred = UDE_forward_simulation(ode_f, Q0, tspan, p, settings, swe_2D_constants)
 
     #compute the loss
     # Ensure type stability in loss computation

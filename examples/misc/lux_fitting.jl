@@ -1,8 +1,11 @@
-using Lux, Random, Zygote, Optimisers, ComponentArrays, Plots, Statistics, NNlib
+using Lux, Random, Zygote, Optimisers, ComponentArrays, Plots, Statistics
+
+# Define the sigmoid function
+my_sigmoid(x) = 1 / (1 + exp(-x))
 
 # Generate data
-x_train = reshape(collect(range(0, 1, 100)), 1, :)  # Shape: (1, 100)
-y_train = reshape(0.01 .+ 0.03 .* sin.(2π * x_train) .+ 0.005 .* randn(size(x_train)), 1, :)
+x_train = reshape(collect(range(-10, 10, 20)), 1, :)  # Shape: (1, 100)
+y_train = reshape(1.0 ./ (1.0 .+ exp.(100.0*x_train)) .+ 0.005 .* randn(size(x_train)), 1, :)
 
 @show size(x_train)
 @show size(y_train)
@@ -10,16 +13,15 @@ y_train = reshape(0.01 .+ 0.03 .* sin.(2π * x_train) .+ 0.005 .* randn(size(x_t
 # Define model
 n_low, n_upper = -0.02, 0.04
 model = Chain(
-    Dense(1 => 16, relu),
-    Dense(16 => 16, relu),
-    Dense(16 => 1)
+    Dense(1 => 3, relu),
+    Dense(3 => 3, relu),
+    Dense(3 => 1)
 )
 
 # Forward pass
 function predict(model, x, ps, st)
     y, st = model(x, ps, st)
-    scaled_output = n_low .+ (n_upper - n_low) .* sigmoid.(y)
-    return scaled_output, st
+    return y, st
 end
 
 # Loss function
@@ -29,7 +31,7 @@ function loss(model, ps, st, x, y)
 end
 
 # Training loop
-function train_model!(model, x_train, y_train; epochs=1000, lr=0.01)
+function train_model!(model, x_train, y_train; epochs=10000, lr=0.01)
     opt = Optimisers.Adam(lr)
     rng = Random.default_rng()
     ps, st = Lux.setup(rng, model)
@@ -47,7 +49,25 @@ function train_model!(model, x_train, y_train; epochs=1000, lr=0.01)
 end
 
 # Train
-ps, st = train_model!(model, x_train, y_train)
+ ps, st = train_model!(model, x_train, y_train)
+
+#save the model
+jldsave("model.jld", ps=ps, st=st)
+
+#load the model
+ps_loaded, st_loaded = jldopen("model.jld", "r") do file
+    file["ps"], file["st"]
+end
+
+#@show typeof(ps)
+#@show typeof(st)
+#@show ps
+#@show st
+
+#@show typeof(ps_loaded)
+#@show typeof(st_loaded)
+#@show ps_loaded
+#@show st_loaded
 
 # Predict using the trained model
 x_test = [0.5]  # Example test input: water depth = 2.0

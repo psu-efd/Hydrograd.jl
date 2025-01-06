@@ -20,6 +20,9 @@ struct ForwardSimulationSettings
     initial_condition_constant_values::Vector{Float64}
     save_file_name::String
     save_solution_truth_file_name::String
+    ManningN_option::String  # "constant", "variable_as_function_of_h", "custom"
+    ManningN_function_type::String
+    ManningN_function_parameters::Dict
 end
 
 struct InversionSettings
@@ -103,7 +106,6 @@ struct UDESettings
     UDE_ode_solver_nSave::Int
     UDE_training_save_file_name::String
     UDE_training_save_loss_history_file_name::String
-    UDE_training_save_parameters_history_file_name::String
     UDE_training_save_NN_weights_state_file_name::String
     UDE_inference_save_file_name::String
 end
@@ -129,17 +131,20 @@ function parse_control_file(control_file::String)
     control_file_dir = dirname(control_file)  # Get directory of control file
 
     # check whether any of the task flags are present
-    if !(haskey(control_dict["control_variables"], "bPerform_Forward_Simulation") &&
-         haskey(control_dict["control_variables"], "bPerform_Inversion") &&
-         haskey(control_dict["control_variables"], "bPerform_Sensitivity_Analysis") &&
+    if !(haskey(control_dict["control_variables"], "bPerform_Forward_Simulation") ||
+         haskey(control_dict["control_variables"], "bPerform_Inversion") ||
+         haskey(control_dict["control_variables"], "bPerform_Sensitivity_Analysis") ||
          haskey(control_dict["control_variables"], "bPerform_UDE"))
         error("None of the task flags (bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, and bPerform_UDE) are present. Please set at least one of the task flags to true.")
     end
 
-    if !any([control_dict["control_variables"]["bPerform_Forward_Simulation"],
-            control_dict["control_variables"]["bPerform_Inversion"],
-            control_dict["control_variables"]["bPerform_Sensitivity_Analysis"],
-            control_dict["control_variables"]["bPerform_UDE"]])
+    # Check if any task flag is set true
+    if !any(get(get(control_dict, "control_variables", Dict()), flag, false) for flag in [
+        "bPerform_Forward_Simulation",
+        "bPerform_Inversion",
+        "bPerform_Sensitivity_Analysis",
+        "bPerform_UDE"
+    ])
         error("No task flag is set true. Please set at least one of the task flags to true.")
     end
 
@@ -152,36 +157,48 @@ function parse_control_file(control_file::String)
 
     # Parse forward simulation settings if needed
     forward_settings = nothing
-    if control_dict["control_variables"]["bPerform_Forward_Simulation"]
-        forward_settings = parse_forward_settings(control_dict["forward_simulation_options"], control_file_dir)
+    if get(get(control_dict, "control_variables", Dict()), "bPerform_Forward_Simulation", false)
+        forward_settings = parse_forward_settings(
+            get(control_dict, "forward_simulation_options", Dict()),
+            control_file_dir
+        )
     end
 
     # Parse inversion settings if needed
     inversion_settings = nothing
-    if control_dict["control_variables"]["bPerform_Inversion"]
-        inversion_settings = parse_inversion_settings(control_dict["inversion_options"], control_file_dir)
+    if get(get(control_dict, "control_variables", Dict()), "bPerform_Inversion", false)
+        inversion_settings = parse_inversion_settings(
+            get(control_dict, "inversion_options", Dict()),
+            control_file_dir
+        )
     end
 
     # Parse sensitivity analysis settings if needed
     sensitivity_analysis_settings = nothing
-    if control_dict["control_variables"]["bPerform_Sensitivity_Analysis"]
-        sensitivity_analysis_settings = parse_sensitivity_analysis_settings(control_dict["sensitivity_analysis_options"], control_file_dir)
+    if get(get(control_dict, "control_variables", Dict()), "bPerform_Sensitivity_Analysis", false)
+        sensitivity_analysis_settings = parse_sensitivity_analysis_settings(
+            get(control_dict, "sensitivity_analysis_options", Dict()),
+            control_file_dir
+        )
     end
 
     # Parse UDE settings if needed
     UDE_settings = nothing
-    if control_dict["control_variables"]["bPerform_UDE"]
-        UDE_settings = parse_UDE_settings(control_dict["UDE_options"], control_file_dir)
+    if get(get(control_dict, "control_variables", Dict()), "bPerform_UDE", false)
+        UDE_settings = parse_UDE_settings(
+            get(control_dict, "UDE_options", Dict()),
+            control_file_dir
+        )
     end
 
     # Create main control settings
     settings = ControlSettings(
         control_dict["bVerbose"],
         control_dict["control_variables"]["srhhydro_file_name"],
-        control_dict["control_variables"]["bPerform_Forward_Simulation"],
-        control_dict["control_variables"]["bPerform_Inversion"],
-        control_dict["control_variables"]["bPerform_Sensitivity_Analysis"],
-        control_dict["control_variables"]["bPerform_UDE"],
+        get(get(control_dict, "control_variables", Dict()), "bPerform_Forward_Simulation", false),
+        get(get(control_dict, "control_variables", Dict()), "bPerform_Inversion", false),
+        get(get(control_dict, "control_variables", Dict()), "bPerform_Sensitivity_Analysis", false),
+        get(get(control_dict, "control_variables", Dict()), "bPerform_UDE", false),
         time_settings,
         forward_settings,
         inversion_settings,
@@ -221,6 +238,9 @@ function parse_control_file(control_file::String)
             println("    initial_condition_file_name = ", settings.forward_settings.initial_condition_file_name)
             println("    save_file_name = ", settings.forward_settings.save_file_name)
             println("    save_solution_truth_file_name = ", settings.forward_settings.save_solution_truth_file_name)
+            println("    ManningN_option = ", settings.forward_settings.ManningN_option)
+            println("    ManningN_function_type = ", settings.forward_settings.ManningN_function_type)
+            println("    ManningN_function_parameters = ", settings.forward_settings.ManningN_function_parameters)
         else
             println("No forward simulation is to be performed.")
         end
@@ -325,7 +345,6 @@ function parse_control_file(control_file::String)
             println("    ode_solver_nSave = ", settings.UDE_settings.UDE_ode_solver_nSave)
             println("    UDE_training_save_file_name = ", settings.UDE_settings.UDE_training_save_file_name)
             println("    UDE_training_save_loss_history_file_name = ", settings.UDE_settings.UDE_training_save_loss_history_file_name)
-            println("    UDE_training_save_parameters_history_file_name = ", settings.UDE_settings.UDE_training_save_parameters_history_file_name)
             println("    UDE_training_save_NN_weights_state_file_name = ", settings.UDE_settings.UDE_training_save_NN_weights_state_file_name)
             println("    UDE_inference_save_file_name = ", settings.UDE_settings.UDE_inference_save_file_name)
         else
@@ -341,7 +360,7 @@ end
 # Helper functions to parse specific settings
 function parse_forward_settings(options::Dict, control_file_dir::String)
     # Handle initial condition values from file if specified
-    initial_condition_values = nothing
+    initial_condition_values_from_file = nothing
     if options["forward_simulation_initial_condition_options"] == "from_file"
         # Use the current directory to find the file
         println("Current working directory: ", pwd())
@@ -349,6 +368,11 @@ function parse_forward_settings(options::Dict, control_file_dir::String)
         println("Attempting to open file: ", file_path)
 
         initial_condition_values = JSON3.read(open(file_path), Dict)
+    end
+
+    #sanity check on ManningN_option
+    if options["forward_simulation_ManningN_option"] != "constant" && options["forward_simulation_ManningN_option"] != "variable_as_function_of_h"
+        error("Invalid ManningN_option: $(options["forward_simulation_ManningN_option"]). Supported options: constant, variable_as_function_of_h.")
     end
 
     ForwardSimulationSettings(
@@ -359,10 +383,13 @@ function parse_forward_settings(options::Dict, control_file_dir::String)
         Int(options["forward_simulation_nSave"]),              # nSave
         options["forward_simulation_initial_condition_options"],  # initial_condition_options
         options["forward_simulation_initial_condition_file_name"], # initial_condition_file_name
-        initial_condition_values,                               # initial_condition_values_from_file
+        initial_condition_values_from_file,                               # initial_condition_values_from_file
         Float64.(options["forward_simulation_initial_condition_constant_values"]), # initial_condition_constant_values
         options["forward_simulation_save_file_name"],           # save_file_name
-        options["forward_simulation_save_solution_truth_file_name"] # save_solution_truth_file_name
+        options["forward_simulation_save_solution_truth_file_name"], # save_solution_truth_file_name
+        options["forward_simulation_ManningN_option"],  # ManningN_option
+        options["forward_simulation_ManningN_function_type"],  # ManningN_function_type
+        options["forward_simulation_ManningN_function_parameters"]  # ManningN_function_parameters
     )
 end
 
@@ -532,7 +559,6 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
         Int(options["UDE_ode_solver_options"]["ode_solver_nSave"]),
         String(options["UDE_training_save_file_name"]),
         String(options["UDE_training_save_loss_history_file_name"]),
-        String(options["UDE_training_save_parameters_history_file_name"]),
         String(options["UDE_training_save_NN_weights_state_file_name"]),
         String(options["UDE_inference_save_file_name"])
     )

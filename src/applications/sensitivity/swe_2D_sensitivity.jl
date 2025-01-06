@@ -1,7 +1,7 @@
 #perform sensitivity analysis for 2D SWE: Only the sensitivity of the final solution with respect to the active parameters is computed.
 # For other kind of sensitivity analysis, a custom function should be implemented.
 
-function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_path)
+function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
 
     #unpack the extra parameters
     active_param_name = swe_extra_params.active_param_name
@@ -9,6 +9,7 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_pat
     my_mesh_2D = swe_extra_params.my_mesh_2D
     swe_2D_constants = swe_extra_params.swe_2D_constants
     nodeCoordinates = swe_extra_params.nodeCoordinates
+    case_path = swe_extra_params.case_path
 
     println("   Active parameter name = ", active_param_name)
 

@@ -5,13 +5,14 @@ using Dates
 #using Debugger, JuliaInterpreter
 
 #main function for the inversion
-function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
+function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #unpack the extra parameters
     active_param_name = swe_extra_params.active_param_name
     settings = swe_extra_params.settings
     my_mesh_2D = swe_extra_params.my_mesh_2D
     swe_2D_constants = swe_extra_params.swe_2D_constants
+    case_path = swe_extra_params.case_path
 
     nodeCoordinates = swe_extra_params.nodeCoordinates
 

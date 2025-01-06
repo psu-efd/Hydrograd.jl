@@ -20,18 +20,19 @@
     "UDE_options": {
         "comment_UDE_mode": "training, inference (must provide NN_weights_state_file_name)",
         "UDE_mode": "training",
+
         "comment_UDE_choice": "Choice for UDE: ManningN_h, FlowResistance. For ManningN_h, a NN is used to fit ManningN as a function of water depth h. For FlowResistance, a NN is used to fit the flow resistance term (tau_b) as a function of h, u, and v.",
         "comment_how_to_initialize_NN": "random, from_pretrained (for inference or continued training; file name must be provided as NN_weights_state_file_name)",
         "UDE_choice": "ManningN_h",
         "UDE_NN_config": {
             "comment": "Configuration for the NN",
             "how_to_initialize_NN": "random",
-            "NN_weights_state_file_name": "NN_weights_state.jld2",
+            "NN_weights_state_file_name": "pretrained_NN_weights_state.jld2",
             "input_dim": 1,
             "output_dim": 1,
             "hidden_layers": [3, 3],
             "activations": ["relu", "relu"],
-            "output_bounds": [0.001, 0.1]
+            "output_bounds": [0.03, 0.06]
         },
         
         "UDE_bWSE_loss": true,
@@ -39,7 +40,7 @@
                 
         "UDE_optimizer": "Adam",
         "UDE_learning_rate": 0.01,
-        "UDE_max_iterations": 2,
+        "UDE_max_iterations": 100,
         "UDE_training_save_frequency": 1,
         "UDE_training_save_checkpoint": true,
         "UDE_training_checkpoint_frequency": 10,
@@ -58,8 +59,7 @@
         },
         "UDE_training_save_file_name": "UDE_training_results.jld2",
         "UDE_training_save_loss_history_file_name": "UDE_training_loss_history.csv",
-        "UDE_training_save_parameters_history_file_name": "UDE_training_parameters_history.csv",
-        "UDE_training_save_NN_weights_state_file_name": "UDE_NN_weights_state.jld2",
+        "UDE_training_save_NN_weights_state_file_name": "UDE_training_NN_weights_state.jld2",
         "UDE_inference_save_file_name": "UDE_inference_results.jld2"
     }
 }

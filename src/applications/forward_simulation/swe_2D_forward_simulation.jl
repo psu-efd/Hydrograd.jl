@@ -1,14 +1,12 @@
 
 #perform forward simulation for 2D SWE and save the results
 function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params, 
-            zb_cell_truth, ManningN_cell_truth, inlet_discharges_truth,
-            save_path)
+            zb_cell_truth, ManningN_zone_values_truth, inlet_discharges_truth
+            )
 
     settings = swe2d_extra_params.settings
-    my_mesh_2D = swe2d_extra_params.my_mesh_2D
-    nodeCoordinates = swe2d_extra_params.nodeCoordinates
     swe_2D_constants = swe2d_extra_params.swe_2D_constants
-    zb_cells = swe2d_extra_params.zb_cells
+    case_path = swe2d_extra_params.case_path
 
     #define the time for saving the results (for forward simulation, which may be different from the time for saving the results in inversion)
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.forward_settings.nSave
@@ -43,13 +41,12 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         end
 
         # #save the simulation solution results
-        #jldsave(joinpath(save_path, settings.forward_settings.save_file_name); sol)
-        save_ode_solution(sol, joinpath(save_path, settings.forward_settings.save_file_name))
+        save_ode_solution(sol, joinpath(case_path, settings.forward_settings.save_file_name))
 
         println("   Postprocessing the forward simulation results ...")
         
         # postprocess the simulation results
-        postprocess_forward_simulation_results_swe_2D(settings, my_mesh_2D, zb_cell_truth, ManningN_cell_truth, inlet_discharges_truth, zb_cells, nodeCoordinates, save_path)
+        postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_cell_truth, ManningN_zone_values_truth, inlet_discharges_truth)
 
     elseif settings.forward_settings.solver == "customized"    #My own ODE Solver
         #TODO: implement the customized ODE solver

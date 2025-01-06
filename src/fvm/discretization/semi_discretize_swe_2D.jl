@@ -94,9 +94,14 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         end
     end
 
+    #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step.
+    #If ManningN_option is variable_as_function_of_h, ManningN_cells_local is updated here.
+    if settings.bPerform_Forward_Simulation && settings.forward_settings.ManningN_option == "variable_as_function_of_h"
+        ManningN_cells_local = update_ManningN_forward_simulation(h, settings)
+        
     #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 
     # we need to update ManningN at cells and ghost cells
-    if (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "ManningN"
+    elseif (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "ManningN"
 
         Zygote.ignore() do
             if settings.bVerbose
@@ -104,14 +109,13 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
             end
         end
 
-        ManningN_cells_local = update_ManningN(my_mesh_2D, srh_all_Dict, params_vector)
-    end
-
+        ManningN_cells_local = update_ManningN_inversion_sensitivity_analysis(my_mesh_2D, srh_all_Dict, params_vector)
+    
     #For the case of UDE, we need to update ManningN or flow resistance based on the UDE model
     #In this case, params_vector is the trainable NN parameters
-    if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
+    elseif settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
         #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
-        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, my_mesh_2D)
+        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, my_mesh_2D.numOfCells)
     end
 
     Zygote.ignore() do

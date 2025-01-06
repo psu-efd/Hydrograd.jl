@@ -125,13 +125,13 @@ end
 #get the true Manning's n and inlet discharges
 srhhydro_ManningsN_Dict = srh_all_Dict["srhhydro_ManningsN"]
 
-#define the true Manning's n values
-ManningN_values_truth = zeros(length(srhhydro_ManningsN_Dict))
+#define the true Manning's n values for all material zones
+ManningN_zone_values_truth = zeros(length(srhhydro_ManningsN_Dict))
 
-#If performing forward simulation, make a copy of the Manning's n truth: ManningN_values_truth; otherwise for 
+#If performing forward simulation, make a copy of the Manning's n truth: ManningN__zone_values_truth; otherwise for 
 #inversion and sensitivity analysis, it is zero (its value will be loaded from the forward simulation result in the inversion).
 if settings.bPerform_Forward_Simulation
-    ManningN_values_truth = Float64[srhhydro_ManningsN_Dict[i] for i in 0:(length(srhhydro_ManningsN_Dict)-1)]
+    ManningN_zone_values_truth = Float64[srhhydro_ManningsN_Dict[i] for i in 0:(length(srhhydro_ManningsN_Dict)-1)]  #0 is default material ID.
 end
 
 #get the true inlet discharges (could be nothing if no inletQ_BCs)
@@ -147,16 +147,19 @@ end
 #print the true values. The true parameter values are computed regardless of whether performing forward simulation or inversion
 if settings.bVerbose
     println("True zb_cells = ", zb_cells_truth)
-    println("True Manning's n values = ", ManningN_values_truth)
+    println("True Manning's n values = ", ManningN_zone_values_truth)
     println("True inlet discharges = ", inlet_discharges_truth)
 end
 
-#preprocess: create a 1D array to combine all model parameters for 2D shallow water equations
-#params_vector: the 1D array of the active parameter (zb_cells_truth, ManningN_values_truth, or inlet_discharges_truth)
+#preprocess: create a 1D array to for model parameter for 2D shallow water equations
+#params_vector: the 1D array of the active parameter (zb_cells_truth, ManningN_zone_values_truth, or inlet_discharges_truth)
 #active_param_name: the name of the active parameter (zb, ManningN, or Q)
-params_vector, active_param_name = Hydrograd.setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_values_truth, inlet_discharges_truth)
+params_vector, active_param_name = Hydrograd.setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
 
-#Initial setup of Manning's n at cells and ghost cells using the SRH-2D data (if performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process)
+#Initial setup of Manning's n at cells and ghost cells using the SRH-2D data 
+#If performing forward simulation and the ManningN_option is "variable_as_function_of_h", ManningN_cells will be updated later in the forward simulation process.
+#If performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process.
+#If performing UDE and UDE_choice is ManningN_h, ManningN_cells will be updated later in the UDE process.
 ManningN_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
 #setup initial condition for wse, h, q_x, q_y at cells
@@ -179,6 +182,7 @@ ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(setting
 
 # Create the extra parameters struct
 swe_extra_params = SWE2D_Extra_Parameters(
+    case_path,
     active_param_name,
     settings,
     my_mesh_2D,
@@ -222,8 +226,7 @@ if settings.bPerform_Forward_Simulation
 
     #perform forward simulation
     Hydrograd.swe_2D_forward_simulation(ode_f, Q0, params_vector, swe_extra_params, 
-            zb_cells_truth, ManningN_values_truth, inlet_discharges_truth,
-            case_path)
+            zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
 end
 
 
@@ -237,7 +240,7 @@ if settings.bPerform_Inversion
    
     #perform inversion
     #@code_warntype 
-    Hydrograd.swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params, case_path)
+    Hydrograd.swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
 end
 
@@ -251,7 +254,7 @@ if settings.bPerform_Sensitivity_Analysis
     println("Sensitivity analysis ...")
 
     #perform sensitivity analysis
-    Hydrograd.swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params, case_path)
+    Hydrograd.swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
 
 end
 
@@ -262,10 +265,16 @@ end
 
 if settings.bPerform_UDE
 
-    println("UDE ...")
+    if settings.UDE_settings.UDE_mode == "training"
+        println("UDE training ...")
+    elseif settings.UDE_settings.UDE_mode == "inference"
+        println("UDE inference ...")
+    else
+        error("Invalid UDE mode: $(settings.UDE_settings.UDE_mode). Supported options: training, inference.")
+    end
 
     #perform UDE
-    Hydrograd.swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params, case_path)
+    Hydrograd.swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
 end
 
 #Timing 

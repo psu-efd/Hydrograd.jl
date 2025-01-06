@@ -6,7 +6,8 @@
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
         "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": true,
-        "bPerform_Sensitivity_Analysis": false
+        "bPerform_Sensitivity_Analysis": false,
+        "bPerform_UDE": false
     },
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",

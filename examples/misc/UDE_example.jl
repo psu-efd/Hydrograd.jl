@@ -30,7 +30,7 @@ end
 # Define the experimental parameter
 tspan = (0.0, 5.0)
 u0 = 5.0f0 * rand(rng, 2)
-p_ = [1.3, 0.9, 0.8, 1.8]
+p_ = [1.3, 0.9, 0.8, 1.8]           #truth parameters
 prob = ODEProblem(lotka!, u0, tspan, p_)
 solution = solve(prob, Vern7(), abstol = 1e-12, reltol = 1e-12, saveat = 0.25)
 
@@ -101,26 +101,45 @@ optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p))
 
 # Solve the optimization problem first with the Adam optimizer
 res1 = Optimization.solve(
-    optprob, OptimizationOptimisers.Adam(), callback = callback, maxiters = 5000)
+    optprob, OptimizationOptimisers.Adam(), callback = callback, maxiters = 500)
 println("Training loss after $(length(losses)) iterations: $(losses[end])")
 
 # Solve the optimization problem with the LBFGS optimizer
 optprob2 = Optimization.OptimizationProblem(optf, res1.u)
 res2 = Optimization.solve(
-    optprob2, LBFGS(linesearch = BackTracking()), callback = callback, maxiters = 1000)
+    optprob2, LBFGS(linesearch = BackTracking()), callback = callback, maxiters = 100)
 println("Final training loss after $(length(losses)) iterations: $(losses[end])")
 
 # Rename the best candidate
 p_trained = res2.u
 
+@show typeof(p_trained)
+@show p_trained
+
+#save the model
+jldsave("model.jld", ps=p_trained, st=st)
+
+#load the model
+p_trained_loaded, st_loaded = jldopen("model.jld", "r") do file
+    file["ps"], file["st"]
+end
+
+println(" ")
+@show typeof(p_trained_loaded)
+@show p_trained_loaded
+
+println(" ")
+#compare the loaded model with the trained model
+@show p_trained == p_trained_loaded
+
 # Plot the results
 # Plot the losses
-pl_losses = plot(1:5000, losses[1:5000], yaxis = :log10, xaxis = :log10,
-    xlabel = "Iterations", ylabel = "Loss", label = "ADAM", color = :blue)
-plot!(5001:length(losses), losses[5001:end], yaxis = :log10, xaxis = :log10,
-    xlabel = "Iterations", ylabel = "Loss", label = "LBFGS", color = :red)
+#pl_losses = plot(1:5000, losses[1:5000], yaxis = :log10, xaxis = :log10,
+#    xlabel = "Iterations", ylabel = "Loss", label = "ADAM", color = :blue)
+#plot!(5001:length(losses), losses[5001:end], yaxis = :log10, xaxis = :log10,
+#    xlabel = "Iterations", ylabel = "Loss", label = "LBFGS", color = :red)
 
-display(pl_losses)
+#display(pl_losses)
 
 # Plot the true and predicted data
 ## Analysis of the trained network

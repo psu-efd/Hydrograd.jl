@@ -124,6 +124,7 @@ include("applications/inversion/process_inversion_results_2D.jl")
 include("applications/sensitivity/swe_2D_sensitivity.jl")
 include("applications/sensitivity/process_sensitivity_results_2D.jl")
 include("applications/UDE/swe_2D_UDE.jl")
+include("applications/UDE/process_UDE_results_2D.jl")
 
 
 export print_banner
@@ -224,6 +225,8 @@ export postprocess_inversion_results_swe_2D
 export swe_2D_sensitivity
 export postprocess_sensitivity_results_swe_2D
 export swe_2D_UDE
+export postprocess_UDE_training_results_swe_2D
+export postprocess_UDE_inference_results_swe_2D
 
 
 end

@@ -5,6 +5,7 @@ using Lux
 # These parameters are "extra", meaning, they are not part of the inversion/sensitivity analysis parameters, 
 # such as Manning's n, zb, inletQ, etc. (These are part of the params_array)
 struct SWE2D_Extra_Parameters{T}
+    case_path::String
     active_param_name::String
     settings::Hydrograd.ControlSettings
     my_mesh_2D::Hydrograd.mesh_2D
