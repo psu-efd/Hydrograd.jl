@@ -30,65 +30,58 @@ Plots.scalefontsizes()
 Plots.scalefontsizes(10.0)
 
 
-#compare the resulted n(h) from the trained NN with the truth
+#compare the resulted FlowResistance(h, u, v) from the trained NN with the truth
 
+#compute the truth flow resistance
+function truth_flow_resistance(h_values, u_values, v_values)
+    # Example: Using Manning's formula
+    # You can modify this with your actual truth function
+    n = 0.03  # Manning's n
+    g = 9.81  # gravity
+    
+    # Compute velocity magnitude
+    u_mag = @. sqrt(u_values^2 + v_values^2 + eps())
+    
+    # Manning's formula for flow resistance
+    tau_b = @. g * n^2 / (h_values^(1/3)) * u_mag
 
-#compute the truth n(h)
-function truth_n_h(h_values)
-
-    #truth n(h) is a sigmoid function of h (this is hardcoded here)
-    truth_n_h_parameters = Dict(
-        "n_lower" => 0.03,
-        "n_upper" => 0.06,
-        "k" => 100.0,
-        "h_mid" => 0.3
-    )
-
-    #compute the truth n(h)
-    truth_n_h = truth_n_h_parameters["n_lower"] .+ (truth_n_h_parameters["n_upper"] - truth_n_h_parameters["n_lower"]) ./ (1 .+ exp.(truth_n_h_parameters["k"] .* (h_values .- truth_n_h_parameters["h_mid"])))
-
-    return truth_n_h
+    return tau_b
 end
 
-#trained n(h) is from the NN
-function NN_n_h(h_values, settings)
-    # read the control file
-    control_file = "run_control.json"
-    control_dict = JSON3.read(open(control_file), Dict)
-
-    #load the UDE training results 
-    #UDE_training_results_file_name = control_dict["UDE_options"]["UDE_NN_config"]["NN_weights_state_file_name"]
+#trained flow resistance from the NN
+function NN_flow_resistance(h_values, u_values, v_values, settings)
+    # Load the trained model
     UDE_training_results_file_name = "UDE_training_results.jld2"
     UDE_training_results = load(UDE_training_results_file_name)
-
-    PARS = UDE_training_results["PARS"]
-    #@show typeof(PARS)
-    #@show size(PARS)
-    #@show PARS
-
-    #loop over PARS 
-    #for i in eachindex(PARS)
-    #    println("i = $i \n")
-    #    @show PARS[i]
-    #end
-
-    #Load the UDE model, parameters (only the last iteration), and state
+    
     UDE_model_params_pretrained = UDE_training_results["ude_model_params"]
     UDE_model_state_pretrained = UDE_training_results["ude_model_state"]
-
-    UDE_model, UDE_model_params, UDE_model_state = Hydrograd.create_NN_model(settings)
-
-    #@show UDE_model_params
-    #@show UDE_model_state
-
-    #@show UDE_model_params_pretrained
-    #@show UDE_model_state_pretrained
-
-    #use the pretrained parameters and state to make the NN prediction
-    n_h_NN = Hydrograd.update_ManningN_UDE(h_values, UDE_model, UDE_model_params_pretrained, UDE_model_state_pretrained, Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), length(h_values))
-
-    return n_h_NN
+    
+    UDE_model, _, _ = Hydrograd.create_NN_model(settings)
+    
+    # Normalize inputs using bounds from settings
+    h_bounds = Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"])
+    u_bounds = Float64.(settings.UDE_settings.UDE_NN_config["u_bounds"])
+    v_bounds = Float64.(settings.UDE_settings.UDE_NN_config["v_bounds"])
+    
+    h_normalized = @. 2.0 * (h_values - h_bounds[1]) / (h_bounds[2] - h_bounds[1]) - 1.0
+    u_normalized = @. 2.0 * (u_values - u_bounds[1]) / (u_bounds[2] - u_bounds[1]) - 1.0
+    v_normalized = @. 2.0 * (v_values - v_bounds[1]) / (v_bounds[2] - v_bounds[1]) - 1.0
+    
+    # Reshape for NN input
+    num_points = length(h_values)
+    input_matrix = vcat(
+        reshape(h_normalized, 1, num_points),
+        reshape(u_normalized, 1, num_points),
+        reshape(v_normalized, 1, num_points)
+    )
+    
+    # Get NN prediction
+    flow_resistance = vec(UDE_model(input_matrix, UDE_model_params_pretrained, UDE_model_state_pretrained)[1])
+    
+    return flow_resistance
 end
+
 
 
 #plot and compare the truth and the trained n(h)

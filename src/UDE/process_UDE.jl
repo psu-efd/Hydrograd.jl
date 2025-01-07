@@ -41,7 +41,7 @@ function create_NN_model(settings)
      # Randomly initialize the NN model
      UDE_model_params, UDE_model_state = Lux.setup(rng, UDE_model)
 
-     print_lux_network_structure(UDE_model, UDE_model_params)
+     #print_lux_network_structure(UDE_model, UDE_model_params)
 
     if settings.UDE_settings.UDE_NN_config["how_to_initialize_NN"] == "random"
         # do nothing (it is already randomly initialized above)        

@@ -21,6 +21,7 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     #save the simulation results as truth to a json file
     open(joinpath(case_path, settings.forward_settings.save_solution_truth_file_name), "w") do io
         JSON3.pretty(io, Dict("wse_truth" => wse_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cell_truth" => zb_cell_truth, 
+                            "ManningN_cells" => swe2d_extra_params.ManningN_cells, 
                             "ManningN_zone_values_truth" => ManningN_zone_values_truth, "inlet_discharges_truth" => inlet_discharges_truth))
         println(io)
     end

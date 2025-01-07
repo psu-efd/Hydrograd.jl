@@ -115,7 +115,11 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
     #In this case, params_vector is the trainable NN parameters
     elseif settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
         #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
-        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, settings.UDE_settings.h_bounds, my_mesh_2D.numOfCells)
+
+        #@show typeof(Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]))
+        #@show Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"])
+
+        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), my_mesh_2D.numOfCells)
     end
 
     Zygote.ignore() do
@@ -167,7 +171,7 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         g, RiemannSolver, h_small, data_type)
 
     #compute the contribution of source terms
-    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, g, h_small, data_type)
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, g, h_small)
 
 
     #combine inviscid and source terms
@@ -292,7 +296,10 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
 end
 
 #function to compute the source terms
-function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_cells, g, h_small, data_type)
+function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h::Vector{T1}, q_x::Vector{T1}, q_y::Vector{T1}, 
+                      S0::Matrix{T2}, ManningN_cells::Vector{T3}, g::Float64, h_small::Float64) where {T1, T2, T3}
+
+    data_type = promote_type(T1, T2, T3)
 
     updates_source = [
         let
@@ -308,8 +315,16 @@ function compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0, ManningN_ce
                 v_temp = q_y[iCell] / h[iCell]
                 u_mag = sqrt(u_temp^2 + v_temp^2 + eps(data_type))
 
-                friction_x = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
-                friction_y = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
+                friction_x = zero(data_type)
+                friction_y = zero(data_type)
+
+                #if performing UDE and UDE_choice is FlowResistance, compute the friction terms from the UDE model
+                if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "FlowResistance"
+
+                else  #Just use the Manning's formula
+                    friction_x = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
+                    friction_y = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
+                end
 
                 Zygote.ignore() do
                     if iCell == -1  # Print for first cell only

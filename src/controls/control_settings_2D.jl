@@ -90,6 +90,8 @@ struct UDESettings
     UDE_optimizer::String
     UDE_learning_rate::Float64
     UDE_max_iterations::Int
+    UDE_abs_tol::Float64
+    UDE_rel_tol::Float64
     UDE_training_save_frequency::Int
     UDE_training_save_checkpoint::Bool
     UDE_training_checkpoint_frequency::Int
@@ -330,6 +332,8 @@ function parse_control_file(control_file::String)
             println("    UDE_optimizer = ", settings.UDE_settings.UDE_optimizer)
             println("    UDE_learning_rate = ", settings.UDE_settings.UDE_learning_rate)
             println("    UDE_max_iterations = ", settings.UDE_settings.UDE_max_iterations)
+            println("    UDE_abs_tol = ", settings.UDE_settings.UDE_abs_tol)
+            println("    UDE_rel_tol = ", settings.UDE_settings.UDE_rel_tol)
             println("    UDE_training_save_frequency = ", settings.UDE_settings.UDE_training_save_frequency)
             println("    UDE_training_save_checkpoint = ", settings.UDE_settings.UDE_training_save_checkpoint)
             println("    UDE_training_checkpoint_frequency = ", settings.UDE_settings.UDE_training_checkpoint_frequency)
@@ -543,6 +547,8 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
         String(options["UDE_optimizer"]),
         Float64(options["UDE_learning_rate"]),
         Int(options["UDE_max_iterations"]),
+        Float64(options["UDE_abs_tol"]),
+        Float64(options["UDE_rel_tol"]),
         Int(options["UDE_training_save_frequency"]),
         Bool(options["UDE_training_save_checkpoint"]),
         Int(options["UDE_training_checkpoint_frequency"]),

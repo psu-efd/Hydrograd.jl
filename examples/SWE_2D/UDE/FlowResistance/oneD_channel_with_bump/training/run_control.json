@@ -23,7 +23,7 @@
 
         "comment_UDE_choice": "Choice for UDE: ManningN_h, FlowResistance. For ManningN_h, a NN is used to fit ManningN as a function of water depth h. For FlowResistance, a NN is used to fit the flow resistance term (tau_b) as a function of h, u, and v.",
         "comment_how_to_initialize_NN": "random, from_pretrained (for inference or continued training; file name must be provided as NN_weights_state_file_name)",
-        "UDE_choice": "ManningN_h",
+        "UDE_choice": "FlowResistance",
         "UDE_NN_config": {
             "comment": "Configuration for the NN",
             "how_to_initialize_NN": "random",

@@ -120,10 +120,13 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
 
         # Call callback with all values (but outside gradient calculation)
         Zygote.ignore() do
-            #callback(θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, pred)
+            if settings.UDE_settings.UDE_optimizer == "LBFGS"
+                callback_within_opt_loss(θ, loss_total, loss_pred_WSE, loss_pred_uv, pred)
+            end
         end
 
-        return loss_total, loss_pred_WSE, loss_pred_uv, pred
+        #return loss_total, loss_pred_WSE, loss_pred_uv, pred
+        return loss_total
     end
 
     # Define AD type choice for optimization's gradient computation
@@ -189,7 +192,7 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     if settings.UDE_settings.UDE_optimizer == "Adam"
         optimizer = Adam(settings.UDE_settings.UDE_learning_rate)
     elseif settings.UDE_settings.UDE_optimizer == "LBFGS"
-        optimizer = LBFGS()
+        optimizer = Optimization.LBFGS()
     else
         throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No UDE is performed."))
     end
@@ -201,101 +204,138 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     PARS = []        # parameters accumulator
 
     # Define the callback 
-    # The first argument is the state of the optimizer, which is an OptimizationState object
-    callback = function (optimizer_state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
-
-        # Extract the parameters from the state
-        θ = optimizer_state.u
-
-        #@show typeof(θ)
-        #@show θ
-
-        # Print gradient norms per layer
-        # gs = first(Zygote.gradient(θ) do p
-        #     loss_total, _, _, _ = opt_loss(p, nothing)
-        #     return loss_total
-        # end)
-
-        # println("Structure of gs: ", keys(gs))
-        # for (k, v) in pairs(gs)
-        #     println("Key: ", k)
-        #     println("Value type: ", typeof(v))
-        #     if v isa NamedTuple
-        #         println("  Subfields: ", keys(v))
-        #     end
-        # end
-        
-        # # Analyze gradients by layer
-        # println("\nGradient analysis by layer:")
-        
-        # # Layer 1 gradients
-        # layer1_weights = gs.layer_1.weight
-        # layer1_bias = gs.layer_1.bias
-        # println("Layer 1:")
-        # println("  weights gradient = ", layer1_weights)
-        # println("  bias gradient = ", layer1_bias)
-        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer1_weights)))
-        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer1_bias)))
-        
-        # # Layer 2 gradients
-        # layer3_weights = gs.layer_3.weight
-        # layer3_bias = gs.layer_3.bias
-        # println("Layer 2:")
-        # println("  weights gradient = ", layer3_weights)
-        # println("  bias gradient = ", layer3_bias)
-        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer3_weights)))
-        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer3_bias)))
-        
-        # # Layer 3 gradients
-        # layer5_weights = gs.layer_5.weight
-        # layer5_bias = gs.layer_5.bias
-        # println("Layer 3:")
-        # println("  weights gradient = ", layer5_weights)
-        # println("  bias gradient = ", layer5_bias)
-        # println("  Weights gradient norm: ", sqrt(sum(abs2, layer5_weights)))
-        # println("  Bias gradient norm: ", sqrt(sum(abs2, layer5_bias)))
-
+    callback_within_opt_loss = function (θ, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
-
-        #reset the UDE start time
         UDE_start_time = UDE_current_time
 
-        iter_number = size(LOSS)[1]  #get the UDE iteration number (=length of LOSS array)
+       iter_number = length(ITER) + 1
 
-        Zygote.ignore() do
-            println("      iter, loss_total, loss_pred_WSE, loss_pred_uv = ", iter_number, ", ",
-                loss_total, ", ", loss_pred_WSE, ", ", loss_pred_uv)
-            println("      UDE iteration elapsed seconds = ", UDE_elapsed_seconds)
-        end
+       append!(ITER, iter_number)
+       append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
+       append!(PRED, [prediction[:, 1, end]])
+       append!(PARS, [θ])
+       
+       println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
 
-        #save the UDE results
-        if iter_number % settings.UDE_settings.UDE_training_save_frequency == 0
-            append!(ITER, iter_number)
+       return false
+   end
 
-            append!(PRED, [prediction[:, 1, end]])
+    callback = function (optimizer_state, loss_total) #callback function to observe training
+         UDE_current_time = now()  # Current date and time
+         UDE_elapsed_time = UDE_current_time - UDE_start_time
+         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
+         UDE_start_time = UDE_current_time
 
-            append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
+        θ = optimizer_state.u
 
-            append!(PARS, [θ])
-        end
+        iter_number = length(ITER) + 1
 
-        #checkpoint the UDE results (in case the UDE training is interrupted)
-        if settings.UDE_settings.UDE_training_save_checkpoint &&
-           iter_number % settings.UDE_settings.UDE_training_checkpoint_frequency == 0 &&
-           iter_number > 0
-            jldsave(joinpath(case_path, "checkpoint_UDE_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
-        end
+        append!(ITER, iter_number)
+        append!(LOSS, [[loss_total]])
 
-        #if l > 1e-9
-        #    false
-        #else 
-        #    true   #force the optimizer to stop 
-        #end
+        append!(PARS, [θ])
+        
+        println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
 
-        false
+        return false
     end
+    # The first argument is the state of the optimizer, which is an OptimizationState object
+    # callback = function (optimizer_state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
+
+    #     # Extract the parameters from the state
+    #     θ = optimizer_state.u
+
+    #     #@show typeof(θ)
+    #     #@show θ
+
+    #     # Print gradient norms per layer
+    #     # gs = first(Zygote.gradient(θ) do p
+    #     #     loss_total, _, _, _ = opt_loss(p, nothing)
+    #     #     return loss_total
+    #     # end)
+
+    #     # println("Structure of gs: ", keys(gs))
+    #     # for (k, v) in pairs(gs)
+    #     #     println("Key: ", k)
+    #     #     println("Value type: ", typeof(v))
+    #     #     if v isa NamedTuple
+    #     #         println("  Subfields: ", keys(v))
+    #     #     end
+    #     # end
+        
+    #     # # Analyze gradients by layer
+    #     # println("\nGradient analysis by layer:")
+        
+    #     # # Layer 1 gradients
+    #     # layer1_weights = gs.layer_1.weight
+    #     # layer1_bias = gs.layer_1.bias
+    #     # println("Layer 1:")
+    #     # println("  weights gradient = ", layer1_weights)
+    #     # println("  bias gradient = ", layer1_bias)
+    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer1_weights)))
+    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer1_bias)))
+        
+    #     # # Layer 2 gradients
+    #     # layer3_weights = gs.layer_3.weight
+    #     # layer3_bias = gs.layer_3.bias
+    #     # println("Layer 2:")
+    #     # println("  weights gradient = ", layer3_weights)
+    #     # println("  bias gradient = ", layer3_bias)
+    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer3_weights)))
+    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer3_bias)))
+        
+    #     # # Layer 3 gradients
+    #     # layer5_weights = gs.layer_5.weight
+    #     # layer5_bias = gs.layer_5.bias
+    #     # println("Layer 3:")
+    #     # println("  weights gradient = ", layer5_weights)
+    #     # println("  bias gradient = ", layer5_bias)
+    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer5_weights)))
+    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer5_bias)))
+
+    #     UDE_current_time = now()  # Current date and time
+    #     UDE_elapsed_time = UDE_current_time - UDE_start_time
+    #     UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
+
+    #     #reset the UDE start time
+    #     UDE_start_time = UDE_current_time
+
+    #     iter_number = size(LOSS)[1]  #get the UDE iteration number (=length of LOSS array)
+
+    #     Zygote.ignore() do
+    #         println("      iter, loss_total, loss_pred_WSE, loss_pred_uv = ", iter_number, ", ",
+    #             loss_total, ", ", loss_pred_WSE, ", ", loss_pred_uv)
+    #         println("      UDE iteration elapsed seconds = ", UDE_elapsed_seconds)
+    #     end
+
+    #     #save the UDE results
+    #     if iter_number % settings.UDE_settings.UDE_training_save_frequency == 0
+    #         append!(ITER, iter_number)
+
+    #         append!(PRED, [prediction[:, 1, end]])
+
+    #         append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
+
+    #         append!(PARS, [θ])
+    #     end
+
+    #     #checkpoint the UDE results (in case the UDE training is interrupted)
+    #     if settings.UDE_settings.UDE_training_save_checkpoint &&
+    #        iter_number % settings.UDE_settings.UDE_training_checkpoint_frequency == 0 &&
+    #        iter_number > 0
+    #         jldsave(joinpath(case_path, "checkpoint_UDE_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
+    #     end
+
+    #     #if l > 1e-9
+    #     #    false
+    #     #else 
+    #     #    true   #force the optimizer to stop 
+    #     #end
+
+    #     false
+    # end
 
 
     # Solve optimization problem
@@ -310,7 +350,22 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
     #   stats: statistics of the solver, such as the number of function evaluations required.
 
-    sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations)
+    #Solve in one call
+    if settings.UDE_settings.UDE_optimizer == "Adam"
+        sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations, abstol=settings.UDE_settings.UDE_abs_tol, reltol=settings.UDE_settings.UDE_rel_tol)
+    elseif settings.UDE_settings.UDE_optimizer == "LBFGS"
+        sol = solve(optprob, optimizer, maxiters=settings.UDE_settings.UDE_max_iterations, reltol=settings.UDE_settings.UDE_rel_tol)
+    else
+        error("UDE optimizer not implemented")
+    end
+
+    #Manually do the training loop: Have more control on the optimizer
+    #for epoch in 1:settings.UDE_settings.UDE_max_iterations
+        # Compute gradients and update parameters
+    #    grads = Zygote.pullback(θ -> compute_loss_UDE(ode_f, Q0, tspan, θ, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type), θ)
+    #    θ = optimizer(θ, grads)
+    #end
+    
 
     return sol, ITER, LOSS, PRED, PARS
 end
