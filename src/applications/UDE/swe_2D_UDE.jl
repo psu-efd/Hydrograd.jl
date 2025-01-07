@@ -33,14 +33,18 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
     u_truth = vec(sol_truth["u_truth"])
     v_truth = vec(sol_truth["v_truth"])
     zb_cell_truth = vec(sol_truth["zb_cell_truth"])
-    ManningN_cell_truth = vec(sol_truth["ManningN_cell_truth"])
+    ManningN_cells_truth = vec(sol_truth["ManningN_cells_truth"])
+    friction_x_truth = vec(sol_truth["friction_x_truth"])
+    friction_y_truth = vec(sol_truth["friction_y_truth"])
     inlet_discharges_truth = vec(sol_truth["inlet_discharges_truth"])
 
     println("   Loading calibration data ...")
 
     #combine the truth data into a dictionary
     observed_data = Dict{String,Vector{Float64}}("WSE_truth" => WSE_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth,
-        "zb_cell_truth" => zb_cell_truth, "ManningN_cell_truth" => ManningN_cell_truth, "inlet_discharges_truth" => inlet_discharges_truth)
+        "zb_cell_truth" => zb_cell_truth, "ManningN_cells_truth" => ManningN_cells_truth,
+        "friction_x_truth" => friction_x_truth, "friction_y_truth" => friction_y_truth,
+        "inlet_discharges_truth" => inlet_discharges_truth)
 
     #debug AD correctness
     #debug start
@@ -65,7 +69,7 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
     #perform the UDE
     sol, ITER, LOSS, PRED, PARS = nothing, nothing, nothing, nothing, nothing
     if settings.UDE_settings.UDE_mode == "training"
-        println("   Performing UDE training ...\n")
+        println("   Performing UDE training: ", settings.UDE_settings.UDE_choice, " ...\n")
         sol, ITER, LOSS, PRED, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
 
         #@show typeof(sol.u)
@@ -80,7 +84,9 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
 
         #process UDE results
         #so.u is the trained NN weights (ude_model_params)
-        Hydrograd.postprocess_UDE_training_results_swe_2D(swe_extra_params, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth)
+        Hydrograd.postprocess_UDE_training_results_swe_2D(swe_extra_params, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth,
+            ManningN_cells_truth, friction_x_truth, friction_y_truth)
+
     elseif settings.UDE_settings.UDE_mode == "inference"
         println("   Performing UDE inference ...\n")
         sol = UDE_inference(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, case_path)
@@ -203,30 +209,38 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     PRED = []        # prediction accumulator
     PARS = []        # parameters accumulator
 
-    # Define the callback 
+    # Define the callback. This is the callback within the opt_loss function (for LBFGS optimizer which does not allow more than one return value from the opt_loss function)
     callback_within_opt_loss = function (θ, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
+        iter_number = length(ITER) + 1
+
+        #For the LBFGS optimizer, the opt_loss function is called twice in each iteration. We only need to record the first call.
+        #if (iter_number - 1) % 2 == 0
+
+            UDE_current_time = now()  # Current date and time
+            UDE_elapsed_time = UDE_current_time - UDE_start_time
+            UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
+            UDE_start_time = UDE_current_time
+
+            iter_number = length(ITER) + 1
+
+            append!(ITER, iter_number)
+            append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
+            append!(PRED, [prediction[:, :, end]])
+            append!(PARS, [θ])
+
+            Zygote.ignore() do
+                println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
+            end
+        #end
+
+        return false
+    end
+
+    callback = function (optimizer_state, loss_total) #callback function to observe training
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
         UDE_start_time = UDE_current_time
-
-       iter_number = length(ITER) + 1
-
-       append!(ITER, iter_number)
-       append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
-       append!(PRED, [prediction[:, 1, end]])
-       append!(PARS, [θ])
-       
-       println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
-
-       return false
-   end
-
-    callback = function (optimizer_state, loss_total) #callback function to observe training
-         UDE_current_time = now()  # Current date and time
-         UDE_elapsed_time = UDE_current_time - UDE_start_time
-         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
-         UDE_start_time = UDE_current_time
 
         θ = optimizer_state.u
 
@@ -236,8 +250,10 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
         append!(LOSS, [[loss_total]])
 
         append!(PARS, [θ])
-        
-        println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
+
+        Zygote.ignore() do
+            println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
+        end
 
         return false
     end
@@ -264,10 +280,10 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     #     #         println("  Subfields: ", keys(v))
     #     #     end
     #     # end
-        
+
     #     # # Analyze gradients by layer
     #     # println("\nGradient analysis by layer:")
-        
+
     #     # # Layer 1 gradients
     #     # layer1_weights = gs.layer_1.weight
     #     # layer1_bias = gs.layer_1.bias
@@ -276,7 +292,7 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     #     # println("  bias gradient = ", layer1_bias)
     #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer1_weights)))
     #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer1_bias)))
-        
+
     #     # # Layer 2 gradients
     #     # layer3_weights = gs.layer_3.weight
     #     # layer3_bias = gs.layer_3.bias
@@ -285,7 +301,7 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     #     # println("  bias gradient = ", layer3_bias)
     #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer3_weights)))
     #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer3_bias)))
-        
+
     #     # # Layer 3 gradients
     #     # layer5_weights = gs.layer_5.weight
     #     # layer5_bias = gs.layer_5.bias
@@ -361,11 +377,11 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
 
     #Manually do the training loop: Have more control on the optimizer
     #for epoch in 1:settings.UDE_settings.UDE_max_iterations
-        # Compute gradients and update parameters
+    # Compute gradients and update parameters
     #    grads = Zygote.pullback(θ -> compute_loss_UDE(ode_f, Q0, tspan, θ, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type), θ)
     #    θ = optimizer(θ, grads)
     #end
-    
+
 
     return sol, ITER, LOSS, PRED, PARS
 end

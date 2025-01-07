@@ -1,4 +1,5 @@
 # Hydrograd
+### ***Computational Hydrodynamics with Automatic Differentiation and Scientific Machine Learning***
 
 A Julia-based computational hydrodynamics package with automatic differentiation (AD) capabilities. The package is designed to solve the partial differential equations (PDEs) of hydrodynamics, including the shallow water equations (SWE) and the Navier-Stokes equations (NS). Currently, the package is under development and only supports the SWE.
 

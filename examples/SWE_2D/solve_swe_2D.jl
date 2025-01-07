@@ -48,9 +48,11 @@ using InteractiveUtils
 
 #hack for debugging
 #get the current directory
-#current_dir = pwd()
+current_dir = pwd()
 #cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D")
 #cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D\\forward_simulation\\oneD_channel_with_bump_ManningN_h")
+#cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D\\forward_simulation\\oneD_channel_with_bump")
+#cd("C:\\Users\\xzl123\\research\\Hydrograd.jl\\examples\\SWE_2D\\forward_simulation\\simple")
 
 # Add some warnings/info for gradient computation
 SciMLSensitivity.STACKTRACE_WITH_VJPWARN[] = true
@@ -300,6 +302,6 @@ elapsed_seconds = Millisecond(elapsed_time).value / 1000
 println("Elapsed time in seconds: $elapsed_seconds")
 
 #restore the current directory
-#cd(current_dir)
+cd(current_dir)
 
 println("All done!")

@@ -7,7 +7,7 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
 end
 
 #save results (sol is a solution from SciML ODE solver)
-function swe_2D_save_results_SciML(swe2d_extra_params, sol)
+function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, friction_y_truth)
     
     settings = swe2d_extra_params.settings
     my_mesh_2D = swe2d_extra_params.my_mesh_2D
@@ -48,8 +48,8 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol)
 
         WSE = h_array + zb_cells
             
-        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE]
-        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE"]
+        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE, friction_x_truth, friction_y_truth]
+        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE", "friction_x", "friction_y"]
 
         vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             

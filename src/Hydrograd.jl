@@ -56,7 +56,7 @@ function print_banner()
     ╔════════════════════════════════════════════════════════════════════════╗
     ║                               Hydrograd                                ║
     ║              A Computational Hydrodynamics Package with                ║
-    ║                        Automatic Differentiation                       ║
+    ║       Automatic Differentiation and Scientific Machine Learning        ║
     ║------------------------------------------------------------------------║
     ║ Version    : 0.1.0                                                     ║
     ║ Author     : Xiaofeng Liu, PhD, P.E.                                   ║
@@ -113,6 +113,7 @@ include("parameters/process_bed_2D.jl")
 
 #UDE
 include("UDE/process_UDE.jl")
+include("UDE/process_FlowResistance_UDE.jl")
 
 #utilities
 include("utilities/misc_tools.jl")
@@ -181,6 +182,7 @@ export cells_to_faces_scalar
 #     discretization - semi-discretization
 export swe_2d_rhs
 export define_sparsity_swe_2D
+export compute_friction_terms
 
 #     discretization - initial conditions
 export setup_initial_condition!
@@ -200,7 +202,7 @@ export preprocess_model_parameters_2D
 export create_NN_model
 export save_NN_model
 export load_NN_model
-
+export update_FlowResistance_UDE
 # Utilities
 export update_1d_array
 export save_ode_solution

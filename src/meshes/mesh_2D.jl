@@ -39,6 +39,8 @@ Base.@kwdef struct mesh_2D
 
     faceRightCellID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #faceRightCellID_Dict: key: face ID, value: right cell ID
 
+    bFace_is_boundary::Vector{Bool} = zeros(Bool, 0)  #bFace_is_boundary: true if the face is a boundary face, false otherwise
+
     faceBoundaryID_Dict::Dict{Int, Int} = Dict{Int, Int}()  #faceBoundaryID_Dict: key: face ID, value: boundary ID
     
     boundaryFaces_Dict::Dict{Int, Vector{Int}} = Dict{Int, Vector{Int}}()  #Dictionary for the List of boundary faces: dictionary: {boundaryID: [list of face IDs]}. It also has the default boundary (default: wall)
@@ -192,6 +194,9 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     boundaryFaceID_to_ghostCellID_Dict = Dict{Int, Int}()
     #loop over all boundary faces to find the ghost cell ID for each boundary face
     for iBoundaryFace in 1:numOfAllBounaryFaces
+
+        #@show iBoundaryFace, allBoundaryFacesIDs_List[iBoundaryFace], ghostCellIDs[iBoundaryFace]
+
         boundaryFaceID_to_ghostCellID_Dict[allBoundaryFacesIDs_List[iBoundaryFace]] = ghostCellIDs[iBoundaryFace]
     end
     
@@ -322,11 +327,15 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     faceRightCellID_Dict = Dict{Int, Int}()
     faceBoundaryID_Dict = Dict{Int, Int}()
 
+    bFace_is_boundary = zeros(Bool, numOfFaces)
+
     for iFace in keys(faceCells_Dict)
         
         faceCells = faceCells_Dict[iFace]
         
         if length(faceCells) == 2   #internal face
+            bFace_is_boundary[iFace] = false
+
             #get the face normals
             face_normal = face_normals[iFace]
 
@@ -351,6 +360,8 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
             faceBoundaryID_Dict[iFace] = 0  #0 means internal face
 
         else  #boundary face
+            bFace_is_boundary[iFace] = true
+
             #get the ghost cell ID
             ghostCellID = boundaryFaceID_to_ghostCellID_Dict[iFace]
 
@@ -400,6 +411,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         faceCells_Dict = faceCells_Dict,
         faceLeftCellID_Dict = faceLeftCellID_Dict,
         faceRightCellID_Dict = faceRightCellID_Dict,
+        bFace_is_boundary = bFace_is_boundary,
         faceBoundaryID_Dict = faceBoundaryID_Dict,
         boundaryFaces_Dict = boundaryFaces_Dict,
         allBoundaryFacesIDs_List = allBoundaryFacesIDs_List,

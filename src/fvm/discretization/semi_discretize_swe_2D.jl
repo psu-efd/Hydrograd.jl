@@ -94,13 +94,13 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         end
     end
 
-    #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step.
+    #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step (no need to update here).
     #If ManningN_option is variable_as_function_of_h, ManningN_cells_local is updated here.
     if settings.bPerform_Forward_Simulation && settings.forward_settings.ManningN_option == "variable_as_function_of_h"
         ManningN_cells_local = update_ManningN_forward_simulation(h, settings)
-        
-    #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 
-    # we need to update ManningN at cells and ghost cells
+
+        #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 
+        # we need to update ManningN at cells and ghost cells
     elseif (settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "ManningN"
 
         Zygote.ignore() do
@@ -110,9 +110,9 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         end
 
         ManningN_cells_local = update_ManningN_inversion_sensitivity_analysis(my_mesh_2D, srh_all_Dict, params_vector)
-    
-    #For the case of UDE, we need to update ManningN or flow resistance based on the UDE model
-    #In this case, params_vector is the trainable NN parameters
+
+        #For the case of UDE, we need to update ManningN or flow resistance based on the UDE model
+        #In this case, params_vector is the trainable NN parameters
     elseif settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
         #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
 
@@ -171,7 +171,7 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         g, RiemannSolver, h_small, data_type)
 
     #compute the contribution of source terms
-    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, g, h_small)
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, h_small)
 
 
     #combine inviscid and source terms
@@ -296,11 +296,15 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
 end
 
 #function to compute the source terms
-function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h::Vector{T1}, q_x::Vector{T1}, q_y::Vector{T1}, 
-                      S0::Matrix{T2}, ManningN_cells::Vector{T3}, g::Float64, h_small::Float64) where {T1, T2, T3}
+function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1},
+    S0::Matrix{T2}, ManningN_cells::Vector{T3}, params_vector::AbstractVector{T4}, p_extra::SWE2D_Extra_Parameters{T5}, g::Float64, h_small::Float64) where {T1,T2,T3,T4,T5}
 
-    data_type = promote_type(T1, T2, T3)
+    data_type = promote_type(T1, T2, T3, T4, T5)
 
+    #compute the friction (flow resistance) terms
+    friction_x, friction_y = compute_friction_terms(settings, h, q_x, q_y, ManningN_cells, params_vector, p_extra, my_mesh_2D, g, h_small)
+
+    #compute the momentum source terms
     updates_source = [
         let
             cell_area = my_mesh_2D.cell_areas[iCell]
@@ -311,28 +315,12 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
                     g * h[iCell] * S0[iCell, 1] * cell_area,
                     g * h[iCell] * S0[iCell, 2] * cell_area]
             else
-                u_temp = q_x[iCell] / h[iCell]
-                v_temp = q_y[iCell] / h[iCell]
-                u_mag = sqrt(u_temp^2 + v_temp^2 + eps(data_type))
-
-                friction_x = zero(data_type)
-                friction_y = zero(data_type)
-
-                #if performing UDE and UDE_choice is FlowResistance, compute the friction terms from the UDE model
-                if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "FlowResistance"
-
-                else  #Just use the Manning's formula
-                    friction_x = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * u_temp
-                    friction_y = g * ManningN_cells[iCell]^2.0 / (max(h[iCell], h_small))^(1.0 / 3.0) * u_mag * v_temp
-                end
 
                 Zygote.ignore() do
                     if iCell == -1  # Print for first cell only
                         @show typeof(ManningN_cells)
                         @show typeof(ManningN_cells[iCell])
                         @show ManningN_cells[iCell]
-                        #@show typeof(manning_term)
-                        #@show manning_term
                         @show typeof(friction_x)
                         @show friction_x
                         @show typeof(friction_y)
@@ -341,8 +329,8 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
                 end
 
                 [zero(data_type),
-                    (g * h[iCell] * S0[iCell, 1] - friction_x) * cell_area,
-                    (g * h[iCell] * S0[iCell, 2] - friction_y) * cell_area]
+                    (g * h[iCell] * S0[iCell, 1] - friction_x[iCell]) * cell_area,
+                    (g * h[iCell] * S0[iCell, 2] - friction_y[iCell]) * cell_area]
             end
 
 
@@ -373,6 +361,48 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
     end
 
     return updates_source
+end
+
+#function to compute the friction (flow resistance) terms
+function compute_friction_terms(settings::ControlSettings, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1}, 
+    ManningN_cells::Vector{T2}, params_vector::Union{AbstractVector{T3}, Nothing}, p_extra::SWE2D_Extra_Parameters{T4}, my_mesh_2D::mesh_2D, g::Float64, h_small::Float64) where {T1,T2,T3,T4}
+
+    #initialize friction terms
+    friction_x = zeros(eltype(h), my_mesh_2D.numOfCells)
+    friction_y = zeros(eltype(h), my_mesh_2D.numOfCells)
+
+    #if performing UDE and UDE_choice is FlowResistance, compute the friction terms from the UDE model
+    if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "FlowResistance"
+        friction_magnitudes = update_FlowResistance_UDE(
+            h, q_x, q_y,
+            p_extra.ude_model,
+            params_vector,
+            p_extra.ude_model_state,
+            Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]),
+            Float64.(settings.UDE_settings.UDE_NN_config["velocity_magnitude_bounds"]),
+            my_mesh_2D.numOfCells
+        )
+
+        mag_q = smooth_sqrt.(q_x.^2 .+ q_y.^2)
+
+        #if the cell is dry or the magnitude of the velocity is too small, set the friction terms to zero
+        friction_x = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
+                      friction_magnitudes[i] * q_x[i] / mag_q[i]
+                      for i in eachindex(h)]
+        friction_y = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
+                      friction_magnitudes[i] * q_y[i] / mag_q[i]
+                      for i in eachindex(h)]
+    else  # Just use the Manning's formula
+        # Compute friction terms with zero friction for dry cells
+        friction_x = [h[i] < h_small ? zero(T1) :
+                      g * ManningN_cells[i]^2.0 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_x[i]
+                      for i in eachindex(h)]
+        friction_y = [h[i] < h_small ? zero(T1) :
+                      g * ManningN_cells[i]^2.0 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_y[i]
+                      for i in eachindex(h)]
+    end
+
+    return friction_x, friction_y
 end
 
 #combine functions for AD debugging

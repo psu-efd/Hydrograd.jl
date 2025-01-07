@@ -87,11 +87,11 @@ struct UDESettings
     UDE_NN_config::Dict
     UDE_bWSE_loss::Bool
     UDE_b_uv_loss::Bool
-    UDE_optimizer::String
-    UDE_learning_rate::Float64
-    UDE_max_iterations::Int
-    UDE_abs_tol::Float64
-    UDE_rel_tol::Float64
+    UDE_optimizers::Vector{String}
+    UDE_learning_rates::Vector{Float64}
+    UDE_max_iterations::Vector{Int}
+    UDE_abs_tols::Vector{Float64}
+    UDE_rel_tols::Vector{Float64}
     UDE_training_save_frequency::Int
     UDE_training_save_checkpoint::Bool
     UDE_training_checkpoint_frequency::Int
@@ -329,11 +329,11 @@ function parse_control_file(control_file::String)
             println("    UDE_NN_config = ", settings.UDE_settings.UDE_NN_config)
             println("    UDE_bWSE_loss = ", settings.UDE_settings.UDE_bWSE_loss)
             println("    UDE_b_uv_loss = ", settings.UDE_settings.UDE_b_uv_loss)
-            println("    UDE_optimizer = ", settings.UDE_settings.UDE_optimizer)
-            println("    UDE_learning_rate = ", settings.UDE_settings.UDE_learning_rate)
+            println("    UDE_optimizers = ", settings.UDE_settings.UDE_optimizers)
+            println("    UDE_learning_rates = ", settings.UDE_settings.UDE_learning_rates)
             println("    UDE_max_iterations = ", settings.UDE_settings.UDE_max_iterations)
-            println("    UDE_abs_tol = ", settings.UDE_settings.UDE_abs_tol)
-            println("    UDE_rel_tol = ", settings.UDE_settings.UDE_rel_tol)
+            println("    UDE_abs_tols = ", settings.UDE_settings.UDE_abs_tols)
+            println("    UDE_rel_tols = ", settings.UDE_settings.UDE_rel_tols)
             println("    UDE_training_save_frequency = ", settings.UDE_settings.UDE_training_save_frequency)
             println("    UDE_training_save_checkpoint = ", settings.UDE_settings.UDE_training_save_checkpoint)
             println("    UDE_training_checkpoint_frequency = ", settings.UDE_settings.UDE_training_checkpoint_frequency)
@@ -521,14 +521,14 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
 
     end
 
-    #for the option of FlowResistance, the input dimension must be 3 (h, hu, hv) and the output dimension must be 1 (tau_b)
+    #for the option of FlowResistance, the input dimension must be 2 (h, q_magnitude) and the output dimension must be 1 (tau_b magnitude)
     if options["UDE_choice"] == "FlowResistance" 
 
         input_dim = options["UDE_NN_config"]["input_dim"]
         output_dim = options["UDE_NN_config"]["output_dim"]
 
-        if input_dim != 3 || output_dim != 1
-            error("For FlowResistance, the input dimension must be 3 and the output dimension must be 1.")
+        if input_dim != 2 || output_dim != 1
+            error("For FlowResistance, the input dimension must be 2 (h, q_magnitude) and the output dimension must be 1 (tau_b magnitude).")
         end
     end
 
@@ -544,11 +544,11 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
         Dict(options["UDE_NN_config"]),
         Bool(options["UDE_bWSE_loss"]),
         Bool(options["UDE_b_uv_loss"]),
-        String(options["UDE_optimizer"]),
-        Float64(options["UDE_learning_rate"]),
-        Int(options["UDE_max_iterations"]),
-        Float64(options["UDE_abs_tol"]),
-        Float64(options["UDE_rel_tol"]),
+        String.(options["UDE_optimizers"]),
+        Float64.(options["UDE_learning_rates"]),
+        Int.(options["UDE_max_iterations"]),
+        Float64.(options["UDE_abs_tols"]),
+        Float64.(options["UDE_rel_tols"]),
         Int(options["UDE_training_save_frequency"]),
         Bool(options["UDE_training_save_checkpoint"]),
         Int(options["UDE_training_checkpoint_frequency"]),

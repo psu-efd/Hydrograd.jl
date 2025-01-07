@@ -53,7 +53,11 @@ function compute_cell_gradient(iCell::Int, my_mesh_2D::mesh_2D, scalar_variable:
     nNodes = my_mesh_2D.cellNodesCount[iCell]
     
     cell_faces = my_mesh_2D.cellFacesList[iCell,:]
-    
+
+    #@show iCell
+    #@show cellNeighbors
+    #@show cell_faces
+
     #loop over all faces of the current cell
     for iFace in 1:nNodes
         faceID = cell_faces[iFace]
@@ -61,12 +65,12 @@ function compute_cell_gradient(iCell::Int, my_mesh_2D::mesh_2D, scalar_variable:
         
         # Value of the variable at the current cell and neighbor cell
         variable_c = scalar_variable[iCell]
-        if neighbor_cellID > my_mesh_2D.numOfCells  # Boundary face if the neighbor cell ID is greater than the number of cells
+        if my_mesh_2D.bFace_is_boundary[faceID]  # If it is a boundary face
             variable_n = variable_c  # Assume zero gradient at boundary
         else
             variable_n = scalar_variable[neighbor_cellID]
         end
-        
+
         # Compute the variable value on face (average of cell and neighbor for now; can be improved with interpolation)
         variable_f = T((variable_c + variable_n) / 2.0)
         
@@ -74,6 +78,13 @@ function compute_cell_gradient(iCell::Int, my_mesh_2D::mesh_2D, scalar_variable:
         flux_temp = my_mesh_2D.cell_normals[iCell][iFace] * variable_f * my_mesh_2D.face_lengths[faceID]
         
         cell_gradient = cell_gradient + flux_temp
+
+        #@show iCell, iFace, faceID, neighbor_cellID
+        #@show variable_c
+        #@show variable_n
+        #@show my_mesh_2D.cell_normals[iCell][iFace]
+        #@show flux_temp
+        #@show cell_gradient
 
     end
     
