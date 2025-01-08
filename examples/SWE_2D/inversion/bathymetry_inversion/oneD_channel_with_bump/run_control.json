@@ -2,7 +2,7 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": false,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
+        "srhhydro_file_name": "oneD_channel_with_bump.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
         "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": true,
@@ -12,7 +12,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 10.0],
+        "tspan": [0.0, 100.0],
         "dt": 0.1,
         "dt_save": 0.1,
         "nSave": 10
@@ -34,9 +34,11 @@
         "inversion_parameter_value_upper_bound": 0.2,
         "inversion_parameter_slope_upper_bound": 0.1,
         
-        "inversion_optimizer": "Adam",
-        "inversion_learning_rate": 0.01,
-        "inversion_max_iterations": 2,
+        "inversion_optimizers": ["Adam", "LBFGS"],
+        "inversion_learning_rates": [0.01, 0.01],
+        "inversion_max_iterations": [50, 50],
+        "inversion_abs_tols": [1e-6, 1e-6],
+        "inversion_rel_tols": [1e-6, 1e-6],
         "inversion_save_frequency": 1,
         "inversion_save_checkpoint": true,
         "inversion_checkpoint_frequency": 10,
@@ -49,7 +51,7 @@
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
-            "ode_solver_sensealg": "InterpolatingAdjoint(autojacvec=ZygoteVJP())",
+            "ode_solver_sensealg": "AutoForwardDiff()",
             "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },

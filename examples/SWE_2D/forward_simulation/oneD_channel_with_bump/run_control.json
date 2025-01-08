@@ -2,7 +2,7 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": false,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
+        "srhhydro_file_name": "oneD_channel_with_bump.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
         "bPerform_Forward_Simulation": true,
         "bPerform_Inversion": false,
@@ -11,7 +11,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (optionally overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 10.0],
+        "tspan": [0.0, 100.0],
         "dt": 0.1,
         "dt_save": 0.1,
         "nSave": 10

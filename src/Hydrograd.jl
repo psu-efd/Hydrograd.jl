@@ -29,6 +29,8 @@ using OrdinaryDiffEq
 #Optimizers
 using Optimization
 using OptimizationOptimisers
+using OptimizationOptimJL
+using LineSearches
 #using OptimizationPolyalgorithms
 #using OptimizationNLopt
 #using Optim

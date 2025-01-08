@@ -72,7 +72,7 @@ function  postprocess_UDE_training_results_swe_2D(swe2d_extra_params, zb_cell_tr
 
         #If training the UDE and the UDE choice is ManningN_h
         if settings.UDE_settings.UDE_choice == "ManningN_h"
-            h_i = curPred
+            h_i = curPred[:, 1]
             # Reconstruct the parameters dictionary for the neural network
             #reconstructed_params = ComponentArrays.structuralize(curPars, swe2d_extra_params.ude_model_params)
             ManningN_cells = update_ManningN_UDE(h_i, ude_model, curPars, ude_model_state, Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), my_mesh_2D.numOfCells)

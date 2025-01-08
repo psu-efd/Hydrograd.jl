@@ -40,9 +40,11 @@ struct InversionSettings
     parameter_value_lower_bound::Float64
     parameter_value_upper_bound::Float64
     parameter_slope_upper_bound::Float64
-    optimizer::String
-    learning_rate::Float64
-    max_iterations::Int
+    inversion_optimizers::Vector{String}
+    inversion_learning_rates::Vector{Float64}
+    inversion_max_iterations::Vector{Int}
+    inversion_abs_tols::Vector{Float64}
+    inversion_rel_tols::Vector{Float64}
     save_frequency::Int
     save_checkpoint::Bool
     checkpoint_frequency::Int
@@ -426,9 +428,11 @@ function parse_inversion_settings(options::Dict, control_file_dir::String)
         Float64.(options["inversion_parameter_value_lower_bound"]),  # parameter_value_lower_bound
         Float64.(options["inversion_parameter_value_upper_bound"]),  # parameter_value_upper_bound
         Float64.(options["inversion_parameter_slope_upper_bound"]),  # parameter_slope_upper_bound
-        options["inversion_optimizer"],                        # optimizer
-        Float64(options["inversion_learning_rate"]),           # learning_rate
-        Int(options["inversion_max_iterations"]),              # max_iterations
+        options["inversion_optimizers"],                        # optimizers
+        Float64.(options["inversion_learning_rates"]),           # learning_rates
+        Int.(options["inversion_max_iterations"]),              # max_iterations
+        Float64.(options["inversion_abs_tols"]),           # abs_tols
+        Float64.(options["inversion_rel_tols"]),           # rel_tols
         Int(options["inversion_save_frequency"]),           # save_frequency
         options["inversion_save_checkpoint"],                # save_checkpoint
         Int(options["inversion_checkpoint_frequency"]),     # checkpoint_frequency

@@ -1,7 +1,7 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T, huR::T, hvR::T, g::Float64, normal::Vector{Float64}; hmin::Float64=1e-6) where T
+function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T, huR::T, hvR::T, g::Float64, normal::Vector{Float64}; hmin::Float64=1e-6) where T <: Real
     
     #Data type 
     data_type = eltype(hL)

@@ -548,14 +548,14 @@ end
     boundary_conditions::BoundaryConditions2D,
     ManningN_cells::Vector{T2},
     zb_cells::Vector{T3},
-    zb_faces::Vector{T3},
+    zb_faces::Vector{T4},
     swe_2D_constants::swe_2D_consts,
     inletQ_Length::Vector{Vector{Float64}},
-    inletQ_TotalQ::Vector{T4},
-    exitH_WSE::Vector{Float64}) where {T1,T2,T3,T4}
+    inletQ_TotalQ::Vector{T5},
+    exitH_WSE::Vector{T6}) where {T1,T2,T3,T4,T5,T6}
 
     # Get the most general type
-    T = promote_type(T1, T2, T3, T4)
+    T = promote_type(T1, T2, T3, T4, T5, T6)
 
     Zygote.ignore() do
         if settings.bVerbose

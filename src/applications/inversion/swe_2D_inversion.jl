@@ -39,7 +39,7 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
     u_truth = vec(sol_truth["u_truth"])
     v_truth = vec(sol_truth["v_truth"])
     zb_cell_truth = vec(sol_truth["zb_cell_truth"])
-    ManningN_cell_truth = vec(sol_truth["ManningN_cell_truth"])
+    ManningN_cell_truth = vec(sol_truth["ManningN_cells_truth"])
     inlet_discharges_truth = vec(sol_truth["inlet_discharges_truth"])
 
     println("   Loading inversion data ...")
@@ -83,7 +83,9 @@ end
 
 
 # Define the loss function
-function compute_loss_inversion(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple{T1,T1}, p::AbstractVector{T2}, settings::ControlSettings, 
+    my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T1}}, active_param_name::String, data_type::DataType) where {T1<:Real,T2<:Real}
+
     # Solve the ODE (forward pass)
 
     # Create ODEProblem        
@@ -124,7 +126,7 @@ function compute_loss_inversion(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2
         ode_solver_sensealg = ZygoteVJP()
     elseif settings.inversion_settings.ode_solver_sensealg == "InterpolatingAdjoint(autojacvec=ZygoteVJP())"
         ode_solver_sensealg = InterpolatingAdjoint(autojacvec=ZygoteVJP())
-    elseif settings.inversion_settings.ode_solver_sensealg == "ForwardDiffSensitivity()"
+    elseif settings.inversion_settings.ode_solver_sensealg == "AutoForwardDiff()"
         ode_solver_sensealg = ForwardDiffSensitivity()
     elseif settings.inversion_settings.ode_solver_sensealg == "BacksolveAdjoint(autojacvec=ZygoteVJP())"
         ode_solver_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
@@ -240,12 +242,7 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred = compute_loss_inversion(ode_f, Q0, tspan, θ, settings,
             my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
-        # Call callback with all values (but outside gradient calculation)
-        Zygote.ignore() do
-            #callback(θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_slope, pred)
-        end
-
-        return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, pred
+        return loss_total
     end
 
     # Define AD type choice for optimization's gradient computation
@@ -307,14 +304,6 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
     #ub_p = zeros(my_mesh_2D.numOfCells)
     #ub_p .= 0.3
 
-    #create the optimizer
-    if settings.inversion_settings.optimizer == "Adam"
-        optimizer = Adam(settings.inversion_settings.learning_rate)
-    elseif settings.inversion_settings.optimizer == "LBFGS"
-        optimizer = LBFGS()
-    else
-        throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed."))
-    end
 
     #define the accumulators for the inversion results
     ITER = []        #iteration number accumulator
@@ -330,7 +319,8 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
     #    return false  # continue optimization
     #end
 
-    callback = function (θ, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, prediction) #callback function to observe training
+    #callback function to observe training
+    callback = function (optimizer_state, loss_total)
 
         inversion_current_time = now()  # Current date and time
         inversion_elapsed_time = inversion_current_time - inversion_start_time
@@ -339,34 +329,38 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         #reset the inversion start time
         inversion_start_time = inversion_current_time
 
-        iter_number = size(LOSS)[1]  #get the inversion iteration number (=length of LOSS array)
+        θ = optimizer_state.u
+
+        iter_number = length(LOSS) + 1  #get the inversion iteration number 
 
         Zygote.ignore() do
-            println("      iter, loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope = ", iter_number, ", ",
-                loss_total, ", ", loss_pred, ", ", loss_pred_WSE, ", ", loss_pred_uv, ", ", loss_bound, ", ", loss_slope)
-            println("      inversion iteration elapsed seconds = ", inversion_elapsed_seconds)
-        end
+            println("       iter_number = ", iter_number, ", loss_total = ", loss_total, ", inversion_elapsed_seconds = ", inversion_elapsed_seconds)
 
-        #save the inversion results
-        if iter_number % settings.inversion_settings.save_frequency == 0
-            append!(ITER, iter_number)
+            #save the inversion results
+            if iter_number % settings.inversion_settings.save_frequency == 0
 
-            append!(PRED, [prediction[:, 1, end]])
+                data_type = eltype(θ)
 
-            append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
+                loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, prediction = compute_loss_inversion(ode_f, Q0, tspan, θ, settings,
+                        my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
-            if !isa(θ, Vector{Float64})  #NLopt returns an optimization object, not an arrary
-                #println("theta.u = ", θ.u)
-                append!(PARS, [copy(θ.u)])
-            else
-                append!(PARS, θ)
+                append!(ITER, iter_number)
+
+                append!(PRED, [prediction[:, :, end]])
+
+                append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
+
+                append!(PARS, [θ])
             end
+
+            #checkpoint the inversion results (in case the inversion is interrupted)
+            if settings.inversion_settings.save_checkpoint && iter_number % settings.inversion_settings.checkpoint_frequency == 0
+                jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
+            end
+
         end
 
-        #checkpoint the inversion results (in case the inversion is interrupted)
-        if settings.inversion_settings.save_checkpoint && iter_number % settings.inversion_settings.checkpoint_frequency == 0
-            jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
-        end
+
 
         #if l > 1e-9
         #    false
@@ -377,22 +371,65 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         false
     end
 
+    sol = nothing
 
-    # Solve optimization problem
-    # From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
-    # Returned optimization solution Fields:
-    #   u: the representation of the optimization's solution.
-    #   cache::AbstractOptimizationCache: the optimization cache` that was solved.
-    #   alg: the algorithm type used by the solver.
-    #   objective: Objective value of the solution
-    #   retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether 
-    #            it exited due to an error. For more details, see the return code documentation.
-    #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
-    #   stats: statistics of the solver, such as the number of function evaluations required.
+    #loop over the optimizers
+    for (iOptimizer, optimizer_choice) in enumerate(settings.inversion_settings.inversion_optimizers)
+        println("   iOptimizer: ", iOptimizer, " out of ", length(settings.inversion_settings.inversion_optimizers))
+        println("       optimizer_choice: ", optimizer_choice)
+        println("       iterations: ", settings.inversion_settings.inversion_max_iterations[iOptimizer])
+        println("       learning rate: ", settings.inversion_settings.inversion_learning_rates[iOptimizer])
+        println("       abs_tol: ", settings.inversion_settings.inversion_abs_tols[iOptimizer])
+        println("       rel_tol: ", settings.inversion_settings.inversion_rel_tols[iOptimizer])
 
-    sol = solve(optprob, optimizer, callback=callback, maxiters=settings.inversion_settings.max_iterations)
-    #sol = solve(optprob, Adam(settings.inversion_settings.learning_rate), maxiters=settings.inversion_settings.max_iterations)
-    #@enter sol = @interpret solve(optprob, Adam(settings.inversion_settings.learning_rate), callback=callback, maxiters=settings.inversion_settings.max_iterations)
+        #create the optimizer
+        if optimizer_choice == "Adam"
+            optimizer = OptimizationOptimisers.Adam(settings.inversion_settings.inversion_learning_rates[iOptimizer])
+        elseif optimizer_choice == "LBFGS"
+            optimizer = OptimizationOptimJL.LBFGS(linesearch=LineSearches.BackTracking())
+        else
+            throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No inversion is performed."))
+        end
+
+        # Solve optimization problem
+        # From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
+        # Returned optimization solution Fields:
+        #   u: the representation of the optimization's solution.
+        #   cache::AbstractOptimizationCache: the optimization cache` that was solved.
+        #   alg: the algorithm type used by the solver.
+        #   objective: Objective value of the solution
+        #   retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether 
+        #            it exited due to an error. For more details, see the return code documentation.
+        #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
+        #   stats: statistics of the solver, such as the number of function evaluations required.
+
+        if optimizer_choice == "Adam"
+            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.inversion_settings.inversion_max_iterations[iOptimizer],
+                abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
+        elseif optimizer_choice == "LBFGS"  #LBFGS does not support abstol
+            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.inversion_settings.inversion_max_iterations[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
+        else
+            error("Not implemented yet")
+        end
+
+        #check whether the optimizer converged. If converged, break the loop (no need to continue)
+        if sol.retcode == SciMLBase.ReturnCode.Success
+            println("   Optimizer $(optimizer_choice) converged. No need to continue.")
+            break
+        end
+
+        #Manually do the training loop: Have more control on the optimizer
+        #for epoch in 1:settings.UDE_settings.UDE_max_iterations
+        # Compute gradients and update parameters
+        #    grads = Zygote.pullback(θ -> compute_loss_UDE(ode_f, Q0, tspan, θ, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type), θ)
+        #    θ = optimizer(θ, grads)
+        #end
+
+        #update the initial condition for the next optimizer
+        optprob = OptimizationProblem(optf, copy(sol.u))  # No parameters needed
+        GC.gc() #clear the memory
+
+    end
 
     return sol, ITER, LOSS, PRED, PARS
 end

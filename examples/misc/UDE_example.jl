@@ -4,6 +4,8 @@
 using OrdinaryDiffEq, ModelingToolkit, DataDrivenDiffEq, SciMLSensitivity, DataDrivenSparse
 using Optimization, OptimizationOptimisers, OptimizationOptimJL, LineSearches
 
+using ComponentArrays   
+
 # Standard Libraries
 using LinearAlgebra, Statistics
 
@@ -97,17 +99,18 @@ end
 # Define the optimization problem
 adtype = Optimization.AutoZygote()
 optf = Optimization.OptimizationFunction((x, p) -> loss(x), adtype)
+
 optprob = Optimization.OptimizationProblem(optf, ComponentVector{Float64}(p))
 
 # Solve the optimization problem first with the Adam optimizer
 res1 = Optimization.solve(
-    optprob, OptimizationOptimisers.Adam(), callback = callback, maxiters = 500)
-println("Training loss after $(length(losses)) iterations: $(losses[end])")
+    optprob, OptimizationOptimisers.Adam(), callback = callback, maxiters = 5000)
+println("Training loss after $(length(losses)) iterations: $(losses[end])\n")
 
 # Solve the optimization problem with the LBFGS optimizer
 optprob2 = Optimization.OptimizationProblem(optf, res1.u)
 res2 = Optimization.solve(
-    optprob2, LBFGS(linesearch = BackTracking()), callback = callback, maxiters = 100)
+    optprob2, LBFGS(linesearch = BackTracking()), callback = callback, maxiters = 1000)
 println("Final training loss after $(length(losses)) iterations: $(losses[end])")
 
 # Rename the best candidate

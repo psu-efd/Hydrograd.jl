@@ -43,8 +43,8 @@ end
 
 function compute_cell_gradient(iCell::Int, my_mesh_2D::mesh_2D, scalar_variable::AbstractVector{T})::Vector{T} where T<:Real
     # ... cell gradient computation logic ...
-    #cell_gradient = [zero(T), zero(T)]  # Gradient accumulator for this cell
-    cell_gradient = SVector{2,T}(zero(T), zero(T))
+    cell_gradient = [zero(T), zero(T)]  # Gradient accumulator for this cell
+    #cell_gradient = SVector{2,T}(zero(T), zero(T))
         
     #neighbor cells of the current cell
     cellNeighbors = my_mesh_2D.cellNeighbors_Dict[iCell]

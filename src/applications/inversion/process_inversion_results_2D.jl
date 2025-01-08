@@ -60,7 +60,7 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
 
     #save the results of each iteration to vtk 
     for (i, (curPred, curPars)) in enumerate(zip(PRED, PARS))
-        h_i = curPred
+        h_i = curPred[:,1]
         
         #if the inversion is for zb, then curPars is the zb_cells_param. Otherwise, curPar is something else such as the Manning's n or the inlet discharges. 
         if settings.inversion_settings.active_param_names == ["zb"]

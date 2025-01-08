@@ -124,13 +124,6 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
         loss_total, loss_pred_WSE, loss_pred_uv, pred = compute_loss_UDE(ode_f, Q0, tspan, θ, settings,
             my_mesh_2D, swe_2D_constants, observed_data, data_type)
 
-        # Call callback with all values (but outside gradient calculation)
-        Zygote.ignore() do
-            if settings.UDE_settings.UDE_optimizer == "LBFGS"
-                callback_within_opt_loss(θ, loss_total, loss_pred_WSE, loss_pred_uv, pred)
-            end
-        end
-
         #return loss_total, loss_pred_WSE, loss_pred_uv, pred
         return loss_total
     end
@@ -194,193 +187,115 @@ function UDE_training(ode_f, Q0, tspan, p_init, settings, my_mesh_2D, swe_2D_con
     #ub_p = zeros(my_mesh_2D.numOfCells)
     #ub_p .= 0.3
 
-    #create the optimizer
-    if settings.UDE_settings.UDE_optimizer == "Adam"
-        optimizer = Adam(settings.UDE_settings.UDE_learning_rate)
-    elseif settings.UDE_settings.UDE_optimizer == "LBFGS"
-        optimizer = Optimization.LBFGS()
-    else
-        throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No UDE is performed."))
-    end
-
     #define the accumulators for the UDE results
     ITER = []        #iteration number accumulator
     LOSS = []        # Loss accumulator
     PRED = []        # prediction accumulator
     PARS = []        # parameters accumulator
 
-    # Define the callback. This is the callback within the opt_loss function (for LBFGS optimizer which does not allow more than one return value from the opt_loss function)
-    callback_within_opt_loss = function (θ, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
-        iter_number = length(ITER) + 1
-
-        #For the LBFGS optimizer, the opt_loss function is called twice in each iteration. We only need to record the first call.
-        #if (iter_number - 1) % 2 == 0
-
-            UDE_current_time = now()  # Current date and time
-            UDE_elapsed_time = UDE_current_time - UDE_start_time
-            UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
-            UDE_start_time = UDE_current_time
-
-            iter_number = length(ITER) + 1
-
-            append!(ITER, iter_number)
-            append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
-            append!(PRED, [prediction[:, :, end]])
-            append!(PARS, [θ])
-
-            Zygote.ignore() do
-                println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
-            end
-        #end
-
-        return false
-    end
-
+    # Define the callback 
     callback = function (optimizer_state, loss_total) #callback function to observe training
         UDE_current_time = now()  # Current date and time
         UDE_elapsed_time = UDE_current_time - UDE_start_time
         UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
         UDE_start_time = UDE_current_time
 
-        θ = optimizer_state.u
-
         iter_number = length(ITER) + 1
 
-        append!(ITER, iter_number)
-        append!(LOSS, [[loss_total]])
-
-        append!(PARS, [θ])
+        θ = optimizer_state.u
 
         Zygote.ignore() do
+            #save the UDE results
+            if iter_number % settings.UDE_settings.UDE_training_save_frequency == 0
+
+                data_type = eltype(θ)
+                
+                loss_total_temp, loss_pred_WSE, loss_pred_uv, pred = compute_loss_UDE(ode_f, Q0, tspan, θ, settings,
+                    my_mesh_2D, swe_2D_constants, observed_data, data_type)
+
+                append!(ITER, iter_number)
+
+                append!(PRED, [pred[:, :, end]])
+
+                append!(LOSS, [[loss_total_temp, loss_pred_WSE, loss_pred_uv]])
+
+                append!(PARS, [θ])
+            end
+
+            #checkpoint the UDE results (in case the UDE training is interrupted)
+            if settings.UDE_settings.UDE_training_save_checkpoint &&
+               iter_number % settings.UDE_settings.UDE_training_checkpoint_frequency == 0 &&
+               iter_number > 0
+                jldsave(joinpath(case_path, "checkpoint_UDE_iter_$(iter_number).jld2"); θ)
+            end
+
             println("iter_number = ", iter_number, ", loss_total = ", loss_total, ", UDE_elapsed_seconds = ", UDE_elapsed_seconds)
+            
         end
 
         return false
     end
-    # The first argument is the state of the optimizer, which is an OptimizationState object
-    # callback = function (optimizer_state, loss_total, loss_pred_WSE, loss_pred_uv, prediction) #callback function to observe training
 
-    #     # Extract the parameters from the state
-    #     θ = optimizer_state.u
+    sol = nothing
 
-    #     #@show typeof(θ)
-    #     #@show θ
+    #loop over the optimizers
+    for (iOptimizer, optimizer_choice) in enumerate(settings.UDE_settings.UDE_optimizers)
+        println("   iOptimizer: ", iOptimizer, " out of ", length(settings.UDE_settings.UDE_optimizers))
+        println("       optimizer_choice: ", optimizer_choice)
+        println("       iterations: ", settings.UDE_settings.UDE_max_iterations[iOptimizer])
+        println("       learning rate: ", settings.UDE_settings.UDE_learning_rates[iOptimizer])
+        println("       abs_tol: ", settings.UDE_settings.UDE_abs_tols[iOptimizer])
+        println("       rel_tol: ", settings.UDE_settings.UDE_rel_tols[iOptimizer])
 
-    #     # Print gradient norms per layer
-    #     # gs = first(Zygote.gradient(θ) do p
-    #     #     loss_total, _, _, _ = opt_loss(p, nothing)
-    #     #     return loss_total
-    #     # end)
+        #create the optimizer
+        if optimizer_choice == "Adam"
+            optimizer = OptimizationOptimisers.Adam(settings.UDE_settings.UDE_learning_rates[iOptimizer])
+        elseif optimizer_choice == "LBFGS"
+            optimizer = OptimizationOptimJL.LBFGS(linesearch = LineSearches.BackTracking())
+        else
+            throw(ArgumentError("Invalid optimizer choice. Supported optimizers: Adam, LBFGS. No UDE is performed."))
+        end
 
-    #     # println("Structure of gs: ", keys(gs))
-    #     # for (k, v) in pairs(gs)
-    #     #     println("Key: ", k)
-    #     #     println("Value type: ", typeof(v))
-    #     #     if v isa NamedTuple
-    #     #         println("  Subfields: ", keys(v))
-    #     #     end
-    #     # end
+        # Solve optimization problem
+        # From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
+        # Returned optimization solution Fields:
+        #   u: the representation of the optimization's solution.
+        #   cache::AbstractOptimizationCache: the optimization cache` that was solved.
+        #   alg: the algorithm type used by the solver.
+        #   objective: Objective value of the solution
+        #   retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether 
+        #            it exited due to an error. For more details, see the return code documentation.
+        #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
+        #   stats: statistics of the solver, such as the number of function evaluations required.
 
-    #     # # Analyze gradients by layer
-    #     # println("\nGradient analysis by layer:")
+        #Solve in one call
+        if optimizer_choice == "Adam"
+            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations[iOptimizer], 
+                         abstol=settings.UDE_settings.UDE_abs_tols[iOptimizer], reltol=settings.UDE_settings.UDE_rel_tols[iOptimizer])
+        elseif optimizer_choice == "LBFGS"  #LBFGS does not support abstol
+            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations[iOptimizer], reltol=settings.UDE_settings.UDE_rel_tols[iOptimizer])
+        else
+            error("Not implemented yet")
+        end
 
-    #     # # Layer 1 gradients
-    #     # layer1_weights = gs.layer_1.weight
-    #     # layer1_bias = gs.layer_1.bias
-    #     # println("Layer 1:")
-    #     # println("  weights gradient = ", layer1_weights)
-    #     # println("  bias gradient = ", layer1_bias)
-    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer1_weights)))
-    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer1_bias)))
+        #check whether the optimizer converged. If converged, break the loop (no need to continue)
+        if sol.retcode == SciMLBase.ReturnCode.Success
+            println("   Optimizer $(optimizer_choice) converged. No need to continue.")
+            break
+        end
 
-    #     # # Layer 2 gradients
-    #     # layer3_weights = gs.layer_3.weight
-    #     # layer3_bias = gs.layer_3.bias
-    #     # println("Layer 2:")
-    #     # println("  weights gradient = ", layer3_weights)
-    #     # println("  bias gradient = ", layer3_bias)
-    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer3_weights)))
-    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer3_bias)))
+        #Manually do the training loop: Have more control on the optimizer
+        #for epoch in 1:settings.UDE_settings.UDE_max_iterations
+        # Compute gradients and update parameters
+        #    grads = Zygote.pullback(θ -> compute_loss_UDE(ode_f, Q0, tspan, θ, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type), θ)
+        #    θ = optimizer(θ, grads)
+        #end
 
-    #     # # Layer 3 gradients
-    #     # layer5_weights = gs.layer_5.weight
-    #     # layer5_bias = gs.layer_5.bias
-    #     # println("Layer 3:")
-    #     # println("  weights gradient = ", layer5_weights)
-    #     # println("  bias gradient = ", layer5_bias)
-    #     # println("  Weights gradient norm: ", sqrt(sum(abs2, layer5_weights)))
-    #     # println("  Bias gradient norm: ", sqrt(sum(abs2, layer5_bias)))
+        #update the initial condition for the next optimizer
+        optprob = OptimizationProblem(optf, copy(sol.u))  # No parameters needed
+        GC.gc() #clear the memory
 
-    #     UDE_current_time = now()  # Current date and time
-    #     UDE_elapsed_time = UDE_current_time - UDE_start_time
-    #     UDE_elapsed_seconds = Millisecond(UDE_elapsed_time).value / 1000
-
-    #     #reset the UDE start time
-    #     UDE_start_time = UDE_current_time
-
-    #     iter_number = size(LOSS)[1]  #get the UDE iteration number (=length of LOSS array)
-
-    #     Zygote.ignore() do
-    #         println("      iter, loss_total, loss_pred_WSE, loss_pred_uv = ", iter_number, ", ",
-    #             loss_total, ", ", loss_pred_WSE, ", ", loss_pred_uv)
-    #         println("      UDE iteration elapsed seconds = ", UDE_elapsed_seconds)
-    #     end
-
-    #     #save the UDE results
-    #     if iter_number % settings.UDE_settings.UDE_training_save_frequency == 0
-    #         append!(ITER, iter_number)
-
-    #         append!(PRED, [prediction[:, 1, end]])
-
-    #         append!(LOSS, [[loss_total, loss_pred_WSE, loss_pred_uv]])
-
-    #         append!(PARS, [θ])
-    #     end
-
-    #     #checkpoint the UDE results (in case the UDE training is interrupted)
-    #     if settings.UDE_settings.UDE_training_save_checkpoint &&
-    #        iter_number % settings.UDE_settings.UDE_training_checkpoint_frequency == 0 &&
-    #        iter_number > 0
-    #         jldsave(joinpath(case_path, "checkpoint_UDE_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
-    #     end
-
-    #     #if l > 1e-9
-    #     #    false
-    #     #else 
-    #     #    true   #force the optimizer to stop 
-    #     #end
-
-    #     false
-    # end
-
-
-    # Solve optimization problem
-    # From SciMLSensitivity documentation: https://docs.sciml.ai/Optimization/stable/API/optimization_solution/
-    # Returned optimization solution Fields:
-    #   u: the representation of the optimization's solution.
-    #   cache::AbstractOptimizationCache: the optimization cache` that was solved.
-    #   alg: the algorithm type used by the solver.
-    #   objective: Objective value of the solution
-    #   retcode: the return code from the solver. Used to determine whether the solver solved successfully or whether 
-    #            it exited due to an error. For more details, see the return code documentation.
-    #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
-    #   stats: statistics of the solver, such as the number of function evaluations required.
-
-    #Solve in one call
-    if settings.UDE_settings.UDE_optimizer == "Adam"
-        sol = solve(optprob, optimizer, callback=callback, maxiters=settings.UDE_settings.UDE_max_iterations, abstol=settings.UDE_settings.UDE_abs_tol, reltol=settings.UDE_settings.UDE_rel_tol)
-    elseif settings.UDE_settings.UDE_optimizer == "LBFGS"
-        sol = solve(optprob, optimizer, maxiters=settings.UDE_settings.UDE_max_iterations, reltol=settings.UDE_settings.UDE_rel_tol)
-    else
-        error("UDE optimizer not implemented")
     end
-
-    #Manually do the training loop: Have more control on the optimizer
-    #for epoch in 1:settings.UDE_settings.UDE_max_iterations
-    # Compute gradients and update parameters
-    #    grads = Zygote.pullback(θ -> compute_loss_UDE(ode_f, Q0, tspan, θ, settings, my_mesh_2D, swe_2D_constants, observed_data, data_type), θ)
-    #    θ = optimizer(θ, grads)
-    #end
 
 
     return sol, ITER, LOSS, PRED, PARS

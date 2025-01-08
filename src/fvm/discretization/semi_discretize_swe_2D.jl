@@ -147,6 +147,9 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         if settings.bVerbose
             #@show typeof(inletQ_TotalQ_local)
             #@show inletQ_TotalQ_local
+            #@show typeof(zb_cells_local)
+            #@show typeof(zb_faces_local)
+            
         end
     end
 
@@ -365,7 +368,8 @@ end
 
 #function to compute the friction (flow resistance) terms
 function compute_friction_terms(settings::ControlSettings, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1}, 
-    ManningN_cells::Vector{T2}, params_vector::Union{AbstractVector{T3}, Nothing}, p_extra::SWE2D_Extra_Parameters{T4}, my_mesh_2D::mesh_2D, g::Float64, h_small::Float64) where {T1,T2,T3,T4}
+    ManningN_cells::Vector{T2}, params_vector::Union{AbstractVector{T3}, Nothing}, p_extra::SWE2D_Extra_Parameters{T4}, 
+    my_mesh_2D::mesh_2D, g::Float64, h_small::Float64) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real} 
 
     #initialize friction terms
     friction_x = zeros(eltype(h), my_mesh_2D.numOfCells)
