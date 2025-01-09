@@ -65,6 +65,9 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
         #if the inversion is for zb, then curPars is the zb_cells_param. Otherwise, curPar is something else such as the Manning's n or the inlet discharges. 
         if settings.inversion_settings.active_param_names == ["zb"]
             zb_i = curPars
+
+            #compute S0
+            _, _, S0_i = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, curPars)
         else
             zb_i = zb_cell_truth
         end
@@ -79,6 +82,9 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
         vector_names = []
 
         if settings.inversion_settings.active_param_names == ["zb"]
+            vector_data = [S0_i]
+            vector_names = ["S0"]
+
             scalar_data = [h_i, WSE_i, zb_i, h_truth, WSE_truth, zb_cell_truth]
             scalar_names = ["h", "WSE", "zb", "h_truth", "WSE_truth", "zb_truth"]
         else

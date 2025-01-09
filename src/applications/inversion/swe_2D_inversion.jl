@@ -382,6 +382,13 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         println("       abs_tol: ", settings.inversion_settings.inversion_abs_tols[iOptimizer])
         println("       rel_tol: ", settings.inversion_settings.inversion_rel_tols[iOptimizer])
 
+        max_iterations = settings.inversion_settings.inversion_max_iterations[iOptimizer]
+
+        if max_iterations <= 0
+            println("       max_iterations <= 0. No inversion is performed with this optimizer.")
+            continue
+        end
+
         #create the optimizer
         if optimizer_choice == "Adam"
             optimizer = OptimizationOptimisers.Adam(settings.inversion_settings.inversion_learning_rates[iOptimizer])
@@ -403,11 +410,11 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
 
-        if optimizer_choice == "Adam"
-            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.inversion_settings.inversion_max_iterations[iOptimizer],
+        if optimizer_choice == "Adam" 
+            sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
                 abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
-        elseif optimizer_choice == "LBFGS"  #LBFGS does not support abstol
-            sol = solve(optprob, optimizer, callback=callback, maxiters=settings.inversion_settings.inversion_max_iterations[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
+        elseif optimizer_choice == "LBFGS"   #LBFGS does not support abstol
+            sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations, reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
         else
             error("Not implemented yet")
         end
