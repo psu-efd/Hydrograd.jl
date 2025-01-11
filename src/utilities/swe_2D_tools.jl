@@ -27,9 +27,9 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
         field_value = index
 
         # Extract solution components
-        h_array = state[:, 1]
-        q_x_array = state[:, 2]
-        q_y_array = state[:, 3]
+        h_array = state[1:my_mesh_2D.numOfCells]
+        q_x_array = state[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
+        q_y_array = state[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
 
         #If ManningN_option is variable_as_function_of_h, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
         if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
@@ -67,46 +67,53 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
 end
 
 #save results (sol is a solution from custom ODE solver)
-function swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cell, save_path)
+function swe_2D_save_results_custom(sol, swe2d_extra_params)
+
+    my_mesh_2D = swe2d_extra_params.my_mesh_2D
+    nodeCoordinates = swe2d_extra_params.nodeCoordinates
+    zb_cells = swe2d_extra_params.zb_cells
+    save_path = swe2d_extra_params.case_path
 
     #calculate total volume of water 
+    total_water_volume = []
+
     #for index in 1:size(sol, 3)
-    for index in axes(sol, 3)
+    for index in axes(sol, 2)
 
         field_name = "forward_simulation_saved_index"
         field_type = "integer"
         field_value = index
 
-        Q = @view sol[:,:,index]  # Q will be a view of the 2D slice at timestep index
+        Q = @view sol[:,index]  # Q will be a view of the 2D slice at timestep index
 
-        push!(total_water_volume, swe_2D_calc_total_water_volume(Q[:, 1], my_mesh_2D))
+        push!(total_water_volume, swe_2D_calc_total_water_volume(Q[1:my_mesh_2D.numOfCells], my_mesh_2D))
 
-        u_temp = Q[:,2] ./ Q[:,1]
-        v_temp = Q[:,3] ./ Q[:,1]
+        u_temp = Q[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells] ./ Q[1:my_mesh_2D.numOfCells]
+        v_temp = Q[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells] ./ Q[1:my_mesh_2D.numOfCells]
         U_vector = hcat(u_temp, v_temp)
                         
         vector_data = [U_vector] 
         vector_names = ["U"]
 
-        WSE = Q[:,1] + zb_cell
+        WSE = Q[1:my_mesh_2D.numOfCells] + zb_cells
             
-        scalar_data = [Q[:,1], Q[:,2], Q[:,3], zb_cell, WSE]
+        scalar_data = [Q[1:my_mesh_2D.numOfCells], Q[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells], Q[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells], zb_cells, WSE]
         scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
 
-        vtk_fileName = @sprintf("solution_%04d_AdHydraulics.vtk", index)
+        vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             
         file_path = joinpath(save_path, vtk_fileName ) 
-        export_to_vtk_2D(file_path, my_mesh_2D.nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
+        export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
     
     end
 
         
-    open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
-        println(fo, "total_water_volume")
-        for volume in total_water_volume
-            println(fo, volume)
-        end
-    end
+    # open(joinpath(save_path, "total_water_volume.csv"), "w") do fo
+    #     println(fo, "total_water_volume")
+    #     for volume in total_water_volume
+    #         println(fo, volume)
+    #     end
+    # end
 end
 
 

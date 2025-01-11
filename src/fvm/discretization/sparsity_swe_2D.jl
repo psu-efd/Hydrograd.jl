@@ -12,27 +12,37 @@ function define_sparsity_swe_2D(settings::ControlSettings, my_mesh_2D::mesh_2D)
        (settings.bPerform_Inversion && settings.inversion_settings.ode_solver_b_jac_sparsity) ||
        (settings.bPerform_Sensitivity_Analysis && settings.sensitivity_analysis_settings.ode_solver_b_jac_sparsity)
 
+        numOfCells = my_mesh_2D.numOfCells
+
         # Populate the Jacobian sparsity pattern
         # Assume each variable depends on itself and its neighbors
         # we have 3 variables (h, q_x, q_y) for each cell
-        jac_sparsity = spzeros(3 * my_mesh_2D.numOfCells, 3 * my_mesh_2D.numOfCells)
+        jac_sparsity = spzeros(3 * numOfCells, 3 * numOfCells)
 
-        for cellID in 1:my_mesh_2D.numOfCells
+
+        for cellID in 1:numOfCells
             # Self-dependence (diagonal entries)
-            jac_sparsity[3*(cellID-1)+1, 3*(cellID-1)+1] = 1.0  # h -> h
-            jac_sparsity[3*(cellID-1)+2, 3*(cellID-1)+2] = 1.0  # hu -> hu
-            jac_sparsity[3*(cellID-1)+3, 3*(cellID-1)+3] = 1.0  # hv -> hv
+            jac_sparsity[cellID, cellID] = 1.0  # h -> h
+            jac_sparsity[cellID+numOfCells, cellID+numOfCells] = 1.0  # hu -> hu
+            jac_sparsity[cellID+2*numOfCells, cellID+2*numOfCells] = 1.0  # hv -> hv
+
+            cell_faces = my_mesh_2D.cellFacesList[cellID, :]
+            cellNeighbors = my_mesh_2D.cellNeighbors_Dict[cellID]
 
             # Neighbor-dependence
-            for neighbor in my_mesh_2D.cellNeighbors_Dict[cellID]
+            for iFace in 1:my_mesh_2D.cellNodesCount[cellID]
+                faceID = cell_faces[iFace]
+                neighbor_cellID = cellNeighbors[iFace]
 
-                #only need interior neighbors
-                if neighbor > 0
-                    jac_sparsity[3*(cellID-1)+1, 3*(neighbor-1)+1] = 1.0  # h -> h (neighbor)
-                    jac_sparsity[3*(cellID-1)+2, 3*(neighbor-1)+2] = 1.0  # hu -> hu (neighbor)
-                    jac_sparsity[3*(cellID-1)+3, 3*(neighbor-1)+3] = 1.0  # hv -> hv (neighbor)
+                #get the neighbor cell ID
+                neighborID = my_mesh_2D.cellNeighbors_Dict[cellID][iFace]
+
+                if !my_mesh_2D.bFace_is_boundary[faceID]  # If it is not a boundary face
+                    #jac_sparsity[cellID, neighborID] = 1.0  # h does not directly depend on h of the neighbor cell
+                    jac_sparsity[cellID+numOfCells, neighborID+numOfCells] = 1.0  # hu -> hu (neighbor)
+                    jac_sparsity[cellID+2*numOfCells, neighborID+2*numOfCells] = 1.0  # hv -> hv (neighbor)
                 end
-            end
+            end          
         end
     end
 

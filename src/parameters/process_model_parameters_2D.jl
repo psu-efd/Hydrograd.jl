@@ -38,7 +38,10 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
         elseif settings.inversion_settings.parameter_initial_values_options == "from_file"
             if settings.inversion_settings.active_param_names == ["zb"]
                 active_param_name = "zb"
-                zb_cells_param = settings.inversion_settings.parameter_initial_values_from_file["zb_cells_param"]
+                zb_cells_param = Float64.(settings.inversion_settings.parameter_initial_values_from_file["zb_cells_param"])
+                @show size(zb_cells_param)
+                @show size(my_mesh_2D.numOfCells)
+                @show zb_cells_param
             elseif settings.inversion_settings.active_param_names == ["ManningN"]
                 active_param_name = "ManningN"
                 ManningN_list_param = settings.inversion_settings.parameter_initial_values_from_file["ManningN_list_param"]

@@ -83,7 +83,7 @@ end
 
 
 # Define the loss function
-function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple{T1,T1}, p::AbstractVector{T2}, settings::ControlSettings, 
+function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, tspan::Tuple{T1,T1}, p::AbstractVector{T2}, settings::ControlSettings, 
     my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T1}}, active_param_name::String, data_type::DataType) where {T1<:Real,T2<:Real}
 
     # Solve the ODE (forward pass)
@@ -94,6 +94,8 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple
     # Create ODE solver
     if settings.inversion_settings.ode_solver == "Tsit5()"
         ode_solver = Tsit5()
+    elseif settings.inversion_settings.ode_solver == "Euler()"
+        ode_solver = Euler()
     else
         error("Not implemented yet")
     end
@@ -129,10 +131,22 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple
     elseif settings.inversion_settings.ode_solver_sensealg == "AutoForwardDiff()"
         ode_solver_sensealg = ForwardDiffSensitivity()
     elseif settings.inversion_settings.ode_solver_sensealg == "BacksolveAdjoint(autojacvec=ZygoteVJP())"
-        ode_solver_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())
+        ode_solver_sensealg = BacksolveAdjoint(autojacvec=ZygoteVJP())    
+    elseif settings.inversion_settings.ode_solver_sensealg == "GaussAdjoint(autojacvec=ZygoteVJP())"
+        ode_solver_sensealg = GaussAdjoint(autojacvec=ZygoteVJP())
+    elseif settings.inversion_settings.ode_solver_sensealg == "QuadratureAdjoint(autojacvec = ZygoteVJP())"
+        ode_solver_sensealg = QuadratureAdjoint(autojacvec = ZygoteVJP())
+    elseif settings.inversion_settings.ode_solver_sensealg == "ReverseDiffAdjoint()"
+        ode_solver_sensealg = ReverseDiffAdjoint()
+    elseif settings.inversion_settings.ode_solver_sensealg == "AutoForwardSensitivity()"
+        ode_solver_sensealg = ForwardSensitivity()
+    elseif settings.inversion_settings.ode_solver_sensealg == "AutoEnzyme()"
+        ode_solver_sensealg = AutoEnzyme()                
     else
         error("Not implemented yet")
     end
+
+    @show ode_solver_sensealg
 
     #define the time for saving the results for the ODE solver
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.inversion_settings.ode_solver_nSave
@@ -172,7 +186,9 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple
             zb_cells_temp = observed_data["zb_cell_truth"]
         end
 
-        l = pred[:, 1, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
+        #@show size(pred)
+
+        l = pred[1:my_mesh_2D.numOfCells, end] .+ zb_cells_temp .- WSE_truth  #loss = free surface elevation mismatch
 
         #loss for free surface elevation mismatch
         if settings.inversion_settings.bInversion_WSE_loss
@@ -184,8 +200,8 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::Matrix{T1}, tspan::Tuple
         ϵ = sqrt(eps(data_type))
 
         if settings.inversion_settings.bInversion_uv_loss      #if also include u in the loss 
-            l_u = pred[:, 2, end] ./ (pred[:, 1, end] .+ ϵ) .- u_truth
-            l_v = pred[:, 3, end] ./ (pred[:, 1, end] .+ ϵ) .- v_truth
+            l_u = pred[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells, end] ./ (pred[1:my_mesh_2D.numOfCells, end] .+ ϵ) .- u_truth
+            l_v = pred[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells, end] ./ (pred[1:my_mesh_2D.numOfCells, end] .+ ϵ) .- v_truth
 
             loss_pred_uv = sum(abs2, l_u) + sum(abs2, l_v)
         end
@@ -262,8 +278,8 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         adtype = Optimization.AutoReverseDiff(compile=false)
     elseif settings.inversion_settings.inversion_sensealg == "AutoForwardDiff()"
         adtype = Optimization.AutoForwardDiff()
-    elseif settings.inversion_settings.inversion_sensealg == "AutoReverseDiff()"
-        adtype = Optimization.AutoReverseDiff(compile=false)
+    elseif settings.inversion_settings.inversion_sensealg == "AutoForwardSensitivity()"
+        adtype = Optimization.AutoForwardSensitivity()
     else
         println("       settings.inversion_settings.inversion_sensealg = ", settings.inversion_settings.inversion_sensealg)
         throw(ArgumentError("Invalid sensealg choice. Supported sensealg: AutoZygote(), AutoReverseDiff(), AutoForwardDiff(), AutoFiniteDiff(), AutoModelingToolkit(), AutoEnzyme(). No inversion is performed."))
@@ -346,7 +362,7 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
 
                 append!(ITER, iter_number)
 
-                append!(PRED, [prediction[:, :, end]])
+                append!(PRED, [prediction[:, end]])
 
                 append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
 
@@ -390,7 +406,9 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         end
 
         #create the optimizer
-        if optimizer_choice == "Adam"
+        if optimizer_choice == "Descent"
+            optimizer = OptimizationOptimisers.Descent(settings.inversion_settings.inversion_learning_rates[iOptimizer])
+        elseif optimizer_choice == "Adam"
             optimizer = OptimizationOptimisers.Adam(settings.inversion_settings.inversion_learning_rates[iOptimizer])
         elseif optimizer_choice == "LBFGS"
             optimizer = OptimizationOptimJL.LBFGS(linesearch=LineSearches.BackTracking())
@@ -410,7 +428,10 @@ function optimize_parameters_inversion(ode_f, Q0, tspan, p_init, settings, my_me
         #   original: if the solver is wrapped from a external solver, e.g. Optim.jl, then this is the original return from said solver library.
         #   stats: statistics of the solver, such as the number of function evaluations required.
 
-        if optimizer_choice == "Adam" 
+        if optimizer_choice == "Descent" 
+            sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
+                abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
+        elseif optimizer_choice == "Adam" 
             sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
                 abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
         elseif optimizer_choice == "LBFGS"   #LBFGS does not support abstol

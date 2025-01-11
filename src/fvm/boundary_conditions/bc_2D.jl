@@ -630,6 +630,8 @@ end
         # current_inletQ_DryWet: 1.0 for wet, 0.0 for dry
         current_inletQ_DryWet = map(internalCellID -> h[internalCellID] > swe_2D_constants.h_small ? 1.0 : 0.0, current_internalCellIDs)  #does this break AD?
 
+        #@show h
+
         # Compute total_A only for wet faces
         total_A = sum(current_inletQ_Length[iFace]^(5.0 / 3.0) * h[current_internalCellIDs[iFace]] / ManningN_cells[current_internalCellIDs[iFace]] * current_inletQ_DryWet[iFace]
                         for iFace in eachindex(current_internalCellIDs) 

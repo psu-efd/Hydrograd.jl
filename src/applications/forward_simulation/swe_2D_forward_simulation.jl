@@ -54,15 +54,18 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         println("   Performing 2D SWE simulation with MyOwn solver ...")
         println("   This is not implemented yet.")
 
-        Profile.clear()
-        @profile sol = custom_ODE_solve(ode_f, Q0, params_vector, swe2d_extra_params)
-        StatProfilerHTML.statprofilehtml()
+        #@show Q0
+        
+        #Profile.clear()
+        #@profile sol = custom_ODE_solve(ode_f, Q0, params_vector, swe2d_extra_params)
+        sol = custom_ODE_solve(ode_f, Q0, params_vector, swe2d_extra_params)
+        #StatProfilerHTML.statprofilehtml()
 
         # #save the results
         # #save the simulation solution results
-        #jldsave(joinpath(save_path, "simulation_solution.jld2"); sol)
+        jldsave(joinpath(swe2d_extra_params.case_path, "simulation_solution.jld2"); sol)
 
-        #swe_2D_save_results_custom(sol, total_water_volume, my_mesh_2D, zb_cells, save_path)
+        swe_2D_save_results_custom(sol, swe2d_extra_params)
     else
         println("   Wrong solver choice. Supported solvers: SciML, customized. No forward simulation is performed.")
     end

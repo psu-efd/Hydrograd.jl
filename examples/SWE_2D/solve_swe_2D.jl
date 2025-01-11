@@ -179,18 +179,26 @@ boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_Length, inletQ_To
 exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = Hydrograd.initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinates)
 
 #set up initial condition for for solution state variables for ODE solver
-Q0 = hcat(h, q_x, q_y)
+Q0 = vcat(h, q_x, q_y)   #Q0 is a 1D array
 
-Q_ghost = hcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+Q_ghost = vcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)  #Q_ghost is a 1D array
 
 # Define the UDE model (if not performing UDE, ude_model, ude_model_params, ude_model_state will not be used)
 ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(settings)
+
+#define whether to use in-place ODE solver
+bInPlaceODE = false #default is false
+if settings.bPerform_Inversion && (settings.inversion_settings.ode_solver_sensealg == "AutoEnzyme()" || 
+    settings.inversion_settings.ode_solver_sensealg == "AutoForwardSensitivity()")
+    bInPlaceODE = true
+end
 
 # Create the extra parameters struct
 swe_extra_params = SWE2D_Extra_Parameters(
     case_path,
     active_param_name,
     settings,
+    bInPlaceODE,
     my_mesh_2D,
     nodeCoordinates,
     srh_all_Dict,
@@ -210,7 +218,8 @@ swe_extra_params = SWE2D_Extra_Parameters(
 )
 
 # Create the ODEFunction with the extra parameters struct passed in.
-ode_f = ODEFunction((u, p, t) -> begin
+#This is the out-of-place version of the ODE function.
+ode_f_out_of_place = ODEFunction((u, p, t) -> begin
 
     if settings.bVerbose
         #@show typeof(u)
@@ -219,7 +228,22 @@ ode_f = ODEFunction((u, p, t) -> begin
         #@show typeof(swe_extra_params)
     end
 
-    swe_2d_rhs(u, p, t, swe_extra_params)
+    du = zeros(size(u))
+
+    swe_2d_rhs(du, u, p, t, swe_extra_params)
+end; jac_prototype=jac_sparsity)
+
+#This is the in-place version of the ODE function.
+ode_f_in_place = ODEFunction((du, u, p, t) -> begin
+
+    if settings.bVerbose
+        #@show typeof(u)
+        #@show typeof(p)
+        #@show typeof(t)
+        #@show typeof(swe_extra_params)
+    end
+
+    swe_2d_rhs(du, u, p, t, swe_extra_params)
 end; jac_prototype=jac_sparsity)
 
 
@@ -230,10 +254,10 @@ end; jac_prototype=jac_sparsity)
 if settings.bPerform_Forward_Simulation
     println("Forward simulation (2D SWE) ...")
 
-    #perform forward simulation
+    #perform forward simulation (out-of-place version)
     #Profile.clear()
     #@profile
-    Hydrograd.swe_2D_forward_simulation(ode_f, Q0, params_vector, swe_extra_params, 
+    Hydrograd.swe_2D_forward_simulation(ode_f_out_of_place, Q0, params_vector, swe_extra_params, 
             zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
 
     #StatProfilerHTML.statprofilehtml()
@@ -258,7 +282,11 @@ if settings.bPerform_Inversion
    
     #perform inversion
     #@code_warntype 
-    Hydrograd.swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
+    if bInPlaceODE
+        Hydrograd.swe_2D_inversion(ode_f_in_place, Q0, params_vector, swe_extra_params)
+    else
+        Hydrograd.swe_2D_inversion(ode_f_out_of_place, Q0, params_vector, swe_extra_params)
+    end
 
 end
 
@@ -271,8 +299,8 @@ if settings.bPerform_Sensitivity_Analysis
 
     println("Sensitivity analysis ...")
 
-    #perform sensitivity analysis
-    Hydrograd.swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
+    #perform sensitivity analysis (out-of-place version)
+    Hydrograd.swe_2D_sensitivity(ode_f_out_of_place, Q0, params_vector, swe_extra_params)
 
 end
 

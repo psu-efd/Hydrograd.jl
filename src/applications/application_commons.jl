@@ -8,6 +8,7 @@ struct SWE2D_Extra_Parameters{T<:Real}
     case_path::String
     active_param_name::String
     settings::Hydrograd.ControlSettings
+    bInPlaceODE::Bool
     my_mesh_2D::Hydrograd.mesh_2D
     nodeCoordinates::Matrix{T}
     srh_all_Dict::Dict

@@ -15,7 +15,8 @@
 
 #using JuliaInterpreter
 
-function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T2})::Matrix{promote_type(T1, T2)} where {T1,T2}
+function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vector::AbstractVector{T3}, 
+    t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T4})::AbstractVector{promote_type(T1, T2, T3, T4)} where {T1,T2,T3,T4}
 
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
@@ -67,9 +68,13 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
         end
     end
 
-    h = @view Q[:, 1]  # water depth      #view of 2D array does not create a new array; only a reference
-    q_x = @view Q[:, 2]  # discharge in x
-    q_y = @view Q[:, 3]  # discharge in y
+    h = @view Q[1:my_mesh_2D.numOfCells]  # water depth      #view of 2D array does not create a new array; only a reference
+    q_x = @view Q[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]  # discharge in x
+    q_y = @view Q[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]  # discharge in y
+
+    #@show h
+    #@show q_x
+    #@show q_y
 
     # For the case of inversion or sensitivity analysis, and if zb is the active parameter, 
     # we need to interpolate zb from cell to face and compute bed slope at cells
@@ -173,17 +178,43 @@ function swe_2d_rhs(Q::Matrix{T1}, params_vector::AbstractVector{T1}, t::Float64
     updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, my_mesh_2D,
         g, RiemannSolver, h_small, data_type)
 
+    #@show typeof(updates_inviscid)
+    #@show size(updates_inviscid)
+    #@show updates_inviscid
+
+    #convert updates_inviscid to a 1D array
+    updates_inviscid = vec(updates_inviscid)
+    
+    #@show typeof(updates_inviscid)
+    #@show size(updates_inviscid)
+    #@show updates_inviscid
+    
     #compute the contribution of source terms
     updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, h_small)
 
+    #convert updates_source to a 1D array
+    updates_source = vec(updates_source)
 
     #combine inviscid and source terms
-    dQdt = updates_inviscid .+ updates_source
+    if p_extra.bInPlaceODE    
+        # In-place: use broadcast assignment to update existing array
+        @. dQdt = updates_inviscid + updates_source  # More efficient than .=
+        return dQdt  # Explicit return for clarity
+    else    
+        # Out-of-place: create new array
+        return updates_inviscid .+ updates_source
+    end
+
+    #@show typeof(Q)
+    #@show size(Q)
+    #@show typeof(dQdt)
+    #@show size(dQdt)
+    #@show dQdt
 
     # Ensure output dQdt has same dimensions as Q
-    @assert size(dQdt) == size(Q) "Dimension mismatch: dQdt $(size(dQdt)) ≠ Q $(size(Q))"
+    #@assert size(dQdt) == size(Q) "Dimension mismatch: dQdt $(size(dQdt)) ≠ Q $(size(Q))"
 
-    return dQdt
+    #return dQdt
 end
 
 #function to compute the inviscid fluxes
@@ -204,7 +235,7 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 faceBoundaryID = my_mesh_2D.faceBoundaryID_Dict[faceID]
                 face_normal = my_mesh_2D.cell_normals[iCell][iFace]
 
-                if faceBoundaryID == 0  # internal face
+                if !my_mesh_2D.bFace_is_boundary[faceID]  # internal face
                     hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
                     hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
                 else  # boundary face

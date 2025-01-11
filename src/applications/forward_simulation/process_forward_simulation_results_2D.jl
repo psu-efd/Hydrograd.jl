@@ -15,10 +15,10 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     forward_simulation_results = load(forward_simulation_results_file_name)["sol_data"]["u"]  #get the solution data (state variable)
 
     #save the simulation results (h, u, v) at the last time step to a json file (to be used as ground truth for inversion)
-    h_truth = vec(forward_simulation_results)[end][:, 1]
+    h_truth = vec(forward_simulation_results)[end][1:my_mesh_2D.numOfCells]
     wse_truth = h_truth .+ zb_cell_truth
-    q_x_truth = vec(forward_simulation_results)[end][:, 2]
-    q_y_truth = vec(forward_simulation_results)[end][:, 3]
+    q_x_truth = vec(forward_simulation_results)[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
+    q_y_truth = vec(forward_simulation_results)[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
     u_truth = q_x_truth ./ h_truth
     v_truth = q_y_truth ./ h_truth
 

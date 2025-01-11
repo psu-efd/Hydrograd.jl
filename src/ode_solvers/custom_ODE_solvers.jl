@@ -9,18 +9,20 @@ function custom_ODE_update_cells(ode_f, Q, params_vector, t, dt, swe2d_extra_par
     # compute dQdt 
     #swe_2d_ode!(dQdt, Q, para, t)
     dQdt = ode_f(Q, params_vector, t)
+
+    #@show dQdt
     
      # Vectorized update of Q
     Q_new = Q + dt * dQdt
     
     # Create mask for dry cells
-    dry_mask = Q_new[:, 1] .< swe2d_extra_params.swe_2D_constants.h_small
+    dry_mask = Q_new[1:swe2d_extra_params.my_mesh_2D.numOfCells] .< swe2d_extra_params.swe_2D_constants.h_small
     
     # Create new array with all updates at once
-    Q_new = hcat(
-        ifelse.(dry_mask, swe2d_extra_params.swe_2D_constants.h_small, Q_new[:, 1]),
-        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[:, 2]),
-        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[:, 3])
+    Q_new = vcat(
+        ifelse.(dry_mask, swe2d_extra_params.swe_2D_constants.h_small, Q_new[1:swe2d_extra_params.my_mesh_2D.numOfCells]),
+        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[swe2d_extra_params.my_mesh_2D.numOfCells+1:2*swe2d_extra_params.my_mesh_2D.numOfCells]),
+        ifelse.(dry_mask, zero(eltype(params_vector)), Q_new[2*swe2d_extra_params.my_mesh_2D.numOfCells+1:3*swe2d_extra_params.my_mesh_2D.numOfCells])
     )
    
     # Update WSE using broadcasting
@@ -76,12 +78,17 @@ function custom_ODE_solve(ode_f, Q0, params_vector, swe2d_extra_params)
         iStep += 1
     end
 
-    # Convert the list of solutions to a 3D array using cat
-    sol = cat(solution_list..., dims=3)
+    #@show typeof(solution_list)
+    #@show size(solution_list)
+    #@show solution_list
 
-    # sol is a 3D array with dimensions [cells, variables, timesteps]
-    # Convert to tuple of 2D arrays (one per timestep) to make like a solution from DifferentialEquations.jl
-    #sol_tuples = tuple(eachslice(sol, dims=3)...)
+    # Convert the list of solutions to a 3D array using cat
+    sol = cat(solution_list..., dims=2)
+
+    #@show typeof(sol)
+    #@show size(sol)
+    #@show sol[:,1]
+    #@show sol[:,2]
 
     return sol
     

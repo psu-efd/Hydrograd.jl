@@ -27,7 +27,7 @@
         "inversion_inlet_discharge_initial_values": [0.2],
 
         "inversion_bInversion_WSE_loss": true,
-        "inversion_bInversion_uv_loss": true,
+        "inversion_bInversion_uv_loss": false,
         "inversion_bInversion_bound_loss": true,
         "inversion_bInversion_slope_loss": true,
         "inversion_parameter_value_lower_bound": 0.0,
@@ -36,7 +36,7 @@
         
         "inversion_optimizers": ["Adam", "LBFGS"],
         "inversion_learning_rates": [0.01, 0.01],
-        "inversion_max_iterations": [1, 0],
+        "inversion_max_iterations": [50, 50],
         "inversion_abs_tols": [1e-6, 1e-6],
         "inversion_rel_tols": [1e-6, 1e-6],
         "inversion_save_frequency": 1,

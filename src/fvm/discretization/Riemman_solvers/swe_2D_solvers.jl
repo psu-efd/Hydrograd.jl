@@ -1,10 +1,10 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T, huR::T, hvR::T, g::Float64, normal::Vector{Float64}; hmin::Float64=1e-6) where T <: Real
+function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR::T4, huR::T5, hvR::T6, g::Float64, normal::Vector{T7}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7}
     
     #Data type 
-    data_type = eltype(hL)
+    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7)
 
     # Extract unit normal components
     nx, ny = normal
@@ -16,7 +16,7 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T,
             print("Both sides are dry")
         end
 
-        return zeros(eltype(hL), 3)
+        return zeros(data_type, 3)
     elseif hL < hmin
         # Left side is dry
         if settings.bVerbose
@@ -58,8 +58,8 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T,
     uRoe = (sqrt_hL * uL + sqrt_hR * uR) / (sqrt_hL + sqrt_hR)
     vRoe = (sqrt_hL * vL + sqrt_hR * vR) / (sqrt_hL + sqrt_hR)
     unRoe = uRoe * nx + vRoe * ny
-    cRoe = smooth_sqrt(g * hRoe)::T
-    over_two_cRoe = one(T)/T(2.0)/cRoe
+    cRoe = smooth_sqrt(g * hRoe)
+    over_two_cRoe = one(data_type)/2.0/cRoe
 
     # Compute wave speeds
     SL = unRoe - cRoe
@@ -68,12 +68,12 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T, huL::T, hvL::T, hR::T,
     # define matrices 
     R_mat = @SMatrix [data_type(0.0) data_type(1.0) data_type(1.0); ny uRoe-cRoe*nx uRoe+cRoe*nx; -nx vRoe-cRoe*ny vRoe+cRoe*ny]
     #L_mat = [-(uRoe*ny-vRoe*nx) ny -nx; unRoe/2/cRoe+0.5 -nx/2/cRoe -ny/2/cRoe; -unRoe/2/cRoe+0.5 nx/2/cRoe ny/2/cRoe]
-    L_mat = @SMatrix [-(uRoe*ny-vRoe*nx) ny -nx; unRoe*over_two_cRoe+T(0.5) -nx*over_two_cRoe -ny*over_two_cRoe; -unRoe*over_two_cRoe+T(0.5) nx*over_two_cRoe ny*over_two_cRoe]
+    L_mat = @SMatrix [-(uRoe*ny-vRoe*nx) ny -nx; unRoe*over_two_cRoe+data_type(0.5) -nx*over_two_cRoe -ny*over_two_cRoe; -unRoe*over_two_cRoe+data_type(0.5) nx*over_two_cRoe ny*over_two_cRoe]
     absLamda = @SMatrix [smooth_abs(unRoe) data_type(0.0) data_type(0.0); data_type(0.0) smooth_abs(unRoe-cRoe) data_type(0.0); data_type(0.0) data_type(0.0) smooth_abs(unRoe+cRoe)]
 
     #absA = R_mat * absLamda * L_mat 
 
-    dQ = SVector{3,T}(hR-hL, huR-huL, hvR-hvL)
+    dQ = SVector{3,data_type}(hR-hL, huR-huL, hvR-hvL)
 
     #absA_dQ = absA * dQ
 
