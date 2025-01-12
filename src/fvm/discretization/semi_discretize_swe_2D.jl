@@ -181,9 +181,6 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #@show typeof(updates_inviscid)
     #@show size(updates_inviscid)
     #@show updates_inviscid
-
-    #convert updates_inviscid to a 1D array
-    updates_inviscid = vec(updates_inviscid)
     
     #@show typeof(updates_inviscid)
     #@show size(updates_inviscid)
@@ -192,9 +189,6 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #compute the contribution of source terms
     updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, h_small)
 
-    #convert updates_source to a 1D array
-    updates_source = vec(updates_source)
-
     #combine inviscid and source terms
     if p_extra.bInPlaceODE    
         # In-place: use broadcast assignment to update existing array
@@ -202,6 +196,8 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         return dQdt  # Explicit return for clarity
     else    
         # Out-of-place: create new array
+        #@show size(updates_inviscid)
+        #@show size(updates_source)
         return updates_inviscid .+ updates_source
     end
 
@@ -218,9 +214,11 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 end
 
 #function to compute the inviscid fluxes
+#serial version
 function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
-    updates_inviscid = [
+    #compute the inviscid fluxes for each cell (in the order of cells)
+    updates_inviscid_cells = [
         let
             cell_area = my_mesh_2D.cell_areas[iCell]
 
@@ -271,7 +269,8 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                     if iCell == -1  # Print for first cell only
                         println("After Riemann solver:")
                         @show typeof(flux)
-                        @show flux
+                        @show size(flux)
+                        #@show flux
                     end
                 end
 
@@ -295,38 +294,54 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                         if iCell == -1  # Print for first cell only
                             println("after accumulating flux_sum")
                             @show typeof(flux_sum)
-                            @show flux_sum
+                            @show size(flux_sum)
+
                         end
                     end
                 end
             end
 
             Zygote.ignore() do
-                if settings.bVerbose
+                #if settings.bVerbose
                     if iCell == -1
                         @show typeof(flux_sum)
-                        @show flux_sum
+                        @show size(flux_sum)
                     end
-                end
+                #end
             end
 
             # Return the update for this cell (without in-place mutation)            
-            -flux_sum[j] / cell_area
+            -flux_sum ./ cell_area
 
         end
-        for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
+        for iCell in 1:my_mesh_2D.numOfCells
     ]
 
+    #convert updates_inviscid_cells to a 1D array in the order (h1, h2, h3, q_x1, q_x2, q_x3, q_y1, q_y2, q_y3)
+    updates_inviscid = rearrange_vector_of_vectors(updates_inviscid_cells)
+
     Zygote.ignore() do
-        if settings.bVerbose
+        #if settings.bVerbose
             #@show typeof(updates_inviscid)
             #@show size(updates_inviscid)
             #@show updates_inviscid
-        end
+        #end
     end
 
     return updates_inviscid
 
+end
+
+#function to rearrange a vector of vectors into a 1D array
+function rearrange_vector_of_vectors(data::Vector{Vector{T}}) where T
+    n = length(data)  # Number of elements in the outer vector
+    m = length(data[1])  # Number of components in each tuple
+
+    # Separate components into individual arrays
+    components = [getindex.(data, i) for i in 1:m]
+
+    # Concatenate the components into a single 1D array
+    return vcat(components...)
 end
 
 #function to compute the source terms
@@ -339,59 +354,82 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
     friction_x, friction_y = compute_friction_terms(settings, h, q_x, q_y, ManningN_cells, params_vector, p_extra, my_mesh_2D, g, h_small)
 
     #compute the momentum source terms
-    updates_source = [
-        let
-            cell_area = my_mesh_2D.cell_areas[iCell]
+    #use vectorization to compute the source terms
+    cell_areas = my_mesh_2D.cell_areas
 
-            # Source terms
-            source_terms = if h[iCell] <= h_small
-                [zero(data_type),
-                    g * h[iCell] * S0[iCell, 1] * cell_area,
-                    g * h[iCell] * S0[iCell, 2] * cell_area]
-            else
+    #create a boolean array to check if h is less than or equal to h_small
+    below_small_h = h .<= h_small
 
-                Zygote.ignore() do
-                    if iCell == -1  # Print for first cell only
-                        @show typeof(ManningN_cells)
-                        @show typeof(ManningN_cells[iCell])
-                        @show ManningN_cells[iCell]
-                        @show typeof(friction_x)
-                        @show friction_x
-                        @show typeof(friction_y)
-                        @show friction_y
-                    end
-                end
+    # For h <= h_small
+    source_x_small = g .* h .* S0[:, 1] .* cell_areas
+    source_y_small = g .* h .* S0[:, 2] .* cell_areas
 
-                [zero(data_type),
-                    (g * h[iCell] * S0[iCell, 1] - friction_x[iCell]) * cell_area,
-                    (g * h[iCell] * S0[iCell, 2] - friction_y[iCell]) * cell_area]
-            end
+    # For h > h_small
+    source_x_large = (g .* h .* S0[:, 1] .- friction_x) .* cell_areas
+    source_y_large = (g .* h .* S0[:, 2] .- friction_y) .* cell_areas
+
+    # Combine results based on the condition
+    source_x = below_small_h .* source_x_small .+ .~below_small_h .* source_x_large
+    source_y = below_small_h .* source_y_small .+ .~below_small_h .* source_y_large
+
+    # Normalize source terms by cell areas and combine them into a single 1D array
+    updates_source = vcat(zeros(data_type, length(h)), source_x ./ cell_areas, source_y ./ cell_areas)
 
 
-            Zygote.ignore() do
-                if iCell == -1  # Print for first cell only
-                    if settings.bVerbose
-                        @show source_terms
-                        @show cell_area
-                        @show (-flux_sum .+ source_terms) ./ cell_area
-                    end
-                end
-            end
+    #use comprehension to create the updates_source array (serial, slow)
+    # updates_source = [
+    #     let
+    #         cell_area = my_mesh_2D.cell_areas[iCell]
 
-            # Return the update for this cell (without in-place mutation)
-            #Array((-flux_sum .+ source_terms) ./ cell_area)
-            source_terms[j] / cell_area
+    #         # Source terms
+    #         source_terms = if h[iCell] <= h_small
+    #             [zero(data_type),
+    #                 g * h[iCell] * S0[iCell, 1] * cell_area,
+    #                 g * h[iCell] * S0[iCell, 2] * cell_area]
+    #         else
 
-        end
-        for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
-    ]
+    #             Zygote.ignore() do
+    #                 if iCell == -1  # Print for first cell only
+    #                     @show typeof(ManningN_cells)
+    #                     @show typeof(ManningN_cells[iCell])
+    #                     @show ManningN_cells[iCell]
+    #                     @show typeof(friction_x)
+    #                     @show friction_x
+    #                     @show typeof(friction_y)
+    #                     @show friction_y
+    #                 end
+    #             end
+
+    #             [zero(data_type),
+    #                 (g * h[iCell] * S0[iCell, 1] - friction_x[iCell]) * cell_area,
+    #                 (g * h[iCell] * S0[iCell, 2] - friction_y[iCell]) * cell_area]
+    #         end
+
+
+    #         Zygote.ignore() do
+    #             if iCell == -1  # Print for first cell only
+    #                 if settings.bVerbose
+    #                     @show source_terms
+    #                     @show cell_area
+    #                     @show (-flux_sum .+ source_terms) ./ cell_area
+    #                 end
+    #             end
+    #         end
+
+    #         # Return the update for this cell (without in-place mutation)
+    #         #Array((-flux_sum .+ source_terms) ./ cell_area)
+    #         source_terms[j] / cell_area
+
+    #     end
+    #     for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
+    # ]
 
     Zygote.ignore() do
-        if settings.bVerbose
+        #if settings.bVerbose
             #@show typeof(updates_source)
             #@show size(updates_source)
             #@show updates_source
-        end
+        #end
     end
 
     return updates_source

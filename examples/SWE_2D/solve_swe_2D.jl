@@ -228,6 +228,7 @@ ode_f_out_of_place = ODEFunction((u, p, t) -> begin
         #@show typeof(swe_extra_params)
     end
 
+    #dummpy du (not used)
     du = zeros(size(u))
 
     swe_2d_rhs(du, u, p, t, swe_extra_params)
