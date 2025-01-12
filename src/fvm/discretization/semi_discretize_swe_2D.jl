@@ -45,7 +45,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     RiemannSolver = swe_2D_constants.RiemannSolver
 
     # Use promote_type to ensure consistent types for computations
-    data_type = promote_type(T1, T2)
+    data_type = promote_type(T1, T2, T3, T4)
 
     Zygote.ignore() do
         if settings.bVerbose
@@ -192,8 +192,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #combine inviscid and source terms
     if p_extra.bInPlaceODE    
         # In-place: use broadcast assignment to update existing array
-        @. dQdt = updates_inviscid + updates_source  # More efficient than .=
-        return dQdt  # Explicit return for clarity
+        #@. dQdt = updates_inviscid + updates_source  # This creates an intermediate array and then assigns it to dQdt.
+        dQdt .= updates_inviscid .+ updates_source  # This is more efficient because it avoids the intermediate array creation. (not the case; even slower)
+    #    return dQdt  # Explicit return for clarity
     else    
         # Out-of-place: create new array
         #@show size(updates_inviscid)

@@ -26,7 +26,7 @@ using StableRNGs
 #SciML related 
 using SciMLSensitivity
 using OrdinaryDiffEq
-
+using SteadyStateDiffEq
 #Optimizers
 using Optimization
 using OptimizationOptimisers
@@ -37,6 +37,7 @@ using LineSearches
 #using Optim
 #using OptimizationFlux
 #using Flux
+using NLsolve
 
 #AD engines
 using Zygote

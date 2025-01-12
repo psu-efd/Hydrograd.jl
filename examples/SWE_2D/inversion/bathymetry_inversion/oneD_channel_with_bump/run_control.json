@@ -20,8 +20,8 @@
     "inversion_options": {
         "comment": "Options for the inversion.parameter_initial_values_options is the option for the parameter initial values: constant or from_file.",
         "active_param_names": ["zb"],
-        "inversion_parameter_initial_values_options": "constant",
-        "inversion_parameter_initial_values_file_name": "inversion_parameter_initial_values.json",
+        "inversion_parameter_initial_values_options": "from_file",
+        "inversion_parameter_initial_values_file_name": "parameters_checkpoint_350.json",
         "inversion_zb_initial_values": [0.0],
         "inversion_ManningN_initial_values": [0.02, 0.03],
         "inversion_inlet_discharge_initial_values": [0.2],
@@ -36,11 +36,11 @@
         
         "inversion_optimizers": ["Adam", "LBFGS"],
         "inversion_learning_rates": [0.001, 0.01],
-        "inversion_max_iterations": [10, 0],
+        "inversion_max_iterations": [50, 0],
         "inversion_abs_tols": [1e-6, 1e-6],
         "inversion_rel_tols": [1e-6, 1e-6],
         "inversion_save_frequency": 1,
-        "inversion_save_checkpoint": true,
+        "inversion_save_checkpoint": false,
         "inversion_checkpoint_frequency": 10,
         "inversion_sensealg": "AutoForwardDiff()",
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
@@ -52,7 +52,7 @@
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
             "ode_solver_sensealg": "ForwardDiffSensitivity()",
-            "ode_solver_b_jac_sparsity": false,
+            "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },
         "inversion_save_file_name": "inversion_results.jld2",

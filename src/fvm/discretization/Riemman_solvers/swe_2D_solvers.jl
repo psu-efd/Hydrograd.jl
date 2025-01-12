@@ -1,7 +1,8 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR::T4, huR::T5, hvR::T6, g::Float64, normal::Vector{T7}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7}
+function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR::T4, huR::T5, hvR::T6, 
+    g::Float64, normal::Vector{T7}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7}
     
     #Data type 
     data_type = promote_type(T1, T2, T3, T4, T5, T6, T7)
@@ -73,7 +74,7 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR:
 
     #absA = R_mat * absLamda * L_mat 
 
-    dQ = SVector{3,data_type}(hR-hL, huR-huL, hvR-hvL)
+    dQ = @SVector{3,data_type}(hR-hL, huR-huL, hvR-hvL)
 
     #absA_dQ = absA * dQ
 

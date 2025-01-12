@@ -1,6 +1,6 @@
 
-#perform forward simulation for 2D SWE and save the results
-function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params, 
+#perform forward simulation for steady state 2D SWE and save the results
+function swe_2D_forward_simulation_steady_state(ode_f, Q0, params_vector, swe2d_extra_params, 
             zb_cell_truth, ManningN_zone_values_truth, inlet_discharges_truth
             )
 
@@ -35,9 +35,9 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         println("       with SciML solver ...")
 
         if settings.forward_settings.ode_solver == "Tsit5()"
-            @time sol = solve(prob, Tsit5(), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)
+            sol = solve(prob, Tsit5(), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)
         else
-            @time sol = solve(prob, Tsit5(), adaptive=true, dt=swe_2D_constants.dt, saveat=t_save)
+            sol = solve(prob, Tsit5(), adaptive=true, dt=swe_2D_constants.dt, saveat=t_save)
         end
 
         # #save the simulation solution results

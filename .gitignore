@@ -1,6 +1,7 @@
 #/Manifest.toml
 
 **/statprof/
+**/parameters_checkpoint_*.*
 **/*.vtk
 *.mp4
 *.jif

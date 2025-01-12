@@ -38,7 +38,7 @@ function define_sparsity_swe_2D(settings::ControlSettings, my_mesh_2D::mesh_2D)
                 neighborID = my_mesh_2D.cellNeighbors_Dict[cellID][iFace]
 
                 if !my_mesh_2D.bFace_is_boundary[faceID]  # If it is not a boundary face
-                    #jac_sparsity[cellID, neighborID] = 1.0  # h does not directly depend on h of the neighbor cell
+                    jac_sparsity[cellID, neighborID] = 1.0  # h does not directly depend on h of the neighbor cell
                     jac_sparsity[cellID+numOfCells, neighborID+numOfCells] = 1.0  # hu -> hu (neighbor)
                     jac_sparsity[cellID+2*numOfCells, neighborID+2*numOfCells] = 1.0  # hv -> hv (neighbor)
                 end

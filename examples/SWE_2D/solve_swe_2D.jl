@@ -187,11 +187,14 @@ Q_ghost = vcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)  #Q_ghost is a 1D a
 ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(settings)
 
 #define whether to use in-place ODE solver
-bInPlaceODE = false #default is false
-if settings.bPerform_Inversion && (settings.inversion_settings.ode_solver_sensealg == "AutoEnzyme()" || 
-    settings.inversion_settings.ode_solver_sensealg == "AutoForwardSensitivity()")
+bInPlaceODE = false #default is false. Use in-place ODE solver if the sensealg supports it.
+if (settings.bPerform_Inversion && (settings.inversion_settings.ode_solver_sensealg == "AutoEnzyme()" || 
+    settings.inversion_settings.ode_solver_sensealg == "ForwardSensitivity()" ||
+    settings.inversion_settings.ode_solver_sensealg == "ForwardDiffSensitivity()")) #|| settings.bPerform_Forward_Simulation
     bInPlaceODE = true
 end
+
+@show bInPlaceODE
 
 # Create the extra parameters struct
 swe_extra_params = SWE2D_Extra_Parameters(
@@ -258,8 +261,16 @@ if settings.bPerform_Forward_Simulation
     #perform forward simulation (out-of-place version)
     #Profile.clear()
     #@profile
-    Hydrograd.swe_2D_forward_simulation(ode_f_out_of_place, Q0, params_vector, swe_extra_params, 
+    # For forward simulation, we always use out-of-place ODE solver (it seems to be slightly faster).
+    if swe_extra_params.bInPlaceODE
+        println("   Using in-place ODE solver for forward simulation ...")
+        Hydrograd.swe_2D_forward_simulation(ode_f_in_place, Q0, params_vector, swe_extra_params, 
             zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
+    else
+        println("   Using out-of-place ODE solver for forward simulation ...")
+        Hydrograd.swe_2D_forward_simulation(ode_f_out_of_place, Q0, params_vector, swe_extra_params, 
+            zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
+    end
 
     #StatProfilerHTML.statprofilehtml()
 
@@ -283,7 +294,7 @@ if settings.bPerform_Inversion
    
     #perform inversion
     #@code_warntype 
-    if bInPlaceODE
+    if swe_extra_params.bInPlaceODE
         Hydrograd.swe_2D_inversion(ode_f_in_place, Q0, params_vector, swe_extra_params)
     else
         Hydrograd.swe_2D_inversion(ode_f_out_of_place, Q0, params_vector, swe_extra_params)
