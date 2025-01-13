@@ -96,6 +96,10 @@ function compute_loss_inversion(ode_f::Function, Q0::AbstractVector{T1}, p::Abst
     # Create ODE solver
     if settings.inversion_settings.ode_solver == "Tsit5()"
         ode_solver = Tsit5()
+    elseif settings.inversion_settings.ode_solver == "TRBDF2()"
+        ode_solver = TRBDF2()
+    elseif settings.inversion_settings.ode_solver == "Rosenbrock23()"
+        ode_solver = Rosenbrock23()
     elseif settings.inversion_settings.ode_solver == "Euler()"
         ode_solver = Euler()
     else
@@ -148,14 +152,15 @@ function compute_loss_inversion(ode_f::Function, Q0::AbstractVector{T1}, p::Abst
         error("Not implemented yet")
     end
 
-    @show ode_solver_sensealg
+    #@show ode_solver_sensealg
 
     #define the time for saving the results for the ODE solver
     dt_save = (swe_2D_constants.tspan[2] - swe_2D_constants.tspan[1]) / settings.inversion_settings.ode_solver_nSave
     t_save = swe_2D_constants.tspan[1]:dt_save:swe_2D_constants.tspan[2]
 
     # Solve the ODE with the updated parameters p
-    @time ode_pred = solve(ode_prob, ode_solver, p=p, adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ode_solver_sensealg)
+    #@time 
+    ode_pred = solve(ode_prob, ode_solver, p=p, adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ode_solver_sensealg)
 
     Zygote.ignore() do
         if settings.bVerbose
@@ -401,13 +406,18 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
 
         iter_number = length(LOSS) + 1  #get the inversion iteration number 
 
+        #append the loss and parameters to the accumulators
+        append!(ITER, iter_number)
+        append!(LOSS, [loss_total])
+        append!(PARS, [θ])
+
         Zygote.ignore() do
             println("       iter_number = ", iter_number, ", loss_total = ", loss_total, ", inversion_elapsed_seconds = ", inversion_elapsed_seconds)
-            println("       optimizer_state = ", optimizer_state)
+            #println("       optimizer_state = ", optimizer_state)
 
             #if not the first iteration, compute and print the max and min of the parameter change from the previous iteration
             if iter_number > 1
-                param_change = θ - PARS[end]
+                param_change = θ - PARS[end-1]
                 println("           max(param_change) = ", maximum(param_change), ", min(param_change) = ", minimum(param_change))
             end
 
@@ -419,13 +429,13 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
                 loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ, settings,
                         my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
-                append!(ITER, iter_number)
+                #append!(ITER, iter_number)
 
                 append!(PRED, [ode_pred[:, end]])
 
-                append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
+                #append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
 
-                append!(PARS, [θ])
+                #append!(PARS, [θ])
             end
 
             #checkpoint the inversion results (in case the inversion is interrupted)

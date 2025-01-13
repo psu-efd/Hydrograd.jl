@@ -35,7 +35,11 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         println("       with SciML solver ...")
 
         if settings.forward_settings.ode_solver == "Tsit5()"
-            @time sol = solve(prob, Tsit5(), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save)
+            @time sol = solve(prob, Tsit5(), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save;
+                              abstol=1e-6, reltol=1e-3)
+        elseif settings.forward_settings.ode_solver == "Rosenbrock23()"
+            @time sol = solve(prob, Rosenbrock23(autodiff=false), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save;
+                              abstol=1e-4, reltol=1e-2)  
         else
             @time sol = solve(prob, Tsit5(), adaptive=true, dt=swe_2D_constants.dt, saveat=t_save)
         end

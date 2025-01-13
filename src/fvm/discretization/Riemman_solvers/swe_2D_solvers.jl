@@ -74,7 +74,8 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR:
 
     #absA = R_mat * absLamda * L_mat 
 
-    dQ = @SVector{3,data_type}(hR-hL, huR-huL, hvR-hvL)
+    #dQ = @SVector (hR-hL, huR-huL, hvR-hvL)
+    dQ = @SVector [hR - hL, huR - huL, hvR - hvL]
 
     #absA_dQ = absA * dQ
 

@@ -356,25 +356,29 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
 
     #compute the momentum source terms
     #use vectorization to compute the source terms
-    cell_areas = my_mesh_2D.cell_areas
+    #cell_areas = my_mesh_2D.cell_areas
 
     #create a boolean array to check if h is less than or equal to h_small
     below_small_h = h .<= h_small
 
     # For h <= h_small
-    source_x_small = g .* h .* S0[:, 1] .* cell_areas
-    source_y_small = g .* h .* S0[:, 2] .* cell_areas
+    #source_x_small = g .* h .* S0[:, 1] .* cell_areas
+    #source_y_small = g .* h .* S0[:, 2] .* cell_areas
 
     # For h > h_small
-    source_x_large = (g .* h .* S0[:, 1] .- friction_x) .* cell_areas
-    source_y_large = (g .* h .* S0[:, 2] .- friction_y) .* cell_areas
+    #source_x_large = (g .* h .* S0[:, 1] .- friction_x) .* cell_areas
+    #source_y_large = (g .* h .* S0[:, 2] .- friction_y) .* cell_areas
 
     # Combine results based on the condition
-    source_x = below_small_h .* source_x_small .+ .~below_small_h .* source_x_large
-    source_y = below_small_h .* source_y_small .+ .~below_small_h .* source_y_large
+    #source_x = below_small_h .* source_x_small .+ .~below_small_h .* source_x_large
+    #source_y = below_small_h .* source_y_small .+ .~below_small_h .* source_y_large
 
+    # remove the intermediate arrays
+    source_x = below_small_h .* g .* h .* S0[:, 1] .+ .~below_small_h .* (g .* h .* S0[:, 1] .- friction_x)
+    source_y = below_small_h .* g .* h .* S0[:, 2] .+ .~below_small_h .* (g .* h .* S0[:, 2] .- friction_y)
+    
     # Normalize source terms by cell areas and combine them into a single 1D array
-    updates_source = vcat(zeros(data_type, length(h)), source_x ./ cell_areas, source_y ./ cell_areas)
+    updates_source = vcat(zeros(data_type, length(h)), source_x, source_y)
 
 
     #use comprehension to create the updates_source array (serial, slow)
@@ -442,8 +446,8 @@ function compute_friction_terms(settings::ControlSettings, h::AbstractVector{T1}
     my_mesh_2D::mesh_2D, g::Float64, h_small::Float64) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real} 
 
     #initialize friction terms
-    friction_x = zeros(eltype(h), my_mesh_2D.numOfCells)
-    friction_y = zeros(eltype(h), my_mesh_2D.numOfCells)
+    #friction_x = zeros(eltype(h), my_mesh_2D.numOfCells)
+    #friction_y = zeros(eltype(h), my_mesh_2D.numOfCells)
 
     #if performing UDE and UDE_choice is FlowResistance, compute the friction terms from the UDE model
     if settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "FlowResistance"
