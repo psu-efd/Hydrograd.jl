@@ -381,7 +381,7 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
     #define the accumulators for the inversion results
     ITER = []        #iteration number accumulator
     LOSS = []        # Loss accumulator
-    PRED = []        # prediction accumulator
+    #PRED = []        # prediction accumulator
     PARS = []        # parameters accumulator
 
     # Define the callback to handle both vector and OptimizationState inputs
@@ -422,25 +422,26 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
             end
 
             #save the inversion results
-            if iter_number % settings.inversion_settings.save_frequency == 0
+            #if iter_number % settings.inversion_settings.save_frequency == 0
 
-                data_type = eltype(θ)
+            #    data_type = eltype(θ)
 
-                loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ, settings,
-                        my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+            #    loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ, settings,
+            #            my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
 
                 #append!(ITER, iter_number)
 
-                append!(PRED, [ode_pred[:, end]])
+                #append!(PRED, [ode_pred[:, end]])
 
                 #append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
 
                 #append!(PARS, [θ])
-            end
+            #end
 
             #checkpoint the inversion results (in case the inversion is interrupted)
             if settings.inversion_settings.save_checkpoint && iter_number % settings.inversion_settings.checkpoint_frequency == 0
-                jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
+                #jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
+                jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PARS)
             end
 
         end
