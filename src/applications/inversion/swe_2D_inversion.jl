@@ -70,16 +70,16 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    sol, ITER, LOSS, PRED, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
 
     #save the inversion results
-    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PRED, PARS)
+    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PARS)
 
     #process the inversion results
     println("   Post-processing inversion results ...")
 
     #process inversion results
-    Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
+    #Hydrograd.postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, zb_cell_truth, h_truth, u_truth, v_truth, WSE_truth, case_path)
 
 end
 
@@ -381,7 +381,6 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
     #define the accumulators for the inversion results
     ITER = []        #iteration number accumulator
     LOSS = []        # Loss accumulator
-    #PRED = []        # prediction accumulator
     PARS = []        # parameters accumulator
 
     # Define the callback to handle both vector and OptimizationState inputs
@@ -421,26 +420,13 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
                 println("           max(param_change) = ", maximum(param_change), ", min(param_change) = ", minimum(param_change))
             end
 
-            #save the inversion results
-            #if iter_number % settings.inversion_settings.save_frequency == 0
-
-            #    data_type = eltype(θ)
-
-            #    loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ, settings,
-            #            my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
-
-                #append!(ITER, iter_number)
-
-                #append!(PRED, [ode_pred[:, end]])
-
-                #append!(LOSS, [[loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope]])
-
-                #append!(PARS, [θ])
-            #end
+            #save the inversion results (for just the current iteration; insurance in case the inversion is interrupted)
+            if iter_number % settings.inversion_settings.save_frequency == 0
+                jldsave(joinpath(case_path, "inversion_callback_save_iter_$(iter_number).jld2"); iter_number, loss_total, θ)
+            end
 
             #checkpoint the inversion results (in case the inversion is interrupted)
             if settings.inversion_settings.save_checkpoint && iter_number % settings.inversion_settings.checkpoint_frequency == 0
-                #jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PRED, PARS)
                 jldsave(joinpath(case_path, "checkpoint_inversion_iter_$(iter_number).jld2"); ITER, LOSS, PARS)
             end
 
@@ -502,7 +488,8 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
             sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
                 abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
         elseif optimizer_choice == "Adam" 
-            @time sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
+            #@time 
+            sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations,
                 abstol=settings.inversion_settings.inversion_abs_tols[iOptimizer], reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
         elseif optimizer_choice == "LBFGS"   #LBFGS does not support abstol
             sol = solve(optprob, optimizer, callback=callback, maxiters=max_iterations, reltol=settings.inversion_settings.inversion_rel_tols[iOptimizer])
@@ -529,7 +516,7 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
 
     end
 
-    return sol, ITER, LOSS, PRED, PARS
+    return sol, ITER, LOSS, PARS
 end
 
 # Bound loss function compatible with both Zygote and ForwardDiff

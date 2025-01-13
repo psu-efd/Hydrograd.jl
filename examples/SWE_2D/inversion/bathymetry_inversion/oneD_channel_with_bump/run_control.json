@@ -36,10 +36,10 @@
         
         "inversion_optimizers": ["Adam", "LBFGS"],
         "inversion_learning_rates": [0.001, 0.001],
-        "inversion_max_iterations": [300, 100],
+        "inversion_max_iterations": [5, 2],
         "inversion_abs_tols": [1e-6, 1e-6],
         "inversion_rel_tols": [1e-6, 1e-6],
-        "inversion_save_frequency": 10,
+        "inversion_save_frequency": 1,
         "inversion_save_checkpoint": true,
         "inversion_checkpoint_frequency": 10,
         "inversion_sensealg": "AutoForwardDiff()",

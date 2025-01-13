@@ -12,7 +12,7 @@ function  postprocess_inversion_results_swe_2D(settings, my_mesh_2D, nodeCoordin
     
     ITER = inversion_results["ITER"]
     LOSS = inversion_results["LOSS"]
-    PRED = inversion_results["PRED"]
+    #PRED = inversion_results["PRED"]
     PARS = inversion_results["PARS"]
     
     #extract the Losses
