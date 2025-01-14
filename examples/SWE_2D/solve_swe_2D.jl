@@ -106,6 +106,9 @@ q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghos
 #Get nodeCoordinates: Float64 2D array [numOfNodes, 3]
 nodeCoordinates = srh_all_Dict["srhgeom_obj"].nodeCoordinates
 
+#copy the bed elevation from nodeCoordinates to zb_nodes
+#zb_nodes = copy(nodeCoordinates[:, 3])
+
 #  setup bed elevation 
 #If performing inversion on zb, zero out the bed elevation in nodeCoordinates.
 if settings.bPerform_Inversion && settings.inversion_settings.active_param_names == ["zb"]
@@ -119,13 +122,15 @@ end
 #      Instead, they are updated in the inversion process.
 zb_cells, zb_ghostCells, zb_faces, S0 = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
 
-#define the true bed elevation at cells
+#define the true bed elevation at cells and nodes
 zb_cells_truth = zeros(size(zb_cells))
+#zb_nodes_truth = zeros(size(zb_nodes))
 
 #If performing forward simulation, make a copy of the bathymetry truth: zb_cell_truth; otherwise for 
 #inversion and sensitivity analysis, it is zero (its value will be loaded from the forward simulation result in the inversion).
 if settings.bPerform_Forward_Simulation
     zb_cells_truth = deepcopy(zb_cells)
+    #zb_nodes_truth = deepcopy(zb_nodes)
 end
 
 #get the true Manning's n and inlet discharges
@@ -153,11 +158,12 @@ end
 #print the true values. The true parameter values are computed regardless of whether performing forward simulation or inversion
 if settings.bVerbose
     println("True zb_cells = ", zb_cells_truth)
+    println("True zb_nodes = ", zb_nodes_truth)
     println("True Manning's n values = ", ManningN_zone_values_truth)
     println("True inlet discharges = ", inlet_discharges_truth)
 end
 
-#preprocess: create a 1D array to for model parameter for 2D shallow water equations
+#preprocess: create a 1D array for model parameter for 2D shallow water equations
 #params_vector: the 1D array of the active parameter (zb_cells_truth, ManningN_zone_values_truth, or inlet_discharges_truth)
 #active_param_name: the name of the active parameter (zb, ManningN, or Q)
 params_vector, active_param_name = Hydrograd.setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)

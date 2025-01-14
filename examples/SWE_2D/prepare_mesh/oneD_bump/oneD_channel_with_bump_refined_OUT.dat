@@ -10,7 +10,7 @@
  *                                                                 *
  *******************************************************************
 
- ==> Code Execution Year-Month-Date:  2024 12 26
+ ==> Code Execution Year-Month-Date:  2025  1 13
 
 
  ************************************************************
@@ -24,11 +24,11 @@
       Turbulence Model: Depth-averaged parabolic zero-equation model
 
  MESH SIZE INFO:
-      Total number of cells:                100
-      Total number of mesh points:          202
-      Total number of faces:                301
-      Total number of boundary faces:       202
-      NCLVT:                                400
+      Total number of cells:                200
+      Total number of mesh points:          402
+      Total number of faces:                601
+      Total number of boundary faces:       402
+      NCLVT:                                800
       Number of Mesh Blocks:                  1
       Mesh Type: Unstructured mesh - SMS-2DM format
 
@@ -37,7 +37,7 @@
       Initial Condition:   New run from user specified initial condition
       Number of time steps (ntstep):                   -1
       Number of iterations within each time step:       3
-      Tstart(s) DT(s) DT_CHAN(s) Total_simu_time(hr):    0.0000E+00   1.0000E+00   1.0000E+00   1.0000E+00
+      Tstart(s) DT(s) DT_CHAN(s) Total_simu_time(hr):    0.0000E+00   1.0000E-02   1.0000E-02   1.0000E+00
       Laminar kinematic viscosity:                       1.0000E-06
       Turbulent Parabolic Model Constant:                7.0000E-01
 
@@ -51,12 +51,12 @@
  ************************************************************
 
  ==> Mesh Size Info over Solution Domain
-     Minimum Mesh Cell Area (m^2)      =   2.500E-01
-     Maximum Mesh Cell Area (m^2)      =   2.500E-01
+     Minimum Mesh Cell Area (m^2)      =   1.250E-01
+     Maximum Mesh Cell Area (m^2)      =   1.250E-01
      Total Solution Domain Area (m^2)  =   2.500E+01
 
  ==> Smallest Angle between Cell-to-Cell-Base-Vector and Face =   9.000E+01
-     Located at Face=     140;    Between two cells:      63      63
+     Located at Face=     276;    Between two cells:     127     127
 
  ==> Total water volume (m3) at t=tstart:
      Within Model Domain =   0.0000E+00
@@ -77,10 +77,10 @@
  =      (Note:FLUX useful for STEADY modeling; VOLUME for UNSTEADY)
  ================================================================
 
- Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -6.4782E+02
+ Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -6.4800E+02
                       Flux in m^3/s at the end of the computation =  -1.8000E-01
 
- Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   6.3990E+02
+ Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   6.3938E+02
                       Flux in m^3/s at the end of the computation =   1.8000E-01
 
  Boundary patch =  3 Total Water Volume (m^3) out of the boundary =   0.0000E+00
@@ -94,21 +94,21 @@
  ==============================================================
 
  Initial Water Volume (m3) in Domain ............................. =   0.0000E+00
- Final   Water Volume (m3) in Domain ............................. =   8.6166E+00
+ Final   Water Volume (m3) in Domain ............................. =   8.4895E+00
 
- Total Water Volume entering domain from boundary (m3) ........... =   6.4782E+02
- Total Water Volume exiting  domain from boundary (m3) ........... =   6.3990E+02
+ Total Water Volume entering domain from boundary (m3) ........... =   6.4800E+02
+ Total Water Volume exiting  domain from boundary (m3) ........... =   6.3938E+02
  Net Water Volume exiting domain from internal boundary (m3) ..... =   0.0000E+00
 
  Total Rainfall Volume (m3) into domain (V_rain) ................. =   0.0000E+00
  Total Infiltrated Volume (m3) lost from domain................... =   0.0000E+00
 
- Water Conservation Error in Volume (m3) ......................... =  -6.9227E-01
- Percentage of above Error relative to Total_Incoming_Volume ..... =   0.11%
+ Water Conservation Error in Volume (m3) ......................... =   1.3490E-01
+ Percentage of above Error relative to Total_Incoming_Volume ..... =   0.02%
  [errors due primarily to numerical discretization etc.]
 
- ==> CPU-TIME(hours) =    3.299E-04
+ ==> CPU-TIME(hours) =    4.923E-02
 
- ==> Wall-TIME(hours) =    4.881E-04
+ ==> Wall-TIME(hours) =    7.218E-02
 
  ==> SRH is successfully executed

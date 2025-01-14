@@ -18,6 +18,8 @@
 function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vector::AbstractVector{T3}, 
     t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T4})::AbstractVector{promote_type(T1, T2, T3, T4)} where {T1,T2,T3,T4}
 
+    #@show t
+
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
     settings = p_extra.settings
@@ -86,17 +88,18 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
             end
         end
 
-        zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, params_vector)
+        zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
+        #zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_nodes_to_cells_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
     end
 
     Zygote.ignore() do
-        if settings.bVerbose
+        #if settings.bVerbose
             #@show typeof(zb_ghostCells_local)
             #@show typeof(zb_faces_local)
             #@show typeof(S0_local)
             #@show size(S0_local)
-            #@show S0_local
-        end
+            #@show S0_local[1]
+        #end
     end
 
     #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step (no need to update here).

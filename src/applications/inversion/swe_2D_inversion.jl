@@ -422,7 +422,12 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
 
             #save the inversion results (for just the current iteration; insurance in case the inversion is interrupted)
             if iter_number % settings.inversion_settings.save_frequency == 0
-                jldsave(joinpath(case_path, "inversion_callback_save_iter_$(iter_number).jld2"); iter_number, loss_total, θ)
+                #jldsave(joinpath(case_path, "inversion_callback_save_iter_$(iter_number).jld2"); iter_number, loss_total, θ)
+
+                call_back_save_dict = Dict("iter_number" => iter_number, "loss_total" => loss_total, "theta" => θ)
+                open(joinpath(case_path, "inversion_callback_save_iter_$(iter_number).json"), "w") do io
+                    JSON3.pretty(io, call_back_save_dict)
+                end
             end
 
             #checkpoint the inversion results (in case the inversion is interrupted)
@@ -542,7 +547,7 @@ function calc_slope_loss(params::Vector{T}, settings, my_mesh_2D) where {T}
     end
 
     # Compute gradient at cell centers 
-    S0 = compute_scalar_gradients(my_mesh_2D, params)
+    S0 = compute_scalar_gradients_from_cells(my_mesh_2D, params)
 
     #compute the magnitude of S0
     S0_mag = sqrt.(S0[:, 1] .^ 2 + S0[:, 2] .^ 2 .+ eps(T))

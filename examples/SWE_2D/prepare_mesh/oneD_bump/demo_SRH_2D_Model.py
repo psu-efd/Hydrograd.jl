@@ -31,7 +31,7 @@ def run_SRH_2D():
     print("Hydraulic model version: ", my_srh_2d_model.getVersion())
 
     #open a SRH-2D project
-    my_srh_2d_model.open_project("oneD_channel_with_bump.srhhydro")
+    my_srh_2d_model.open_project("oneD_channel_with_bump_refined.srhhydro")
 
     #run SRH-2D Pre to preprocess the case
     my_srh_2d_model.run_pre_model()
@@ -54,16 +54,16 @@ def convert_SRH_2D_to_VTK():
 
     """
 
-    my_srh_2d_data = pyHMT2D.SRH_2D.SRH_2D_Data("oneD_channel_with_bump.srhhydro")
+    my_srh_2d_data = pyHMT2D.SRH_2D.SRH_2D_Data("oneD_channel_with_bump_refined.srhhydro")
 
     #read SRH-2D result in XMDF format (*.h5)
     #wether the XMDF result is nodal or cell center
     bNodal = False
 
-    my_srh_2d_data.readSRHXMDFFile("oneD_channel_with_bump_XMDFC.h5", bNodal)
+    my_srh_2d_data.readSRHXMDFFile("oneD_channel_with_bump_refined_XMDFC.h5", bNodal)
 
     #export to VTK
-    my_srh_2d_data.outputXMDFDataToVTK(bNodal, lastTimeStep=True, dir='')
+    my_srh_2d_data.outputXMDFDataToVTK(bNodal, lastTimeStep=False, dir='')
 
 if __name__ == "__main__":
 

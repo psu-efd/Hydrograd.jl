@@ -53,9 +53,9 @@ def convert_gmsh_to_srh(gmsh3d_fileName, srh2d_caseName):
                   bAddMonitoringLines=False, monitoringLines=monitoringLines)
 
 if __name__ == "__main__":
-    gmsh2d_fileName = "rect_structured.msh"
-    gmsh3d_fileName = "rect_structured_with_zb.msh"
-    srh2d_caseName = "oneD_channel_with_bump"
+    gmsh2d_fileName = "rect_structured_refined.msh"
+    gmsh3d_fileName = "rect_structured_refined_with_zb.msh"
+    srh2d_caseName = "oneD_channel_with_bump_refined"
 
     gmsh2d_to_3d(gmsh2d_fileName, gmsh3d_fileName)
 

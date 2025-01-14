@@ -1,0 +1,16 @@
+
+ *********************************************************************
+ * Time Series Output Correspondence between index i and Actual time *
+ *   _RSTi.dat _SRHi.dat etc: i refers to time as shown below        *
+ *********************************************************************
+
+     i_Index  ITIME  TIME(hour) =     1     36000      0.10
+     i_Index  ITIME  TIME(hour) =     2     72000      0.20
+     i_Index  ITIME  TIME(hour) =     3    108000      0.30
+     i_Index  ITIME  TIME(hour) =     4    144000      0.40
+     i_Index  ITIME  TIME(hour) =     5    180000      0.50
+     i_Index  ITIME  TIME(hour) =     6    216000      0.60
+     i_Index  ITIME  TIME(hour) =     7    252000      0.70
+     i_Index  ITIME  TIME(hour) =     8    288000      0.80
+     i_Index  ITIME  TIME(hour) =     9    324000      0.90
+     i_Index  ITIME  TIME(hour) =    10    360000      1.00
