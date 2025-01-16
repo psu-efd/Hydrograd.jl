@@ -1,0 +1,23 @@
+SRHHYDRO 30
+Case "oneD_channel_uniform_flow_refined"
+Description "1D channel uniform flow refined"
+RunType FLOW
+ModelTemp OFF
+UnsteadyOutput UNSTEADY
+SimTime 0.0 0.1 1
+TurbulenceModel PARABOLIC
+ParabolicTurbulence 0.7
+InitCondOption DRY
+Grid "oneD_channel_uniform_flow_refined.srhgeom"
+HydroMat "oneD_channel_uniform_flow_refined.srhmat"
+OutputFormat XMDFC SI
+OutputOption 1
+OutputInterval 0.1
+ManningsN 0 0.03
+ManningsN 1 0.03
+BC 1 INLET-Q
+BC 2 EXIT-H
+BC 3 SYMM
+BC 4 SYMM
+IQParams 1 1.0 SI CONVEYANCE
+EWSParamsC 2 3.857205 SI C

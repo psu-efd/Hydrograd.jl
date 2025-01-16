@@ -1,6 +1,6 @@
 
 #update scalar at ghost cells: ghost cells have the same value as the neighbor cell
-function update_ghost_cells_scalar(my_mesh_2D::mesh_2D, scalar_cells::AbstractVector{T})::Vector{T} where T<:Real
+function update_ghost_cells_scalar(my_mesh_2D::mesh_2D, scalar_cells::AbstractVector{T})::AbstractVector{T} where T<:Real
 
     # Check if scalar_cells is an AbstractArray
     #@assert isa(scalar_cells, AbstractArray) "scalar_cells must be an AbstractArray"

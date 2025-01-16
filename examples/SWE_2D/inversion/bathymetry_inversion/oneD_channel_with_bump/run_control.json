@@ -42,7 +42,7 @@
         "inversion_save_frequency": 1,
         "inversion_save_checkpoint": true,
         "inversion_checkpoint_frequency": 10,
-        "inversion_sensealg": "AutoForwardDiff()",
+        "inversion_sensealg": "AutoZygote()",
         "inversion_truth_file_name": "forward_simulation_solution_truth.json",
         "inversion_forward_simulation_initial_condition_options": "constant",
         "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
@@ -51,7 +51,7 @@
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
-            "ode_solver_sensealg": "ForwardDiffSensitivity()",
+            "ode_solver_sensealg": "GaussAdjoint(autojacvec=ZygoteVJP())",
             "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },

@@ -1,0 +1,39 @@
+{
+    "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
+    "bVerbose": false,
+    "control_variables": {
+        "srhhydro_file_name": "oneD_channel_uniform_flow_refined.srhhydro",
+        "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": false,
+        "bPerform_Sensitivity_Analysis": true
+    },
+    "time_settings": {
+        "comment": "Time settings for the simulation (overrides the srhhydro file)",
+        "bUse_srhhydro_time_settings": false,
+        "tspan": [0.0, 200.0],
+        "dt": 0.02,
+        "dt_save": 0.1,
+        "nSave": 100
+    },
+    "sensitivity_analysis_options": {
+        "comment": "Options for the sensitivity analysis. parameter_values_options is the option for the parameter values: constant or from_file.",
+        "active_param_names": ["ManningN"],
+        "sensitivity_parameter_values_options": "constant",
+        "sensitivity_parameter_values_file_name": "sensitivity_parameter_values.json",
+        "sensitivity_zb_values": [0.0],
+        "sensitivity_ManningN_values": [0.03, 0.03],
+        "sensitivity_inlet_discharge_values": [0.2],
+        "sensitivity_forward_simulation_initial_condition_options": "constant",
+        "sensitivity_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
+        "sensitivity_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
+        "sensitivity_ode_solver_options": {
+            "comment": "Options for the ode solver in the forward pass",
+            "ode_solver": "Tsit5()",
+            "ode_solver_adaptive": true,
+            "ode_solver_b_jac_sparsity": true,
+            "ode_solver_nSave": 100
+        },
+        "sensitivity_save_file_name": "sensitivity_results.jld2"
+    }        
+}

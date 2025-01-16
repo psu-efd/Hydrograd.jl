@@ -10,6 +10,7 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
     swe_2D_constants = swe_extra_params.swe_2D_constants
     nodeCoordinates = swe_extra_params.nodeCoordinates
     case_path = swe_extra_params.case_path
+    zb_cells = swe_extra_params.zb_cells
 
     println("   Active parameter name = ", active_param_name)
 
@@ -42,23 +43,51 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
         end
 
         #get the final solution
-        sol = pred[:,:,end]
+        pred_final = Array(pred)[:,end]
 
         Zygote.ignore() do
             #@show pred.retcode
             #@show typeof(pred)
-            #@show size(pred)
+            @show size(pred)
             #@show pred
+
+            @show size(pred_final)
+
+            #save the forward simulation results in a JSON file
+            pred_array = Array(pred)
+            #convert from ForwardDiff.Dual to Float64
+            pred_array = map(x -> ForwardDiff.value(x), pred_array)
+            
+            @show typeof(pred_array) 
+            @show size(pred_array)
+            #@show pred_array            
+
+            open(joinpath(case_path, "forward_simulation_results.json"), "w") do io
+                JSON3.pretty(io, Dict("forward_simulation_results" => pred_array, "zb_cells" => zb_cells))
+                println(io)
+            end
+            
         end
 
-        return sol
+        return pred_final
     end
-    
+
     #perform the sensitivity analysis (only ForwardDiff is supported for now)
-    sol = ForwardDiff.jacobian(forward_simulation, params_vector)
+    sensitivity = ForwardDiff.jacobian(forward_simulation, params_vector)
+
+    #@show typeof(sensitivity)
+    #@show size(sensitivity)
     
     #save the inversion results
-    jldsave(joinpath(case_path, settings.sensitivity_analysis_settings.save_file_name); sol)
+    jldsave(joinpath(case_path, settings.sensitivity_analysis_settings.save_file_name); sensitivity)
+
+    #also save the sensitivity results in a JSON file
+    open(joinpath(case_path, "sensitivity_results.json"), "w") do io
+        JSON3.pretty(io, Dict("sensitivity_results" => sensitivity, 
+                              "parameter_name" => active_param_name,
+                              "params_vector" => params_vector))
+        println(io)
+    end
 
     #process the inversion results
     println("   Post-processing sensitivity results ...")

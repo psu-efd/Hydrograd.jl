@@ -70,10 +70,14 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    #sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+
+    #compute all the losses and ODE solutions for each inversion iteration
+    println("   Computing all the losses and ODE solutions for each inversion iteration ...")
+    compute_all_losses_inversion(ode_f, Q0, settings, nodeCoordinates, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
 
     #save the inversion results
-    jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PARS)
+    #jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PARS)
 
     #process the inversion results
     println("   Post-processing inversion results ...")
@@ -83,9 +87,159 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
 end
 
+# compute all the losses for each inversion iteration
+function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, settings::ControlSettings, nodeCoordinates::Matrix{T2}, 
+    my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T2}}, active_param_name::String, case_path::String) where {T1<:Real,T2<:Real}
+
+    data_type = eltype(Q0)
+    
+    #find the list of files of "inversion_callback_save_iter_<iter_number>.json"
+    iter_files = filter(file -> occursin("inversion_callback_save_iter_", file) && endswith(file, ".json"), readdir(case_path))
+
+    #println("iter_files = ", iter_files)
+
+    #sort the files by the iteration number
+    iter_files = sort(iter_files, by = file -> begin
+        # Extract the number between "iter_" and ".json"
+        m = match(r"inversion_callback_save_iter_(\d+)\.json$", file)
+        if isnothing(m)
+            error("Invalid filename format: $file")
+        end
+        parse(Int, m.captures[1])
+    end)
+
+    #print the total number of iterations
+    nIter = length(iter_files)
+    println("       Total number of inversion iterations: ", nIter)
+
+    #get the truth data
+    WSE_truth = observed_data["WSE_truth"]
+    h_truth = observed_data["h_truth"]
+    u_truth = observed_data["u_truth"]
+    v_truth = observed_data["v_truth"]
+    zb_cell_truth = observed_data["zb_cell_truth"]
+    ManningN_cell_truth = observed_data["ManningN_cell_truth"]
+    inlet_discharges_truth = observed_data["inlet_discharges_truth"]    
+
+
+    #initialize the losses
+    loss_totals = []
+    loss_preds = []
+    loss_pred_WSEs = []
+    loss_pred_uvs = []
+    loss_bounds = []
+    loss_slopes = []
+    inverted_WSEs = []
+    inverted_hs = []
+    inverted_us = []
+    inverted_vs = []
+    
+    #load the files
+    for file in iter_files
+        println("       Loading inversion results from file: ", file)
+        data = JSON3.read(open(joinpath(case_path, file)), Dict{String,Any})
+
+        iter_number = parse(Int, match(r"inversion_callback_save_iter_(\d+)\.json$", file).captures[1])
+        iter_number_from_file = data["iter_number"]
+        @assert iter_number == iter_number_from_file "The iteration number in the file name and the file content do not match: iter_number = $iter_number, iter_number_from_file = $iter_number_from_file"
+
+        θ_from_file = convert(Vector{Float64}, data["theta"])
+        total_loss_from_file = convert(Float64, data["loss_total"])
+
+        #@show typeof(θ_from_file)
+
+        loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ_from_file, settings,
+            my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+            
+
+        #assert the total loss is the same as the one in the file
+        @assert abs(loss_total - total_loss_from_file) < 1e-3 "The total loss in the file and the computed loss do not match: loss_total = $loss_total, total_loss_from_file = $total_loss_from_file"
+
+        #append the losses to the accumulators
+        push!(loss_totals, loss_total)
+        push!(loss_preds, loss_pred)
+        push!(loss_pred_WSEs, loss_pred_WSE)
+        push!(loss_pred_uvs, loss_pred_uv)
+        push!(loss_bounds, loss_bound)
+        push!(loss_slopes, loss_slope)
+
+        #if the inversion is for zb, then curPars is the zb_cells_param. Otherwise, curPar is something else such as the Manning's n or the inlet discharges. 
+        if settings.inversion_settings.active_param_names == ["zb"]
+            zb_i = θ_from_file
+
+            #compute S0
+            #_, _, S0_i = interploate_zb_from_cell_to_face_and_compute_S0(my_mesh_2D, zb_i)
+        else
+            zb_i = zb_cell_truth
+        end
+
+        @show size(ode_pred.u[end])
+        @show size(zb_i)
+
+        #append the ODE solution to the accumulator
+        push!(inverted_WSEs, ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ zb_i)
+        push!(inverted_hs, ode_pred.u[end][1:my_mesh_2D.numOfCells])
+        push!(inverted_us, ode_pred.u[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells])
+        push!(inverted_vs, ode_pred.u[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells])
+
+
+        #save the inverted results to vtk
+        bSave_vtk = true
+        if bSave_vtk
+            println("       Saving forward simulation results to vtk file for iteration: ", iter_number)
+
+            field_name = "iter_number"
+            field_type = "integer"
+            field_value = iter_number
+
+            h_array = ode_pred.u[end][1:my_mesh_2D.numOfCells]
+            q_x_array = ode_pred.u[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
+            q_y_array = ode_pred.u[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
+
+            u_temp = q_x_array ./ h_array
+            v_temp = q_y_array ./ h_array
+            U_vector = hcat(u_temp, v_temp)
+                            
+            vector_data = [U_vector] 
+            vector_names = ["U"]
+
+            WSE_array = h_array + zb_i
+                
+            scalar_data = [h_array, q_x_array, q_y_array, zb_i, WSE_array]
+            scalar_names = ["h", "hu", "hv", "zb_cell", "WSE"]
+
+            vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", iter_number)
+                
+            file_path = joinpath(case_path, vtk_fileName ) 
+            export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
+        end
+    end
+
+    #save everything (loss and ODE solution) to a JSON file
+    println("       Saving inversion results to JSON file ...")
+    save_file_name = "inversion_results_losses_and_ODE_solution.json"
+    save_file_path = joinpath(case_path, save_file_name)
+    open(save_file_path, "w") do io
+        JSON3.pretty(io, Dict(
+            "nIter" => nIter,
+            "loss_totals" => loss_totals,
+            "loss_preds" => loss_preds,
+            "loss_pred_WSEs" => loss_pred_WSEs,
+            "loss_pred_uvs" => loss_pred_uvs,
+            "loss_bounds" => loss_bounds,
+            "loss_slopes" => loss_slopes,
+            "inverted_WSEs" => inverted_WSEs,
+            "inverted_hs" => inverted_hs,
+            "inverted_us" => inverted_us,
+            "inverted_vs" => inverted_vs
+        ))
+    end
+    
+
+end
 
 # Define the loss function
-function compute_loss_inversion(ode_f::Function, Q0::AbstractVector{T1}, p::AbstractVector{T2}, settings::ControlSettings, 
+function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::AbstractVector{T2}, settings::ControlSettings, 
     my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T3}}, active_param_name::String, data_type::DataType) where {T1<:Real,T2<:Real,T3<:Real}
 
     # Solve the ODE (forward pass)
@@ -138,9 +292,9 @@ function compute_loss_inversion(ode_f::Function, Q0::AbstractVector{T1}, p::Abst
         ode_solver_sensealg = ForwardDiffSensitivity()
     elseif settings.inversion_settings.ode_solver_sensealg == "BacksolveAdjoint(autojacvec=nothing)"
         ode_solver_sensealg = BacksolveAdjoint(autojacvec=nothing)    
-    elseif settings.inversion_settings.ode_solver_sensealg == "GaussAdjoint(autojacvec=nothing)"
-        ode_solver_sensealg = GaussAdjoint(autojacvec=nothing)
-    elseif settings.inversion_settings.ode_solver_sensealg == "QuadratureAdjoint(autojacvec = nothing)"
+    elseif settings.inversion_settings.ode_solver_sensealg == "GaussAdjoint(autojacvec=ZygoteVJP())"
+        ode_solver_sensealg = GaussAdjoint(autojacvec=ZygoteVJP())
+    elseif settings.inversion_settings.ode_solver_sensealg == "QuadratureAdjoint(autojacvec=nothing)"
         ode_solver_sensealg = QuadratureAdjoint(autojacvec = nothing)
     elseif settings.inversion_settings.ode_solver_sensealg == "ReverseDiffAdjoint()"
         ode_solver_sensealg = ReverseDiffAdjoint()

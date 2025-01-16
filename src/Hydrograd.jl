@@ -5,7 +5,7 @@ using InteractiveUtils #for @code_warntype
 using Profile
 using StatProfilerHTML
 
-using ProfileView
+#using ProfileView
 
 using JSON3
 using JLD2
@@ -51,8 +51,6 @@ using Enzyme
 using ComponentArrays #match arrays of parameters between Lux and SciML
 
 using Lux  #framework for neural networks
-
-
 
 
 function print_banner()
@@ -136,7 +134,7 @@ include("applications/sensitivity/swe_2D_sensitivity.jl")
 include("applications/sensitivity/process_sensitivity_results_2D.jl")
 include("applications/UDE/swe_2D_UDE.jl")
 include("applications/UDE/process_UDE_results_2D.jl")
-
+include("applications/solve_swe_2D.jl")
 
 export print_banner
 export greet_your_package_name
@@ -146,7 +144,6 @@ export greet_your_package_name
 # Constants
 export swe_1D_consts
 export swe_2D_consts
-export update_swe_2D_constants!
 
 # Controls
 export TimeSettings
@@ -228,6 +225,7 @@ export process_SRH_2D_input
 
 export export_to_vtk_2D
 export debug_AD
+
 # Applications
 export SWE2D_Extra_Parameters
 export swe_2D_forward_simulation
@@ -239,6 +237,6 @@ export postprocess_sensitivity_results_swe_2D
 export swe_2D_UDE
 export postprocess_UDE_training_results_swe_2D
 export postprocess_UDE_inference_results_swe_2D
-
+export solve_swe_2D
 
 end

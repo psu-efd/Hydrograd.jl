@@ -14,16 +14,16 @@ function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordi
     sensitivity_results = load(sensitivity_results_file_name)
 
     #extract the sensitivity analysis results
-    sol = sensitivity_results["sol"]
+    sensitivity = sensitivity_results["sensitivity"]
 
-    if settings.bVerbose
-        @show size(sol)
-    end
+    #if settings.bVerbose
+        @show size(sensitivity)
+    #end
     
-    sol_size = size(sol)  #(n_cells * 3, n_params); each cell has 3 solution variables: h, hu, hv. Each cell has 3 rows in the sol array.
+    sensitivity_size = size(sensitivity)  #(n_cells * 3, n_params); each cell has 3 solution variables: h, hu, hv. Each cell has 3 rows in the sol array.
 
-    @assert sol_size[1] == n_cells * 3
-    @assert sol_size[2] == nParams    
+    @assert sensitivity_size[1] == n_cells * 3
+    @assert sensitivity_size[2] == nParams    
 
     # loop over each parameter and save the sensitivity results to vtk
     for i in 1:nParams
@@ -35,10 +35,9 @@ function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordi
 
         #loop over each cell
         for j in 1:n_cells
-            idx = (j - 1) * 3 + 1           # Starting row index for each cell
-            dh_dparam[j]  = sol[idx, i]     # h sensitivity
-            dhu_dparam[j] = sol[idx+1, i]   # hu sensitivity
-            dhv_dparam[j] = sol[idx+2, i]   # hv sensitivity
+            dh_dparam[j]  = sensitivity[j, i]     # h sensitivity
+            dhu_dparam[j] = sensitivity[n_cells+j, i]   # hu sensitivity
+            dhv_dparam[j] = sensitivity[2*n_cells+j, i]   # hv sensitivity
         end
 
         field_name = "parameter_number"
@@ -58,6 +57,16 @@ function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordi
             scalar_data, scalar_names, vector_data, vector_names)    
 
         println("       Sensitivity results for parameter $(active_param_name) = $i) is saved to ", file_path)
+
+        #save the sensitivity results in a JSON file
+        open(joinpath(case_path, "sensitivity_results_$(active_param_name)_$i.json"), "w") do io
+            JSON3.pretty(io, Dict("dh_dparam" => dh_dparam, 
+                                  "dhu_dparam" => dhu_dparam,
+                                  "dhv_dparam" => dhv_dparam,
+                                  "parameter_name" => string(active_param_name, "_", i),
+                                  "parameter_value" => params_vector[i]))
+            println(io)
+        end
     end
 
 end
