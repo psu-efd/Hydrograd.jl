@@ -19,29 +19,45 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     wse_truth = h_truth .+ zb_cell_truth
     q_x_truth = vec(forward_simulation_results)[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
     q_y_truth = vec(forward_simulation_results)[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
-    u_truth = q_x_truth ./ h_truth
-    v_truth = q_y_truth ./ h_truth
+    u_truth = q_x_truth ./ (h_truth .+ swe2d_extra_params.swe_2D_constants.h_small)
+    v_truth = q_y_truth ./ (h_truth .+ swe2d_extra_params.swe_2D_constants.h_small)
 
     #If ManningN_option is variable_as_function_of_h, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
     #if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
     #    ManningN_cells = update_ManningN_forward_simulation(h_truth, settings)
     #end
 
+    #compute bed slope 
+    zb_ghostCells, zb_faces, S0 = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, zb_cells)
+
     #compute the friction terms
     friction_x_truth, friction_y_truth = compute_friction_terms(settings, h_truth, q_x_truth, q_y_truth, swe2d_extra_params.ManningN_cells, 
-                 nothing, swe2d_extra_params, my_mesh_2D, swe2d_extra_params.swe_2D_constants.g, swe2d_extra_params.swe_2D_constants.h_small)
+                 nothing, swe2d_extra_params, my_mesh_2D, swe2d_extra_params.swe_2D_constants.g, swe2d_extra_params.swe_2D_constants.k_n,
+                  swe2d_extra_params.swe_2D_constants.h_small)
+
+    # Function to replace NaN with nothing in arrays
+    #replace_nan(x) = map(v -> isnan(v) ? nothing : v, x)
+    replace_nan(x) = x
 
     #save the simulation results as truth to a json file
     open(joinpath(case_path, settings.forward_settings.save_solution_truth_file_name), "w") do io
-        JSON3.pretty(io, Dict("wse_truth" => wse_truth, "h_truth" => h_truth, "u_truth" => u_truth, "v_truth" => v_truth, "zb_cell_truth" => zb_cell_truth, 
-                            "ManningN_cells_truth" => ManningN_cells, 
-                            "friction_x_truth" => friction_x_truth, "friction_y_truth" => friction_y_truth,
-                            "ManningN_zone_values_truth" => ManningN_zone_values_truth, "inlet_discharges_truth" => inlet_discharges_truth))
+        JSON3.pretty(io, Dict(
+            "wse_truth" => replace_nan(wse_truth),
+            "h_truth" => replace_nan(h_truth),
+            "u_truth" => replace_nan(u_truth),
+            "v_truth" => replace_nan(v_truth),
+            "zb_cell_truth" => replace_nan(zb_cell_truth),
+            "S0_truth" => replace_nan(S0),
+            "ManningN_cells_truth" => replace_nan(ManningN_cells),
+            "friction_x_truth" => replace_nan(friction_x_truth),
+            "friction_y_truth" => replace_nan(friction_y_truth),
+            "ManningN_zone_values_truth" => replace_nan(ManningN_zone_values_truth),
+            "inlet_discharges_truth" => replace_nan(inlet_discharges_truth)))
         println(io)
     end
 
     #save the simulation results to vtk files
-    swe_2D_save_results_SciML(swe2d_extra_params, forward_simulation_results, friction_x_truth, friction_y_truth)
+    swe_2D_save_results_SciML(swe2d_extra_params, forward_simulation_results, friction_x_truth, friction_y_truth, S0)
     
 end
 

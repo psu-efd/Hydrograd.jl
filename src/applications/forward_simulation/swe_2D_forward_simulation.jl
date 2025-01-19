@@ -40,6 +40,12 @@ function swe_2D_forward_simulation(ode_f, Q0, params_vector, swe2d_extra_params,
         elseif settings.forward_settings.ode_solver == "Euler()"
             @time sol = solve(prob, Euler(), dt=swe_2D_constants.dt, saveat=t_save;
                               abstol=1e-6, reltol=1e-3)
+        elseif settings.forward_settings.ode_solver == "RK4()"
+            @time sol = solve(prob, RK4(), dt=swe_2D_constants.dt, saveat=t_save;
+                              abstol=1e-6, reltol=1e-3)
+        elseif settings.forward_settings.ode_solver == "AB3()"
+            @time sol = solve(prob, AB3(), dt=swe_2D_constants.dt, saveat=t_save;
+                              abstol=1e-6, reltol=1e-3)
         elseif settings.forward_settings.ode_solver == "Rosenbrock23()"
             @time sol = solve(prob, Rosenbrock23(autodiff=false), adaptive=settings.forward_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save;
                               abstol=1e-4, reltol=1e-2)  

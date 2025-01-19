@@ -168,11 +168,24 @@ function compute_cell_gradient_from_faces(iCell::Int, my_mesh_2D::mesh_2D, scala
         
         cell_gradient = cell_gradient + flux_temp
 
+        if iCell == 1065
+            @show iCell, iFace, faceID
+            @show my_mesh_2D.cell_normals[iCell][iFace]
+            @show scalar_variable_f[faceID]
+            @show my_mesh_2D.face_lengths[faceID]
+            @show flux_temp
+            @show cell_gradient
+        end
+
         #@show iCell, iFace, faceID
         #@show my_mesh_2D.cell_normals[iCell][iFace]
         #@show flux_temp
         #@show cell_gradient
 
+    end
+
+    if iCell == 1065
+        @show cell_gradient / my_mesh_2D.cell_areas[iCell]
     end
     
     return cell_gradient / my_mesh_2D.cell_areas[iCell]

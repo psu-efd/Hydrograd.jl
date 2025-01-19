@@ -1,0 +1,23 @@
+SRHHYDRO 30
+Case "Savana"
+Description "Description"
+RunType FLOW
+ModelTemp OFF
+UnsteadyOutput UNSTEADY
+SimTime 0.0 1.0 3.0
+TurbulenceModel PARABOLIC
+ParabolicTurbulence 0.7
+InitCondOption DRY
+Grid "savana_SI.srhgeom"
+HydroMat "savana_SI.srhmat"
+OutputFormat XMDFC SI
+OutputOption 1
+OutputInterval 0.2
+ManningsN 0 0.02
+ManningsN 1 0.02
+BC 1 INLET-Q
+BC 2 EXIT-H
+BC 3 WALL
+BC 4 WALL
+IQParams 1 187.4 SI CONVEYANCE
+EWSParamsC 2 29.3 SI C

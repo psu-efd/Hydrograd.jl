@@ -18,7 +18,7 @@
 function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vector::AbstractVector{T3}, 
     t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T4})::AbstractVector{promote_type(T1, T2, T3, T4)} where {T1,T2,T3,T4}
 
-    #@show t
+    @show t
 
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
@@ -27,6 +27,11 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     srh_all_Dict = p_extra.srh_all_Dict
     boundary_conditions = p_extra.boundary_conditions
     swe_2D_constants = p_extra.swe_2D_constants
+
+    #unpack the dry/wet flags
+    b_dry_wet = p_extra.b_dry_wet
+    b_Adjacent_to_dry_land = p_extra.b_Adjacent_to_dry_land
+    b_Adjacent_to_high_dry_land = p_extra.b_Adjacent_to_high_dry_land
 
     # These are the arguments that are passed to the function. They may be only 
     # used for forward simulations. For inversion and sensitivity analysis, 
@@ -43,6 +48,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 
     #other variables from swe_2D_constants
     g = swe_2D_constants.g
+    k_n = swe_2D_constants.k_n
     h_small = swe_2D_constants.h_small
     RiemannSolver = swe_2D_constants.RiemannSolver
 
@@ -74,6 +80,11 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     q_x = @view Q[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]  # discharge in x
     q_y = @view Q[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]  # discharge in y
 
+    #make sure h is larger than h_small
+    h[h.<=h_small] .= h_small
+    q_x[h.<=h_small] .= zero(data_type)
+    q_y[h.<=h_small] .= zero(data_type)
+
     #@show h
     #@show q_x
     #@show q_y
@@ -87,6 +98,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
                 println("calling interploate_zb_from_cell_to_face_and_compute_S0")
             end
         end
+
+        #zb_cells_local points to params_vector, which is the zb parameter vector to be inverted
+        zb_cells_local = params_vector
 
         zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
         #zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_nodes_to_cells_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
@@ -161,6 +175,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         end
     end
 
+    #update the dry/wet flags
+    b_dry_wet, b_Adjacent_to_dry_land, b_Adjacent_to_high_dry_land = process_dry_wet_flags(my_mesh_2D, h, zb_cells_local, swe_2D_constants)
+
     # Process boundaries: update ghost cells values. Each boundary treatment function works on different part of h_ghost, q_x_ghost, and q_y_ghost. 
     h_ghost_local, q_x_ghost_local, q_y_ghost_local = process_all_boundaries_2d(settings, h, q_x, q_y, my_mesh_2D, boundary_conditions,
         ManningN_cells_local, zb_cells_local, zb_faces_local, swe_2D_constants,
@@ -178,8 +195,8 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     end
 
     #compute the contribution of inviscid fluxes
-    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, my_mesh_2D,
-        g, RiemannSolver, h_small, data_type)
+    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, 
+                            zb_cells_local, zb_ghostCells_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #@show typeof(updates_inviscid)
     #@show size(updates_inviscid)
@@ -190,7 +207,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #@show updates_inviscid
     
     #compute the contribution of source terms
-    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, h_small)
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, k_n, h_small)
 
     #combine inviscid and source terms
     if p_extra.bInPlaceODE    
@@ -202,6 +219,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         # Out-of-place: create new array
         #@show size(updates_inviscid)
         #@show size(updates_source)
+        #@show (updates_inviscid .+ updates_source)[7], (updates_inviscid .+ updates_source)[my_mesh_2D.numOfCells+7], 
+        #       (updates_inviscid .+ updates_source)[2*my_mesh_2D.numOfCells+7]
+
         return updates_inviscid .+ updates_source
     end
 
@@ -219,7 +239,8 @@ end
 
 #function to compute the inviscid fluxes
 #serial version
-function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, zb_cells_local, zb_ghostCells_local, 
+    my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #compute the inviscid fluxes for each cell (in the order of cells)
     updates_inviscid_cells = [
@@ -240,27 +261,32 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 if !my_mesh_2D.bFace_is_boundary[faceID]  # internal face
                     hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
                     hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
+                    zb_L = zb_cells_local[left_cellID]
+                    zb_R = zb_cells_local[right_cellID]
                 else  # boundary face
                     hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
                     hR = h_ghost[right_cellID]
                     huR = q_x_ghost[right_cellID]
                     hvR = q_y_ghost[right_cellID]
+                    zb_L = zb_cells_local[left_cellID]
+                    zb_R = zb_ghostCells_local[right_cellID]
                 end
 
                 Zygote.ignore() do
-                    if iCell == -1  # Print for first cell only
+                    if iCell == -7  # Print for first cell only
                         println("Before Riemann solver:")
-                        @show typeof(hL), typeof(huL), typeof(hvL)
+                        @show iCell, iFace, left_cellID, right_cellID
+                        #@show typeof(hL), typeof(huL), typeof(hvL)
                         @show hL, huL, hvL
-                        @show typeof(hR), typeof(huR), typeof(hvR)
+                        #@show typeof(hR), typeof(huR), typeof(hvR)
                         @show hR, huR, hvR
-                        @show typeof(face_normal)
+                        #@show typeof(face_normal)
                         @show face_normal
                     end
                 end
 
                 if RiemannSolver == "Roe"
-                    flux = Riemann_2D_Roe(settings, hL, huL, hvL, hR, huR, hvR, g, face_normal, hmin=h_small)
+                    flux = Riemann_2D_Roe(settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, g, face_normal, hmin=h_small)
                 elseif RiemannSolver == "HLL"
                     error("HLL solver not implemented yet")
                 elseif RiemannSolver == "HLLC"
@@ -270,22 +296,23 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 end
 
                 Zygote.ignore() do
-                    if iCell == -1  # Print for first cell only
+                    if iCell == -7  # Print for first cell only
                         println("After Riemann solver:")
-                        @show typeof(flux)
-                        @show size(flux)
-                        #@show flux
+                        @show iCell, iFace, left_cellID, right_cellID
+                        #@show typeof(flux)
+                        #@show size(flux)
+                        @show flux
                     end
                 end
 
                 Zygote.ignore() do
-                    if iCell == -1  # Print for first cell only
+                    if iCell == -7  # Print for first cell only
                         println("before accumulating flux_sum")
-                        @show typeof(my_mesh_2D.face_lengths)
-                        @show my_mesh_2D.face_lengths
-                        @show typeof(my_mesh_2D.face_lengths[faceID])
+                        #@show typeof(my_mesh_2D.face_lengths)
+                        #@show my_mesh_2D.face_lengths
+                        #@show typeof(my_mesh_2D.face_lengths[faceID])
                         @show my_mesh_2D.face_lengths[faceID]
-                        @show typeof(flux_sum)
+                        #@show typeof(flux_sum)
                         @show flux_sum
                     end
                 end
@@ -294,22 +321,26 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 flux_sum = flux_sum .+ flux .* my_mesh_2D.face_lengths[faceID]
 
                 Zygote.ignore() do
-                    if settings.bVerbose
-                        if iCell == -1  # Print for first cell only
+                    #if settings.bVerbose
+                        if iCell == -7  # Print for first cell only
                             println("after accumulating flux_sum")
-                            @show typeof(flux_sum)
-                            @show size(flux_sum)
-
+                            #@show iCell, iFace, left_cellID, right_cellID
+                            #@show typeof(flux_sum)
+                            #@show size(flux_sum)
+                            @show flux_sum
                         end
-                    end
+                    #end
                 end
             end
 
             Zygote.ignore() do
                 #if settings.bVerbose
-                    if iCell == -1
-                        @show typeof(flux_sum)
-                        @show size(flux_sum)
+                    if iCell == -7
+                        println("after accumulating flux_sum")
+                        @show iCell
+                        #@show typeof(flux_sum)
+                        #@show size(flux_sum)
+                        @show -flux_sum ./ cell_area
                     end
                 #end
             end
@@ -350,87 +381,50 @@ end
 
 #function to compute the source terms
 function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1},
-    S0::Matrix{T2}, ManningN_cells::Vector{T3}, params_vector::AbstractVector{T4}, p_extra::SWE2D_Extra_Parameters{T5}, g::Float64, h_small::Float64) where {T1,T2,T3,T4,T5}
+    S0::Matrix{T2}, ManningN_cells::Vector{T3}, params_vector::AbstractVector{T4}, p_extra::SWE2D_Extra_Parameters{T5}, g::Float64, k_n::Float64, h_small::Float64) where {T1,T2,T3,T4,T5}
 
     data_type = promote_type(T1, T2, T3, T4, T5)
 
+    #unpack the dry/wet flags
+    b_Adjacent_to_high_dry_land = p_extra.b_Adjacent_to_high_dry_land
+
     #compute the friction (flow resistance) terms
-    friction_x, friction_y = compute_friction_terms(settings, h, q_x, q_y, ManningN_cells, params_vector, p_extra, my_mesh_2D, g, h_small)
+    friction_x, friction_y = compute_friction_terms(settings, h, q_x, q_y, ManningN_cells, params_vector, p_extra, my_mesh_2D, g, k_n, h_small)
 
     #compute the momentum source terms
-    #use vectorization to compute the source terms
-    #cell_areas = my_mesh_2D.cell_areas
 
     #create a boolean array to check if h is less than or equal to h_small
-    below_small_h = h .<= h_small
-
-    # For h <= h_small
-    #source_x_small = g .* h .* S0[:, 1] .* cell_areas
-    #source_y_small = g .* h .* S0[:, 2] .* cell_areas
-
-    # For h > h_small
-    #source_x_large = (g .* h .* S0[:, 1] .- friction_x) .* cell_areas
-    #source_y_large = (g .* h .* S0[:, 2] .- friction_y) .* cell_areas
-
-    # Combine results based on the condition
-    #source_x = below_small_h .* source_x_small .+ .~below_small_h .* source_x_large
-    #source_y = below_small_h .* source_y_small .+ .~below_small_h .* source_y_large
+    above_small_h = h .> h_small
 
     # remove the intermediate arrays
-    source_x = below_small_h .* g .* h .* S0[:, 1] .+ .~below_small_h .* (g .* h .* S0[:, 1] .- friction_x)
-    source_y = below_small_h .* g .* h .* S0[:, 2] .+ .~below_small_h .* (g .* h .* S0[:, 2] .- friction_y)
+    #source_x = below_small_h .* g .* h .* S0[:, 1] .+ .~below_small_h .* (g .* h .* S0[:, 1] .- friction_x)
+    #source_y = below_small_h .* g .* h .* S0[:, 2] .+ .~below_small_h .* (g .* h .* S0[:, 2] .- friction_y)
+
+    #source terms considering the dry/wet flags: if a wet cell is adjacent to high dry land, the bed slope part of source terms is zero.
+    #source_x = above_small_h .* (g .* h .* S0[:, 1] .* .~b_Adjacent_to_high_dry_land .- friction_x)
+    #source_y = above_small_h .* (g .* h .* S0[:, 2] .* .~b_Adjacent_to_high_dry_land .- friction_y)
+
+    source_x = above_small_h .* (g .* h .* S0[:, 1] .- friction_x)
+    source_y = above_small_h .* (g .* h .* S0[:, 2] .- friction_y)
     
-    # Normalize source terms by cell areas and combine them into a single 1D array
+    # combine them into a single 1D array
     updates_source = vcat(zeros(data_type, length(h)), source_x, source_y)
 
-
-    #use comprehension to create the updates_source array (serial, slow)
-    # updates_source = [
-    #     let
-    #         cell_area = my_mesh_2D.cell_areas[iCell]
-
-    #         # Source terms
-    #         source_terms = if h[iCell] <= h_small
-    #             [zero(data_type),
-    #                 g * h[iCell] * S0[iCell, 1] * cell_area,
-    #                 g * h[iCell] * S0[iCell, 2] * cell_area]
-    #         else
-
-    #             Zygote.ignore() do
-    #                 if iCell == -1  # Print for first cell only
-    #                     @show typeof(ManningN_cells)
-    #                     @show typeof(ManningN_cells[iCell])
-    #                     @show ManningN_cells[iCell]
-    #                     @show typeof(friction_x)
-    #                     @show friction_x
-    #                     @show typeof(friction_y)
-    #                     @show friction_y
-    #                 end
-    #             end
-
-    #             [zero(data_type),
-    #                 (g * h[iCell] * S0[iCell, 1] - friction_x[iCell]) * cell_area,
-    #                 (g * h[iCell] * S0[iCell, 2] - friction_y[iCell]) * cell_area]
-    #         end
-
-
-    #         Zygote.ignore() do
-    #             if iCell == -1  # Print for first cell only
-    #                 if settings.bVerbose
-    #                     @show source_terms
-    #                     @show cell_area
-    #                     @show (-flux_sum .+ source_terms) ./ cell_area
-    #                 end
-    #             end
-    #         end
-
-    #         # Return the update for this cell (without in-place mutation)
-    #         #Array((-flux_sum .+ source_terms) ./ cell_area)
-    #         source_terms[j] / cell_area
-
-    #     end
-    #     for iCell in 1:my_mesh_2D.numOfCells, j in 1:3
-    # ]
+    Zygote.ignore() do
+        if settings.bVerbose
+            
+                println("source terms, iCell = 7")
+                @show above_small_h[7]
+                @show h[7], q_x[7], q_y[7]
+                @show S0[7, 1], S0[7, 2]
+                @show ManningN_cells[7]
+                #@show params_vector[7]
+                @show friction_x[7], friction_y[7]
+                @show source_x[7], source_y[7]
+                @show updates_source[7], updates_source[my_mesh_2D.numOfCells+7], updates_source[2*my_mesh_2D.numOfCells+7]
+            
+        end
+    end
 
     Zygote.ignore() do
         #if settings.bVerbose
@@ -446,7 +440,7 @@ end
 #function to compute the friction (flow resistance) terms
 function compute_friction_terms(settings::ControlSettings, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1}, 
     ManningN_cells::Vector{T2}, params_vector::Union{AbstractVector{T3}, Nothing}, p_extra::SWE2D_Extra_Parameters{T4}, 
-    my_mesh_2D::mesh_2D, g::Float64, h_small::Float64) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real} 
+    my_mesh_2D::mesh_2D, g::Float64, k_n::Float64, h_small::Float64) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real} 
 
     #initialize friction terms
     #friction_x = zeros(eltype(h), my_mesh_2D.numOfCells)
@@ -466,21 +460,32 @@ function compute_friction_terms(settings::ControlSettings, h::AbstractVector{T1}
 
         mag_q = smooth_sqrt.(q_x.^2 .+ q_y.^2)
 
+        #compute the friction terms
+        friction_x = [friction_magnitudes[i] * q_x[i] / mag_q[i] for i in eachindex(h)]
+        friction_y = [friction_magnitudes[i] * q_y[i] / mag_q[i] for i in eachindex(h)]
+
+        #original code: check small h (no longer needed; friction terms are zero for dry cells anyway)
         #if the cell is dry or the magnitude of the velocity is too small, set the friction terms to zero
-        friction_x = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
-                      friction_magnitudes[i] * q_x[i] / mag_q[i]
-                      for i in eachindex(h)]
-        friction_y = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
-                      friction_magnitudes[i] * q_y[i] / mag_q[i]
-                      for i in eachindex(h)]
+        #friction_x = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
+        #              friction_magnitudes[i] * q_x[i] / mag_q[i]
+        #              for i in eachindex(h)]
+        #friction_y = [h[i] < h_small || mag_q[i] < 1e-6 ? zero(eltype(h)) :
+        #              friction_magnitudes[i] * q_y[i] / mag_q[i]
+        #              for i in eachindex(h)]
     else  # Just use the Manning's formula
-        # Compute friction terms with zero friction for dry cells
-        friction_x = [h[i] < h_small ? zero(T1) :
-                      g * ManningN_cells[i]^2.0 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_x[i]
+        # Compute friction terms 
+        friction_x = [g * ManningN_cells[i]^2/ k_n^2 / (h[i]+h_small)^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_x[i]
                       for i in eachindex(h)]
-        friction_y = [h[i] < h_small ? zero(T1) :
-                      g * ManningN_cells[i]^2.0 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_y[i]
+        friction_y = [g * ManningN_cells[i]^2/ k_n^2 / (h[i]+h_small)^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_y[i]
                       for i in eachindex(h)]
+    
+        #original code: check small h (no longer needed; friction terms are zero for dry cells anyway)
+        #friction_x = [h[i] < h_small ? zero(T1) :
+        #              g * ManningN_cells[i]^2/ k_n^2 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_x[i]
+        #              for i in eachindex(h)]
+        #friction_y = [h[i] < h_small ? zero(T1) :
+        #              g * ManningN_cells[i]^2 / k_n^2 / h[i]^(7.0 / 3.0) * smooth_sqrt(q_x[i]^2 + q_y[i]^2) * q_y[i]
+        #              for i in eachindex(h)]
     end
 
     return friction_x, friction_y

@@ -97,13 +97,13 @@ include("fvm/boundary_conditions/bc_2D.jl")
 include("applications/application_commons.jl")
 
 #fvm
-
 include("fvm/discretization/semi_discretize_swe_2D.jl")
 include("fvm/discretization/sparsity_swe_2D.jl")
 include("fvm/discretization/fvm_schemes_2D.jl")
 include("fvm/discretization/Riemman_solvers/swe_1D_solvers.jl")
 include("fvm/discretization/Riemman_solvers/swe_2D_solvers.jl")
 include("fvm/initial_conditions/process_ICs_2D.jl")
+include("fvm/discretization/process_dry_wet.jl")
 
 #ode solvers
 include("ode_solvers/custom_ODE_solvers.jl")
@@ -179,6 +179,7 @@ export update_ghost_cells_scalar
 export compute_scalar_gradients
 export compute_cell_gradient
 export cells_to_faces_scalar
+export process_dry_wet_flags
 
 #     discretization - semi-discretization
 export swe_2d_rhs

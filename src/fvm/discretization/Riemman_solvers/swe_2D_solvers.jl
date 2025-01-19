@@ -1,24 +1,55 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR::T4, huR::T5, hvR::T6, 
-    g::Float64, normal::Vector{T7}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7}
+function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, hR::T5, huR::T6, hvR::T7, zb_R::T8, 
+    g::Float64, normal::Vector{T9}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9}
     
     #Data type 
-    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7)
+    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7, T8, T9)
 
     # Extract unit normal components
     nx, ny = normal
 
     # Handle dry bed conditions (need to be smoothed; see notes)
-    if hL < hmin && hR < hmin
+    if (hL <= hmin && hR <= hmin)  #both sides are dry
         # Both sides are dry
         if settings.bVerbose
             print("Both sides are dry")
         end
 
         return zeros(data_type, 3)
-    elseif hL < hmin
+    elseif (((hL + zb_L) < (zb_R + hmin)) && (hR <= hmin))    #left side WSE is below right side bed and right side is dry
+        #In this case, the interface is virtually a wall. We will treat it as a wall.
+        if settings.bVerbose
+            print("Left side WSE is below right side bed and right side is dry")
+        end
+
+        #In this case, the interface is virtually a wall. We will treat it as a wall.
+        #hR <- hL 
+        #huR <- -huL
+        #hvR <- -hvL
+
+        hR = hL
+        huR = -huL
+        hvR = -hvL
+
+        #return zeros(data_type, 3)
+    elseif (((hR + zb_R) < (zb_L + hmin)) && (hL <= hmin))    #right side WSE is below left side bed and left side is dry
+        if settings.bVerbose
+            print("Right side WSE is below left side bed and left side is dry")
+        end
+
+        #In this case, the interface is virtually a wall. We will treat it as a wall.
+        #hL <- hR 
+        #huL <- -huR
+        #hvL <- -hvR
+
+        hL = hR
+        huL = -huR
+        hvL = -hvR
+
+        #return zeros(data_type, 3)    
+    elseif hL <= hmin                        #left side is dry, but right side is wet and WSE on right side is above left side bed
         # Left side is dry
         if settings.bVerbose
             print("Left side is dry")
@@ -29,7 +60,7 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR:
         hv_flux = (hvR * (huR / hR)) * nx + (hvR * (hvR / hR) + 0.5 * g * smooth_pow(hR, 2)) * ny
 
         return [h_flux, hu_flux, hv_flux]
-    elseif hR < hmin
+    elseif hR <= hmin                        #right side is dry, but left side is wet and WSE on left side is above right side bed
         # Right side is dry
         if settings.bVerbose
             print("Right side is dry")
@@ -92,6 +123,7 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, hR:
     hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * smooth_pow(hR, 2)) * ny
 
     # Roe flux
+    #absA_dQ = absA_dQ .* zero(data_type)  #for debugging
     h_flux = (h_flux_L + h_flux_R - absA_dQ[1]) / 2.0   
     hu_flux = (hu_flux_L + hu_flux_R - absA_dQ[2]) / 2.0
     hv_flux = (hv_flux_L + hv_flux_R - absA_dQ[3]) / 2.0

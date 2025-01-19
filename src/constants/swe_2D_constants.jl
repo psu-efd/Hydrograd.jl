@@ -2,6 +2,8 @@
 #Problem constants and solution fields for 2D SWE with finite volume method
 
 struct swe_2D_consts
+    unit_system::String   #The choice of unit system, e.g., SI, EN
+    k_n::Float64   #unit conversion factor for Manning's equation
     g::Float64   #gravity constant 
     t::Float64   #current time 
     dt_min::Float64  #minimum time step size 

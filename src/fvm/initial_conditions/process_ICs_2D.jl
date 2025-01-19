@@ -2,7 +2,9 @@
 # This file should be problem specific because each problem should have different ICs. 
 
 # setup initial condition: wse, h, q_x, q_y
-function setup_initial_condition!(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, wse::AbstractVector{T}, zb_cell::AbstractVector{T}, h::AbstractVector{T}, q_x::AbstractVector{T}, q_y::AbstractVector{T},swe_2D_constants::swe_2D_consts, case_path::String, bPlot::Bool=false) where T <: Real
+function setup_initial_condition!(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, wse::AbstractVector{T}, 
+    zb_cell::AbstractVector{T}, h::AbstractVector{T}, q_x::AbstractVector{T}, q_y::AbstractVector{T},swe_2D_constants::swe_2D_consts, 
+    case_path::String, bPlot::Bool=false) where T <: Real
 
     initial_condition_options = nothing
     initial_condition_constant_values = nothing
@@ -28,19 +30,24 @@ function setup_initial_condition!(settings::ControlSettings, my_mesh_2D::mesh_2D
         error("Invalid bPerform_Forward_Simulation, bPerform_Inversion, bPerform_Sensitivity_Analysis, or bPerform_UDE. No initial condition is to be setup.")
     end
 
-    if settings.bVerbose
+    #if settings.bVerbose
         println("setup_initial_condition!")
         println("initial_condition_options = ", initial_condition_options)
         println("initial_condition_constant_values = ", initial_condition_constant_values)
-        println("initial_condition_values_from_file = ", initial_condition_values_from_file)
-    end
+        #println("initial_condition_values_from_file = ", initial_condition_values_from_file)
+        if initial_condition_options == "from_file"
+            println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["h"]))
+            println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_x"]))
+            println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_y"]))
+        end 
+    #end
 
     if initial_condition_options == "constant"
         #loop over cells
         for i in 1:my_mesh_2D.numOfCells
-            h[i] = initial_condition_constant_values[1]
-            q_x[i] = initial_condition_constant_values[2]
-            q_y[i] = initial_condition_constant_values[3]
+            h[i] = initial_condition_constant_values[1] - zb_cell[i]
+            #q_x[i] = initial_condition_constant_values[2]
+            #q_y[i] = initial_condition_constant_values[3]
         end
     elseif initial_condition_options == "from_file"
         #make sure the length of the initial condition values is the same as the number of cells
@@ -53,6 +60,9 @@ function setup_initial_condition!(settings::ControlSettings, my_mesh_2D::mesh_2D
         if length(initial_condition_values_from_file["q_y"]) != my_mesh_2D.numOfCells
             error("The length of the initial condition values of q_y (", length(initial_condition_values_from_file["q_y"]), ") is not the same as the number of cells (", my_mesh_2D.numOfCells, ").")
         end
+
+        #make sure h is larger than h_small
+        h[h.<swe_2D_constants.h_small] .= swe_2D_constants.h_small
 
         #copy the initial condition values
         copyto!(h, Float64.(initial_condition_values_from_file["h"]))

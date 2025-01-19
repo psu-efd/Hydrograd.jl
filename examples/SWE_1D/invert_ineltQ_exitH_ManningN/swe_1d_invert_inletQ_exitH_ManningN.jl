@@ -67,7 +67,7 @@ swe_1d_constants = swe_1D_const(
     dt=0.005,          #time step size
     CFL=0.4,           #CFL number 
     tEnd=30.0,          #end of simulation time 
-    h_small=1.0e-3,      #a small water depth for dry/wet treatment
+    h_small=1.0e-2,      #a small water depth for dry/wet treatment
     RiemannSolver="HLL"  #choice of Riemann problem solver 
 )
 

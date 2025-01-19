@@ -24,6 +24,17 @@ zb_ghostCells = nothing
 zb_faces = nothing
 S0 = nothing
 
+#cell wet/dry flag (0: dry, 1: wet)
+b_dry_wet = nothing
+
+#flag for whether a cell is adjacent to dry land (a dry cell or wall boundary)
+b_Adjacent_to_dry_land = nothing
+
+#flag for whether a cell is adjacent to high dry land. Two scenarios:
+# 1. adjacent to wall boundary (wall boundary has infinite height)
+# 2. adjacent to dry cell (WSE of current cell is lower than the zb of the adjacent dry cell)
+b_Adjacent_to_high_dry_land = nothing
+
 #define the true bed elevation at cells
 zb_cells_truth = nothing
 

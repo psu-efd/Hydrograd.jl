@@ -48,6 +48,11 @@ function solve_swe_2D(control_file::String)
     #read data from SRH-2D hydro, geom, and material files; it aslo create the 2D mesh.
     srh_all_Dict = Hydrograd.process_SRH_2D_input(settings, case_path)
 
+    #default unit system is SI
+    unit_system = "SI"
+    k_n = 1.0
+    g = 9.81
+
     #define a swe_2D_constants object with some values from the control file
     swe_2D_constants = nothing
     if settings.time_settings.bUse_srhhydro_time_settings
@@ -56,7 +61,25 @@ function solve_swe_2D(control_file::String)
         tEnd = srhhydro_SimTime[2] * 3600 #convert hours to seconds
         dt = srhhydro_SimTime[3]
 
-        swe_2D_constants = Hydrograd.swe_2D_consts(9.81,               #gravity constant 
+        grid_unit = srh_all_Dict["srhgeom_obj"].GridUnit        
+
+        if grid_unit == "Meters"
+            unit_system = "SI"
+            k_n = 1.0
+            g = 9.81
+        elseif grid_unit == "Feet"
+            unit_system = "EN"
+            k_n = 1.486
+            g = 32.2
+        else
+            error("Invalid grid unit: $grid_unit. Supported options: meter, ft.")
+        end
+
+
+        swe_2D_constants = Hydrograd.swe_2D_consts(
+            unit_system,               #The choice of unit system, e.g., SI, EN
+            k_n,               #unit conversion factor for Manning's equation
+            g,               #gravity constant 
             tStart,              #current time 
             0.001,                #minimum time step size 
             dt,                   #time step size 
@@ -68,7 +91,10 @@ function solve_swe_2D(control_file::String)
             "Roe")                #The choice of Riemann solver, e.g., Roe, HLL, and HLLC                          
 
     else
-        swe_2D_constants = Hydrograd.swe_2D_consts(9.81,               #gravity constant 
+        swe_2D_constants = Hydrograd.swe_2D_consts(
+            unit_system,               #The choice of unit system, e.g., SI, EN
+            k_n,               #unit conversion factor for Manning's equation
+            g,               #gravity constant 
             settings.time_settings.tspan[1],              #current time 
             0.001,                #minimum time step size 
             settings.time_settings.dt,                   #time step size 
@@ -145,7 +171,8 @@ function solve_swe_2D(control_file::String)
     inlet_discharges_truth = nothing
 
     if length(srhhydro_inletQ_Dict) > 0
-        inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[i][1]) for i in 1:(length(srhhydro_inletQ_Dict))]
+        #@show srhhydro_inletQ_Dict
+        inlet_discharges_truth = [parse(Float64, srhhydro_inletQ_Dict[k][1]) for k in keys(srhhydro_inletQ_Dict)]
     end
 
     #print the true values. The true parameter values are computed regardless of whether performing forward simulation or inversion
@@ -172,6 +199,13 @@ function solve_swe_2D(control_file::String)
 
     #setup initial condition for wse, h, q_x, q_y at ghost cells
     Hydrograd.setup_ghost_cells_initial_condition!(settings, my_mesh_2D, wse, h, q_x, q_y, wse_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+
+    #update the dry/wet flag at cells and the flags for whether a cell is adjacent to dry land and high dry land
+    b_dry_wet, b_Adjacent_to_dry_land, b_Adjacent_to_high_dry_land = Hydrograd.process_dry_wet_flags(my_mesh_2D, h, zb_cells, swe_2D_constants) 
+
+    #@show typeof(b_dry_wet)
+    #@show typeof(b_Adjacent_to_dry_land)
+    #@show typeof(b_Adjacent_to_high_dry_land)
 
     #create and preprocess boundary conditions: boundary_conditions only contains the static information of the boundaries.
     boundary_conditions, inletQ_TotalQ, inletQ_H, inletQ_A, inletQ_Length, inletQ_TotalA, inletQ_DryWet,
@@ -214,6 +248,9 @@ function solve_swe_2D(control_file::String)
         zb_ghostCells,
         zb_faces,
         S0,
+        b_dry_wet,
+        b_Adjacent_to_dry_land,
+        b_Adjacent_to_high_dry_land,
         ude_model,
         ude_model_params,
         ude_model_state

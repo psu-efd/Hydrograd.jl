@@ -7,7 +7,7 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
 end
 
 #save results (sol is a solution from SciML ODE solver)
-function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, friction_y_truth)
+function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, friction_y_truth, S0)
     
     settings = swe2d_extra_params.settings
     my_mesh_2D = swe2d_extra_params.my_mesh_2D
@@ -36,20 +36,34 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
             ManningN_cells = update_ManningN_forward_simulation(h_array, settings)
         end
 
+        #computer wet/dry flags
+        b_dry_wet, b_Adjacent_to_dry_land, b_Adjacent_to_high_dry_land = process_dry_wet_flags(my_mesh_2D, h_array, zb_cells, swe2d_extra_params.swe_2D_constants)
+
+        #convert b_dry_wet, b_Adjacent_to_dry_land, b_Adjacent_to_high_dry_land to floats
+        b_dry_wet_float = Float64.(b_dry_wet)
+        b_Adjacent_to_dry_land_float = Float64.(b_Adjacent_to_dry_land)
+        b_Adjacent_to_high_dry_land_float = Float64.(b_Adjacent_to_high_dry_land)
+
         #calculate total volume of water
         push!(total_water_volume, swe_2D_calc_total_water_volume(h_array, my_mesh_2D))
 
-        u_temp = q_x_array ./ h_array
-        v_temp = q_y_array ./ h_array
+        u_temp = q_x_array ./ (h_array .+ swe2d_extra_params.swe_2D_constants.h_small)
+        v_temp = q_y_array ./ (h_array .+ swe2d_extra_params.swe_2D_constants.h_small)
         U_vector = hcat(u_temp, v_temp)
+
+        #add slope to the vector data
+        slope_x = S0[:,1]
+        slope_y = S0[:,2]
+        slope_vector = hcat(slope_x, slope_y)
+        
                         
-        vector_data = [U_vector] 
-        vector_names = ["U"]
+        vector_data = [U_vector, slope_vector] 
+        vector_names = ["U", "slope"]
 
         WSE = h_array + zb_cells
             
-        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE, friction_x_truth, friction_y_truth]
-        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE", "friction_x", "friction_y"]
+        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE, friction_x_truth, friction_y_truth, b_dry_wet_float, b_Adjacent_to_dry_land_float, b_Adjacent_to_high_dry_land_float]
+        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE", "friction_x", "friction_y", "b_dry_wet", "b_Adjacent_to_dry_land", "b_Adjacent_to_high_dry_land"]
 
         vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             

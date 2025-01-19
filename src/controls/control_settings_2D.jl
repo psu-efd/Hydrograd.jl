@@ -373,7 +373,9 @@ function parse_forward_settings(options::Dict, control_file_dir::String)
         file_path = joinpath(control_file_dir, options["forward_simulation_initial_condition_file_name"])
         println("Attempting to open file: ", file_path)
 
-        initial_condition_values = JSON3.read(open(file_path), Dict)
+        initial_condition_values_from_file = JSON3.read(open(file_path), Dict)
+
+        #println("initial_condition_values_from_file = ", initial_condition_values_from_file)
     end
 
     #sanity check on ManningN_option

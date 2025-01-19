@@ -22,6 +22,9 @@ struct SWE2D_Extra_Parameters{T<:Real}
     zb_ghostCells::Vector{T}
     zb_faces::Vector{T}
     S0::Matrix{T}
+    b_dry_wet::BitVector
+    b_Adjacent_to_dry_land::BitVector
+    b_Adjacent_to_high_dry_land::BitVector
     ude_model::Union{Nothing, Lux.Chain}
     ude_model_params::Union{Nothing, NamedTuple}
     ude_model_state::Union{Nothing, NamedTuple}

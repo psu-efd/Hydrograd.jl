@@ -4,7 +4,15 @@ function setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_
     #initialize the parameter arrays
     zb_cells_param = zeros(eltype(zb_cells_truth), length(zb_cells_truth))
     ManningN_list_param = zeros(eltype(ManningN_values_truth), length(ManningN_values_truth))
-    inlet_discharges_param = zeros(eltype(inlet_discharges_truth), length(inlet_discharges_truth))
+
+    #@show inlet_discharges_truth
+    #@show length(inlet_discharges_truth)
+
+    inlet_discharges_param = nothing 
+    
+    if !isnothing(inlet_discharges_truth)
+        inlet_discharges_param = zeros(eltype(inlet_discharges_truth), length(inlet_discharges_truth))
+    end
 
     active_param_name = "none"
 
