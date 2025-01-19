@@ -52,6 +52,7 @@ function setup_bed(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinat
 
 end
 
+#This function computes the bed slope S0 at cells from zb_cells
 function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
    
     #update the ghost cells for zb from zb_cells
@@ -71,21 +72,40 @@ function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D
 
 end
 
-#interpolate zb from nodes to face and compute the bed slope at cells
-# function interploate_zb_from_nodes_to_cells_ghostCells_faces_and_compute_S0(my_mesh_2D::mesh_2D, zb_nodes::AbstractVector{T}) where {T<:Real}
+#This function computes the bed slope S0 at faces
+function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
 
-#     #interpolate zb from nodes to cells
-#     zb_cells = nodes_to_cells_scalar(my_mesh_2D, zb_nodes)
-   
-#     #update the ghost cells for zb from zb_cells
-#     zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
+    #use the simple finite difference method to compute the bed slope at faces: at each face, the bed slope is 
+    #the difference of the bed elevation at the two cells sharing the face divided by the distance between the two cells
 
-#     #interpolate zb from nodes to faces
-#     #zb_faces = nodes_to_faces_scalar(my_mesh_2D, zb_nodes)
+    #initialize the bed slope at each cell's faces
+    S0_faces = Vector{Vector{Vector{T}}}(undef, my_mesh_2D.numOfCells)
 
-#     #compute the bed slope at cells from zb_faces
-#     S0 = -1.0 * compute_scalar_gradients_from_faces(my_mesh_2D, zb_faces)
-    
-#     return zb_cells, zb_ghostCells, zb_faces, S0
+    #loop over all cells    
+    for iCell in 1:my_mesh_2D.numOfCells
+        cell_faces = my_mesh_2D.cellFacesList[iCell,:]
+        nNodes = my_mesh_2D.cellNodesCount[iCell]
 
-# end
+        S0_faces[iCell] = Vector{Vector{T}}(undef, nNodes)
+
+        for iFace in 1:nNodes
+           
+            faceID = cell_faces[iFace]
+            neighbor_cellID = my_mesh_2D.cellNeighbors_Dict[iCell][iFace]
+
+            #get the bed elevation at the neighbor cell
+            if my_mesh_2D.bFace_is_boundary[faceID]  # If it is a boundary face
+                zb_n = zb_cells[iCell]  # Assume zero gradient at boundary
+            else
+                zb_n = zb_cells[neighbor_cellID]
+            end
+
+            #compute the bed slope at the face
+            S0_faces[iCell][iFace] = -(zb_n - zb_cells[iCell]) / my_mesh_2D.cell_distances_to_neighbors[iCell][iFace] .* my_mesh_2D.cell_normals[iCell][iFace]
+        end
+        
+    end
+
+    return S0_faces
+end
+

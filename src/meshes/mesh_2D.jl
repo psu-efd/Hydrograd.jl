@@ -64,6 +64,7 @@ Base.@kwdef struct mesh_2D
     cell_areas::Vector{Float64} = zeros(Float64, 0)  #cell areas
     cell_centroids::Array{Float64, 2} = zeros(Float64, 0, 0)  #cell centroids
     cell_normals::Vector{Vector{Vector{Float64}}} = Vector{Vector{Vector{Float64}}}()  #cell normals
+    cell_distances_to_neighbors::Vector{Vector{Float64}} = Vector{Vector{Float64}}()  #distance from the cell to its neighbors (used for computing gradient on faces)
     face_normals::Vector{Vector{Float64}} = Vector{Vector{Float64}}()  #face normals
     face_lengths::Vector{Float64} = zeros(Float64, 0)  #face lengths
     
@@ -261,7 +262,8 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     check_cell_nodes_counter_clockwise_srhgeom(numOfCells, cellNodesList, nodeCoordinates, cellNodesCount)
     
     #compute mesh properties
-    cell_areas, cell_centroids, cell_normals, face_normals, face_lengths = compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
+    cell_areas, cell_centroids, cell_normals, cell_distances_to_neighbors, face_normals, face_lengths = 
+                     compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
     
     #let counter_temp = 0
     #    println("cell_areas: ")
@@ -425,6 +427,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         cell_areas = cell_areas,
         cell_centroids = cell_centroids,
         cell_normals = cell_normals,
+        cell_distances_to_neighbors = cell_distances_to_neighbors,
         face_normals = face_normals,
         face_lengths = face_lengths
     )
@@ -439,6 +442,8 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
     cell_areas = zeros(Float64, numOfCells)
     cell_centroids = zeros(Float64, numOfCells, 2)
     cell_normals = Vector{Vector{Vector{Float64}}}(undef, numOfCells)
+    cell_distances_to_neighbors = Vector{Vector{Float64}}(undef, numOfCells)  #distance from the cell to its neighbors (used for computing gradient on faces)
+
     face_normals = Vector{Vector{Float64}}(undef, numOfFaces)
     face_lengths = Vector{Float64}(undef, numOfFaces)   #lenght of the face (edge)
 
@@ -467,6 +472,21 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
         cell_normals[cellID] = normals
     end
 
+    #compute the distance from the cell to its neighbors
+    for cellID in eachindex(cellNodesCount)
+
+        #number of nodes (neighbors) for the current cell
+        nNodes = cellNodesCount[cellID]
+
+        distances = Vector{Float64}(undef, nNodes)
+
+        #loop over all neighbors
+        for iNeighbor in 1:nNodes
+            distances[iNeighbor] = norm(cell_centroids[cellID,:] - cell_centroids[cellNeighbors_Dict[cellID][iNeighbor],:])
+        end
+        cell_distances_to_neighbors[cellID] = distances
+    end
+
     #loop over all faces to compute face normals
     for faceID in 1:numOfFaces
         # Get the node IDs for the current face
@@ -481,7 +501,7 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
         face_lengths[faceID] = face_length
     end
 
-    return cell_areas, cell_centroids, cell_normals, face_normals, face_lengths
+    return cell_areas, cell_centroids, cell_normals, cell_distances_to_neighbors, face_normals, face_lengths
 end
 
 # compute the cell normals
