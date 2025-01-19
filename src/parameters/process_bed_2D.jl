@@ -53,7 +53,7 @@ function setup_bed(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinat
 end
 
 #This function computes the bed slope S0 at cells from zb_cells
-function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
+function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_cells(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
    
     #update the ghost cells for zb from zb_cells
     zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
@@ -72,6 +72,26 @@ function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D
 
 end
 
+#This function computes the bed slope S0 at faces from zb_cells
+function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
+   
+    #update the ghost cells for zb from zb_cells
+    zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
+
+    #interpolate zb from cells to faces
+    zb_faces = cells_to_faces_scalar(my_mesh_2D, zb_cells)
+
+    #compute the bed slope at faces
+    S0_faces = compute_bed_slope_at_faces(my_mesh_2D, zb_cells)
+
+    #@show typeof(S0)
+    #@show size(S0)
+    #@show S0[1]
+    
+    return zb_ghostCells, zb_faces, S0_faces
+
+end
+
 #This function computes the bed slope S0 at faces
 function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
 
@@ -84,9 +104,7 @@ function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVecto
     #loop over all cells    
     for iCell in 1:my_mesh_2D.numOfCells
         cell_faces = my_mesh_2D.cellFacesList[iCell,:]
-        nNodes = my_mesh_2D.cellNodesCount[iCell]
-
-        S0_faces[iCell] = Vector{Vector{T}}(undef, nNodes)
+        nNodes = my_mesh_2D.cellNodesCount[iCell]        
 
         for iFace in 1:nNodes
            
@@ -100,7 +118,7 @@ function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVecto
                 zb_n = zb_cells[neighbor_cellID]
             end
 
-            #compute the bed slope at the face
+            #compute the bed slope at the face (alway neighbor cell - current cell)
             S0_faces[iCell][iFace] = -(zb_n - zb_cells[iCell]) / my_mesh_2D.cell_distances_to_neighbors[iCell][iFace] .* my_mesh_2D.cell_normals[iCell][iFace]
         end
         

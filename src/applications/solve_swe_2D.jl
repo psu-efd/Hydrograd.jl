@@ -139,7 +139,7 @@ function solve_swe_2D(control_file::String)
     #and compute the bed slope at cells (S0). 
     #Note: If performing inversion on zb_cells, these values are not used in the inversion process. 
     #      Instead, they are updated in the inversion process.
-    zb_cells, zb_ghostCells, zb_faces, S0 = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
+    zb_cells, zb_ghostCells, zb_faces, S0, S0_faces = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
 
     #define the true bed elevation at cells and nodes
     zb_cells_truth = zeros(size(zb_cells))
@@ -248,6 +248,7 @@ function solve_swe_2D(control_file::String)
         zb_ghostCells,
         zb_faces,
         S0,
+        S0_faces,
         b_dry_wet,
         b_Adjacent_to_dry_land,
         b_Adjacent_to_high_dry_land,

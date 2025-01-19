@@ -45,6 +45,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     zb_ghostCells_local = p_extra.zb_ghostCells
     zb_faces_local = p_extra.zb_faces
     S0_local = p_extra.S0
+    S0_faces_local = p_extra.S0_faces
 
     #other variables from swe_2D_constants
     g = swe_2D_constants.g
@@ -102,7 +103,8 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         #zb_cells_local points to params_vector, which is the zb parameter vector to be inverted
         zb_cells_local = params_vector
 
-        zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
+        zb_ghostCells_local, zb_faces_local, S0_faces_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_faces(my_mesh_2D, params_vector)
+        #zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
         #zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_nodes_to_cells_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
     end
 
@@ -285,8 +287,12 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                     end
                 end
 
+                S0_on_face = S0_faces[iCell][iFace]
+
+                #Compute the inviscid fluxes using the Riemann solver. In fact, 
+                #the return flux also contains the bed slope term contribution
                 if RiemannSolver == "Roe"
-                    flux = Riemann_2D_Roe(settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, g, face_normal, hmin=h_small)
+                    flux = Riemann_2D_Roe(settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, S0_on_face, g, face_normal, hmin=h_small)
                 elseif RiemannSolver == "HLL"
                     error("HLL solver not implemented yet")
                 elseif RiemannSolver == "HLLC"
@@ -404,8 +410,13 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
     #source_x = above_small_h .* (g .* h .* S0[:, 1] .* .~b_Adjacent_to_high_dry_land .- friction_x)
     #source_y = above_small_h .* (g .* h .* S0[:, 2] .* .~b_Adjacent_to_high_dry_land .- friction_y)
 
-    source_x = above_small_h .* (g .* h .* S0[:, 1] .- friction_x)
-    source_y = above_small_h .* (g .* h .* S0[:, 2] .- friction_y)
+    #source terms considering the bed slope term contribution
+    #source_x = above_small_h .* (g .* h .* S0[:, 1] .- friction_x)
+    #source_y = above_small_h .* (g .* h .* S0[:, 2] .- friction_y)
+
+    #source terms without the bed slope term contribution
+    source_x = -friction_x .* above_small_h
+    source_y = -friction_y .* above_small_h
     
     # combine them into a single 1D array
     updates_source = vcat(zeros(data_type, length(h)), source_x, source_y)

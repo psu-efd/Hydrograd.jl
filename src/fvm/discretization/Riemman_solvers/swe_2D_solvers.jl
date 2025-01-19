@@ -1,11 +1,13 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, hR::T5, huR::T6, hvR::T7, zb_R::T8, 
-    g::Float64, normal::Vector{T9}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9}
+function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, 
+    hR::T5, huR::T6, hvR::T7, zb_R::T8, 
+    S0_on_face::Vector{T9},
+    g::Float64, normal::Vector{T10}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
     
     #Data type 
-    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7, T8, T9)
+    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)
 
     # Extract unit normal components
     nx, ny = normal
@@ -127,6 +129,11 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_
     h_flux = (h_flux_L + h_flux_R - absA_dQ[1]) / 2.0   
     hu_flux = (hu_flux_L + hu_flux_R - absA_dQ[2]) / 2.0
     hv_flux = (hv_flux_L + hv_flux_R - absA_dQ[3]) / 2.0
+
+    #add the bed slope term contribution to the momentum fluxes    
+    slope_term = S0_on_face .* g .* hRoe 
+    hu_flux += slope_term[1]
+    hv_flux += slope_term[2]
 
     return [h_flux, hu_flux, hv_flux]
 

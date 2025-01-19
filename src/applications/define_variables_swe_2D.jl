@@ -23,6 +23,7 @@ zb_cells =nothing
 zb_ghostCells = nothing 
 zb_faces = nothing
 S0 = nothing
+S0_faces = nothing
 
 #cell wet/dry flag (0: dry, 1: wet)
 b_dry_wet = nothing
