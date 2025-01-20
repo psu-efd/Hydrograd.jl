@@ -11,7 +11,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (optionally overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 100.0],
+        "tspan": [0.0, 10.0],
         "dt": 0.01,
         "dt_save": 0.1,
         "nSave": 1
@@ -34,7 +34,8 @@
         "forward_simulation_nSave": 100,
         "forward_simulation_initial_condition_options": "from_file",
         "forward_simulation_initial_condition_file_name": "forward_simulation_initial_condition.json",
-        "forward_simulation_initial_condition_constant_values": [1.0, 0.0, 0.0],
+        "comment_forward_simulation_initial_condition_constant_values": "wse, wstill, q_x, q_y",
+        "forward_simulation_initial_condition_constant_values": [0.33, 0.5, 0.0, 0.0],
         "forward_simulation_save_file_name": "forward_simulation_solution.jld2",
         "forward_simulation_save_solution_truth_file_name": "forward_simulation_solution_truth.json"
     }        

@@ -1,20 +1,16 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(iCell::Int, settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, 
-    hR::T5, huR::T6, hvR::T7, zb_R::T8, zb_face::T9, 
-    S0_on_face::Vector{T10},
-    g::Float64, normal::Vector{T10}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
+function Riemann_2D_Roe(iCell::Int, settings::ControlSettings, xiL::T1, hstillL::T2, hL::T3, huL::T4, hvL::T5, zb_L::T6, 
+    xiR::T7, hstillR::T8, hR::T9, huR::T10, hvR::T11, zb_R::T12, zb_face::T13, 
+    S0_on_face::Vector{T14},
+    g::Float64, normal::Vector{T15}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15}
     
     #Data type 
-    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)
+    data_type = promote_type(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15)
 
     # Extract unit normal components
     nx, ny = normal
-
-    # Free surface elevation
-    xi_L = zb_L + hL
-    xi_R = zb_R + hR
 
     # Handle dry bed conditions (need to be smoothed; see notes)
     if (hL <= hmin && hR <= hmin)  #both sides are dry
@@ -116,23 +112,23 @@ function Riemann_2D_Roe(iCell::Int, settings::ControlSettings, hL::T1, huL::T2, 
                          data_type(0.0) smooth_abs(unRoe-cRoe) data_type(0.0); 
                          data_type(0.0) data_type(0.0) smooth_abs(unRoe+cRoe)]
 
-    dQ = @SVector [hR - hL, huR - huL, hvR - hvL]
+    dQ = @SVector [xiR - xiL, huR - huL, hvR - hvL]
 
     #parenthesis to enforce only matrix-vector multiplication, not matrix-matrix multiplication, for better performance
     absA_dQ = R_mat * (absLamda * (L_mat * dQ))
 
     # Compute fluxes
-    h_flux_L = huL * nx + hvL * ny
-    hu_flux_L = (huL * uL + 0.5 * g * smooth_pow(hL, 2)) * nx + huL * vL * ny
-    hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * smooth_pow(hL, 2)) * ny
+    xi_flux_L = huL * nx + hvL * ny
+    hu_flux_L = (huL * uL + 0.5 * g * (smooth_pow(xiL, 2) + 2.0*xiL*hstillL)) * nx + huL * vL * ny
+    hv_flux_L = (hvL * uL) * nx + (hvL * vL + 0.5 * g * (smooth_pow(xiL, 2) + 2.0*xiL*hstillL)) * ny
 
-    h_flux_R = huR * nx + hvR * ny
-    hu_flux_R = (huR * uR + 0.5 * g * smooth_pow(hR, 2)) * nx + huR * vR * ny
-    hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * smooth_pow(hR, 2)) * ny
+    xi_flux_R = huR * nx + hvR * ny
+    hu_flux_R = (huR * uR + 0.5 * g * (smooth_pow(xiR, 2) + 2.0*xiR*hstillR)) * nx + huR * vR * ny
+    hv_flux_R = (hvR * uR) * nx + (hvR * vR + 0.5 * g * (smooth_pow(xiR, 2) + 2.0*xiR*hstillR)) * ny
 
     # Roe flux
     #absA_dQ = absA_dQ .* zero(data_type)  #for debugging
-    h_flux = (h_flux_L + h_flux_R - absA_dQ[1]) / 2.0   
+    xi_flux = (xi_flux_L + xi_flux_R - absA_dQ[1]) / 2.0   
     hu_flux = (hu_flux_L + hu_flux_R - absA_dQ[2]) / 2.0
     hv_flux = (hv_flux_L + hv_flux_R - absA_dQ[3]) / 2.0
 
@@ -140,29 +136,29 @@ function Riemann_2D_Roe(iCell::Int, settings::ControlSettings, hL::T1, huL::T2, 
         if iCell == -8  
             @show iCell
             println("before bed slope term:")
-            @show h_flux_L, hu_flux_L, hv_flux_L
-            @show h_flux_R, hu_flux_R, hv_flux_R
+            @show xi_flux_L, hu_flux_L, hv_flux_L
+            @show xi_flux_R, hu_flux_R, hv_flux_R
             @show absA_dQ
-            @show h_flux, hu_flux, hv_flux
+            @show xi_flux, hu_flux, hv_flux
             @show zb_L, zb_R
         end
     end
 
 
     #add the bed slope term contribution to the momentum fluxes    
-    slope_term = g * hRoe * (zb_L - zb_face)
-    hu_flux -= slope_term * nx
-    hv_flux -= slope_term * ny
+    #slope_term = g * hRoe * (zb_L - zb_face)
+    #hu_flux -= slope_term * nx
+    #hv_flux -= slope_term * ny
 
     Zygote.ignore() do
         if iCell == -8  
             println("after bed slope term:")
             @show S0_on_face, hRoe
             @show slope_term
-            @show h_flux, hu_flux, hv_flux
+            @show xi_flux, hu_flux, hv_flux
         end
     end
 
-    return [h_flux, hu_flux, hv_flux]
+    return [xi_flux, hu_flux, hv_flux]
 
 end

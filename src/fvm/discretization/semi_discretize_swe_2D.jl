@@ -1,8 +1,8 @@
 #semin-discretize the 2D SWE to convert it to an ODE system
 
 # Problem-specific function to calculate the RHS of ODE: 
-# dQdt (= dhdt dq_xdt dq_ydt)
-# Q = [h, q_x, q_y] is the solution vector. q_x = h*u_x, q_y = h*u_y
+# dQdt (= dxidt dq_xdt dq_ydt)
+# Q = [xi, q_x, q_y] is the solution vector. q_x = h*u_x, q_y = h*u_y
 
 # Notes on the arguments and params_vector:
 # For forward simulations: params_vector is not used at all. Model parameters (ManningN, zb, inletQ, etc.) are passed within extra parameters (p_extra).
@@ -47,6 +47,12 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     S0_cells_local = p_extra.S0_cells
     S0_faces_local = p_extra.S0_faces
 
+    hstill_local = p_extra.hstill
+    wstill_local = p_extra.wstill
+    
+    hstill_ghost_local = p_extra.hstill_ghostCells
+    wstill_ghost_local = p_extra.wstill_ghostCells
+
     #other variables from swe_2D_constants
     g = swe_2D_constants.g
     k_n = swe_2D_constants.k_n
@@ -77,9 +83,15 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         end
     end
 
-    h = @view Q[1:my_mesh_2D.numOfCells]  # water depth      #view of 2D array does not create a new array; only a reference
+    xi = @view Q[1:my_mesh_2D.numOfCells]  # water depth      #view of 2D array does not create a new array; only a reference
     q_x = @view Q[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]  # discharge in x
     q_y = @view Q[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]  # discharge in y
+
+    #@show xi 
+    #@show q_x
+    #@show q_y
+
+    h = xi .+ hstill_local
 
     #make sure h is larger than h_small
     h[h.<=h_small] .= h_small
@@ -183,6 +195,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
         ManningN_cells_local, zb_cells_local, zb_faces_local, swe_2D_constants,
         inletQ_Length_local, inletQ_TotalQ_local, exitH_WSE_local)
 
+    # Update ghost cells for xi
+    xi_ghost_local = h_ghost_local .- hstill_ghost_local
+
     Zygote.ignore() do
         if settings.bVerbose
             #@show typeof(h_ghost_local)
@@ -195,7 +210,9 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     end
 
     #compute the contribution of inviscid fluxes
-    updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, 
+    updates_inviscid = compute_inviscid_fluxes(settings, xi, hstill_local, h, q_x, q_y, xi_ghost_local, 
+                            hstill_ghost_local, h_ghost_local, q_x_ghost_local, q_y_ghost_local, 
+                            ManningN_cells_local, 
                             zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_faces_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #@show typeof(updates_inviscid)
@@ -207,7 +224,8 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #@show updates_inviscid
     
     #compute the contribution of source terms
-    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_cells_local, ManningN_cells_local, params_vector, p_extra, g, k_n, h_small)
+    updates_source = compute_source_terms(settings, my_mesh_2D, xi, h, q_x, q_y, S0_cells_local, ManningN_cells_local, 
+                              params_vector, p_extra, g, k_n, h_small)
 
     #combine inviscid and source terms
     if p_extra.bInPlaceODE    
@@ -239,7 +257,8 @@ end
 
 #function to compute the inviscid fluxes
 #serial version
-function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_faces_local, 
+function compute_inviscid_fluxes(settings, xi, hstill, h, q_x, q_y, xi_ghost, hstill_ghost, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, 
+    zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_faces_local, 
     my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #compute the inviscid fluxes for each cell (in the order of cells)
@@ -262,8 +281,8 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                     #hL, huL, hvL = h[left_cellID]+zb_cells_local[left_cellID]-zb_faces_local[faceID], q_x[left_cellID], q_y[left_cellID]
                     #hR, huR, hvR = h[right_cellID]+zb_cells_local[right_cellID]-zb_faces_local[faceID], q_x[right_cellID], q_y[right_cellID]
 
-                    hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-                    hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
+                    xiL, hstillL, hL, huL, hvL = xi[left_cellID], hstill[left_cellID], h[left_cellID], q_x[left_cellID], q_y[left_cellID]
+                    xiR, hstillR, hR, huR, hvR = xi[right_cellID], hstill[right_cellID], h[right_cellID], q_x[right_cellID], q_y[right_cellID]
 
                     zb_L = zb_cells_local[left_cellID]
                     zb_R = zb_cells_local[right_cellID]
@@ -271,11 +290,18 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                     #hL, huL, hvL = h[left_cellID]+zb_cells_local[left_cellID]-zb_faces_local[faceID], q_x[left_cellID], q_y[left_cellID]
                     #hR = h_ghost[right_cellID]+zb_ghostCells_local[right_cellID]-zb_faces_local[faceID]
 
-                    hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
-                    hR = h_ghost[right_cellID]
+                    xiL = xi[left_cellID]
+                    hstillL = hstill[left_cellID]
+                    hL = h[left_cellID]
+                    huL = q_x[left_cellID]
+                    hvL = q_y[left_cellID]
 
+                    xiR = xi_ghost[right_cellID]
+                    hstillR = hstill_ghost[right_cellID]
+                    hR = h_ghost[right_cellID]
                     huR = q_x_ghost[right_cellID]
                     hvR = q_y_ghost[right_cellID]
+
                     zb_L = zb_cells_local[left_cellID]
                     zb_R = zb_ghostCells_local[right_cellID]
                 end
@@ -303,7 +329,9 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 #Compute the inviscid fluxes using the Riemann solver. In fact, 
                 #the return flux also contains the bed slope term contribution
                 if RiemannSolver == "Roe"
-                    flux = Riemann_2D_Roe(iCell, settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, zb_face, S0_on_face, g, face_normal, hmin=h_small)
+                    flux = Riemann_2D_Roe(iCell, settings, xiL, hstillL, hL, huL, hvL, zb_L, 
+                                                           xiR, hstillR, hR, huR, hvR, zb_R, 
+                                   zb_face, S0_on_face, g, face_normal, hmin=h_small)
                 elseif RiemannSolver == "HLL"
                     error("HLL solver not implemented yet")
                 elseif RiemannSolver == "HLLC"
@@ -397,7 +425,7 @@ function rearrange_vector_of_vectors(data::Vector{Vector{T}}) where T
 end
 
 #function to compute the source terms
-function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1},
+function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, xi::AbstractVector{T1}, h::AbstractVector{T1}, q_x::AbstractVector{T1}, q_y::AbstractVector{T1},
     S0::Matrix{T2}, ManningN_cells::Vector{T3}, params_vector::AbstractVector{T4}, p_extra::SWE2D_Extra_Parameters{T5}, g::Float64, k_n::Float64, h_small::Float64) where {T1,T2,T3,T4,T5}
 
     data_type = promote_type(T1, T2, T3, T4, T5)
@@ -422,12 +450,8 @@ function compute_source_terms(settings::ControlSettings, my_mesh_2D::mesh_2D, h:
     #source_y = above_small_h .* (g .* h .* S0[:, 2] .* .~b_Adjacent_to_high_dry_land .- friction_y)
 
     #source terms considering the bed slope term contribution
-    #source_x = above_small_h .* (g .* h .* S0[:, 1] .- friction_x)
-    #source_y = above_small_h .* (g .* h .* S0[:, 2] .- friction_y)
-
-    #source terms without the bed slope term contribution
-    source_x = -friction_x .* above_small_h
-    source_y = -friction_y .* above_small_h
+    source_x = above_small_h .* (g .* xi .* S0[:, 1] .- friction_x)
+    source_y = above_small_h .* (g .* xi .* S0[:, 2] .- friction_y)
     
     # combine them into a single 1D array
     updates_source = vcat(zeros(data_type, length(h)), source_x, source_y)

@@ -111,12 +111,18 @@ function solve_swe_2D(control_file::String)
 
     # define solution variables at cells
     wse = zeros(my_mesh_2D.numOfCells)          #free surface elevation at cells 
+    wstill = zeros(my_mesh_2D.numOfCells)      #still water elevation at cells 
     h = zeros(my_mesh_2D.numOfCells)            #water depth at cells 
+    hstill = zeros(my_mesh_2D.numOfCells)      #still water depth at cells 
+    xi = zeros(my_mesh_2D.numOfCells)          #free surface elevation above still water elevation at cells 
     q_x = zeros(my_mesh_2D.numOfCells)          #q_x=hu at cells 
     q_y = zeros(my_mesh_2D.numOfCells)          #q_y=hv at cells 
 
     # define solution variables at ghost cells
     wse_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #free surface elevation at ghost cells 
+    wstill_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)      #still water elevation at ghost cells 
+    hstill_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)      #still water depth at ghost cells 
+    xi_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #free surface elevation above still water elevation at ghost cells 
     h_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)            #water depth at ghost cells 
     q_x_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_x=hu at ghost cells 
     q_y_ghostCells = zeros(my_mesh_2D.numOfAllBounaryFaces)          #q_y=hv at ghost cells 
@@ -166,7 +172,7 @@ function solve_swe_2D(control_file::String)
     srhhydro_inletQ_Dict = srh_all_Dict["srhhydro_IQParams"]
 
     #define the true inlet discharges
-    inlet_discharges_truth = nothing
+    inlet_discharges_truth = Vector{Float64}()
 
     if length(srhhydro_inletQ_Dict) > 0
         #@show srhhydro_inletQ_Dict
@@ -192,11 +198,13 @@ function solve_swe_2D(control_file::String)
     #If performing UDE and UDE_choice is ManningN_h, ManningN_cells will be updated later in the UDE process.
     ManningN_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
-    #setup initial condition for wse, h, q_x, q_y at cells
-    Hydrograd.setup_initial_condition!(settings, my_mesh_2D, nodeCoordinates, wse, zb_cells, h, q_x, q_y, swe_2D_constants, case_path, true)
+    #setup initial condition for wse, wstill, h, hstill, xi, q_x, q_y at cells
+    Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells,
+                                      swe_2D_constants, case_path, true)
 
     #setup initial condition for wse, h, q_x, q_y at ghost cells
-    Hydrograd.setup_ghost_cells_initial_condition!(settings, my_mesh_2D, wse, h, q_x, q_y, wse_ghostCells, h_ghostCells, q_x_ghostCells, q_y_ghostCells)
+    Hydrograd.setup_ghost_cells_initial_condition(settings, my_mesh_2D, wse, wstill, h, hstill, xi, q_x, q_y, 
+                                      wse_ghostCells, wstill_ghostCells, h_ghostCells, hstill_ghostCells, xi_ghostCells, q_x_ghostCells, q_y_ghostCells)
 
     #update the dry/wet flag at cells and the flags for whether a cell is adjacent to dry land and high dry land
     b_dry_wet, b_Adjacent_to_dry_land, b_Adjacent_to_high_dry_land = Hydrograd.process_dry_wet_flags(my_mesh_2D, h, zb_cells, swe_2D_constants) 
@@ -210,9 +218,11 @@ function solve_swe_2D(control_file::String)
     exitH_WSE, exitH_H, exitH_A, wall_H, wall_A, symm_H, symm_A = Hydrograd.initialize_boundary_conditions_2D(settings, srh_all_Dict, nodeCoordinates)
 
     #set up initial condition for for solution state variables for ODE solver
-    Q0 = vcat(h, q_x, q_y)   #Q0 is a 1D array
+    Q0 = vcat(xi, q_x, q_y)   #Q0 is a 1D array
 
-    Q_ghost = vcat(h_ghostCells, q_x_ghostCells, q_y_ghostCells)  #Q_ghost is a 1D array
+    @show xi 
+
+    Q_ghost = vcat(xi_ghostCells, q_x_ghostCells, q_y_ghostCells)  #Q_ghost is a 1D array
 
     # Define the UDE model (if not performing UDE, ude_model, ude_model_params, ude_model_state will not be used)
     ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(settings)
@@ -242,6 +252,14 @@ function solve_swe_2D(control_file::String)
         inletQ_Length,
         inletQ_TotalQ,
         exitH_WSE,
+        wse,
+        wstill,
+        h,
+        hstill,
+        wse_ghostCells,
+        wstill_ghostCells,
+        h_ghostCells,
+        hstill_ghostCells,
         zb_cells,
         zb_ghostCells,
         zb_faces,

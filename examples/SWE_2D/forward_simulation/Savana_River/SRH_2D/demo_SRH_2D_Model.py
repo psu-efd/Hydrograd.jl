@@ -3,6 +3,7 @@ Test the SRH_2D_Model class
 
 Run SRH-2D simulation with pyHMT2D
 """
+import numpy as np
 import json
 import pyHMT2D
 
@@ -65,9 +66,12 @@ def convert_SRH_2D_to_VTK():
     print(type(my_srh_2d_data.xmdfAllData_Cell))
     print(my_srh_2d_data.xmdfAllData_Cell.keys())
 
+    wse = my_srh_2d_data.xmdfAllData_Cell['Water_Elev_m']
     h = my_srh_2d_data.xmdfAllData_Cell['Water_Depth_m']
     u = my_srh_2d_data.xmdfAllData_Cell['Vel_X_m_p_s']
     v = my_srh_2d_data.xmdfAllData_Cell['Vel_Y_m_p_s']
+
+    wstill = np.ones(len(wse[-1,:])) * 27.0
 
     hu = h * u
     hv = h * v
@@ -75,12 +79,14 @@ def convert_SRH_2D_to_VTK():
     print(type(h))
     print(h.shape)
     print(h[-1,:].shape)
+    print(wstill.shape)
     #print(type(hu))
     #print(type(hv))
 
     # Organize arrays into a dictionary
     data = {
-        "h": h[-1,:].tolist(),
+        "wse": wse[-1,:].tolist(),
+        "wstill": wstill.tolist(),
         "q_x": hu[-1,:].tolist(),
         "q_y": hv[-1,:].tolist()
     }

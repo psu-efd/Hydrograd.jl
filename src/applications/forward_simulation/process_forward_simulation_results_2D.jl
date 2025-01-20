@@ -1,7 +1,8 @@
 #Functions to process the forward simulation results: 
 #The process_forward_simulation_results function is used to process the forward simulation results.
 
-function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_cell_truth, ManningN_zone_values_truth, inlet_discharges_truth)
+function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2D_Extra_Parameters, 
+     zb_cell_truth::Vector{T}, ManningN_zone_values_truth::Vector{T}, inlet_discharges_truth::Vector{T}) where {T<:Real}
 
     settings = swe2d_extra_params.settings
     my_mesh_2D = swe2d_extra_params.my_mesh_2D
@@ -11,12 +12,16 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
 
     ManningN_cells = swe2d_extra_params.ManningN_cells
 
+    wstill = swe2d_extra_params.wstill    
+    hstill = swe2d_extra_params.hstill
+
     forward_simulation_results_file_name = joinpath(case_path, settings.forward_settings.save_file_name)
     forward_simulation_results = load(forward_simulation_results_file_name)["sol_data"]["u"]  #get the solution data (state variable)
 
-    #save the simulation results (h, u, v) at the last time step to a json file (to be used as ground truth for inversion)
-    h_truth = vec(forward_simulation_results)[end][1:my_mesh_2D.numOfCells]
-    wse_truth = h_truth .+ zb_cell_truth
+    #save the simulation results (xi, u, v) at the last time step to a json file (to be used as ground truth for inversion)
+    xi_truth = vec(forward_simulation_results)[end][1:my_mesh_2D.numOfCells]
+    wse_truth = xi_truth .+ wstill
+    h_truth = xi_truth .+ hstill
     q_x_truth = vec(forward_simulation_results)[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
     q_y_truth = vec(forward_simulation_results)[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
     u_truth = q_x_truth ./ (h_truth .+ swe2d_extra_params.swe_2D_constants.h_small)
@@ -42,6 +47,9 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     #save the simulation results as truth to a json file
     open(joinpath(case_path, settings.forward_settings.save_solution_truth_file_name), "w") do io
         JSON3.pretty(io, Dict(
+            "xi_truth" => replace_nan(xi_truth),
+            "wstill_truth" => replace_nan(wstill),
+            "hstill_truth" => replace_nan(hstill),
             "wse_truth" => replace_nan(wse_truth),
             "h_truth" => replace_nan(h_truth),
             "u_truth" => replace_nan(u_truth),

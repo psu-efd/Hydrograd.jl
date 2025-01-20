@@ -68,12 +68,19 @@ param_ranges = nothing
 ManningN_cells = nothing
 
 # setup initial conditions 
-wse = nothing          #free surface elevation at cells 
-h = nothing            #water depth at cells 
+wse = nothing          #free surface elevation at cells: wse = zb + h
+wstill = nothing           #still water elevation at cells: wstill = zb + hstill
+hstill = nothing           #still water depth at cells: hstill = wse - zb
+xi = nothing           #free surface elevation above still water elevation at cells: xi = wse - wstill
+
+h = nothing            #water depth at cells: h = wse - zb
 q_x = nothing          #q_x=hu at cells 
 q_y = nothing          #q_y=hv at cells 
 
 wse_ghostCells = nothing          #free surface elevation at ghost cells 
+wstill_ghostCells = nothing           #still water elevation at ghost cells 
+hstill_ghostCells = nothing           #still water depth at ghost cells 
+xi_ghostCells = nothing           #free surface elevation above still water elevation at ghost cells 
 h_ghostCells = nothing            #water depth at ghost cells 
 q_x_ghostCells = nothing          #q_x=hu at ghost cells 
 q_y_ghostCells = nothing          #q_y=hv at ghost cells 

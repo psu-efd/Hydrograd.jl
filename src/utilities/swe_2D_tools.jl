@@ -17,6 +17,9 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
 
     ManningN_cells = swe2d_extra_params.ManningN_cells
 
+    wstill = swe2d_extra_params.wstill    
+    hstill = swe2d_extra_params.hstill
+
     total_water_volume = []
 
     #calculate total volume of water 
@@ -27,7 +30,8 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
         field_value = index
 
         # Extract solution components
-        h_array = state[1:my_mesh_2D.numOfCells]
+        xi_array = state[1:my_mesh_2D.numOfCells]
+        h_array = xi_array .+ hstill
         q_x_array = state[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
         q_y_array = state[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
 
@@ -62,8 +66,8 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
 
         WSE = h_array + zb_cells
             
-        scalar_data = [h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE, friction_x_truth, friction_y_truth, b_dry_wet_float, b_Adjacent_to_dry_land_float, b_Adjacent_to_high_dry_land_float]
-        scalar_names = ["h", "hu", "hv", "ManningN", "zb_cell", "WSE", "friction_x", "friction_y", "b_dry_wet", "b_Adjacent_to_dry_land", "b_Adjacent_to_high_dry_land"]
+        scalar_data = [xi_array, wstill, hstill, h_array, q_x_array, q_y_array, ManningN_cells, zb_cells, WSE, friction_x_truth, friction_y_truth, b_dry_wet_float, b_Adjacent_to_dry_land_float, b_Adjacent_to_high_dry_land_float]
+        scalar_names = ["xi", "wstill", "hstill", "h", "hu", "hv", "ManningN", "zb_cell", "WSE", "friction_x", "friction_y", "b_dry_wet", "b_Adjacent_to_dry_land", "b_Adjacent_to_high_dry_land"]
 
         vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", index)
             

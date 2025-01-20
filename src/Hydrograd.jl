@@ -179,8 +179,8 @@ export define_sparsity_swe_2D
 export compute_friction_terms
 
 #     discretization - initial conditions
-export setup_initial_condition!
-export setup_ghost_cells_initial_condition!
+export setup_initial_condition
+export setup_ghost_cells_initial_condition
 
 
 # ODE Solvers

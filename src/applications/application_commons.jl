@@ -18,6 +18,14 @@ struct SWE2D_Extra_Parameters{T<:Real}
     inletQ_Length::Vector{Vector{T}}
     inletQ_TotalQ::Vector{T}
     exitH_WSE::Vector{T}
+    wse::Vector{T}
+    wstill::Vector{T}
+    h::Vector{T}
+    hstill::Vector{T}
+    wse_ghostCells::Vector{T}
+    wstill_ghostCells::Vector{T}
+    h_ghostCells::Vector{T}
+    hstill_ghostCells::Vector{T}
     zb_cells::Vector{T}
     zb_ghostCells::Vector{T}
     zb_faces::Vector{T}
