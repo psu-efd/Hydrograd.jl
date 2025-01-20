@@ -7,7 +7,7 @@ function swe_2D_calc_total_water_volume(h, my_mesh_2D)
 end
 
 #save results (sol is a solution from SciML ODE solver)
-function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, friction_y_truth, S0)
+function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, friction_y_truth, S0_cells, S0_faces)
     
     settings = swe2d_extra_params.settings
     my_mesh_2D = swe2d_extra_params.my_mesh_2D
@@ -52,8 +52,8 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
         U_vector = hcat(u_temp, v_temp)
 
         #add slope to the vector data
-        slope_x = S0[:,1]
-        slope_y = S0[:,2]
+        slope_x = S0_cells[:,1]
+        slope_y = S0_cells[:,2]
         slope_vector = hcat(slope_x, slope_y)
         
                         

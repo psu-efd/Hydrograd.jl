@@ -11,7 +11,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (optionally overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 3000.0],
+        "tspan": [0.0, 100.0],
         "dt": 0.01,
         "dt_save": 0.1,
         "nSave": 1

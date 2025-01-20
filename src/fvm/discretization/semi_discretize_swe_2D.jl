@@ -44,7 +44,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     zb_cells_local = p_extra.zb_cells
     zb_ghostCells_local = p_extra.zb_ghostCells
     zb_faces_local = p_extra.zb_faces
-    S0_local = p_extra.S0
+    S0_cells_local = p_extra.S0_cells
     S0_faces_local = p_extra.S0_faces
 
     #other variables from swe_2D_constants
@@ -91,30 +91,28 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #@show q_y
 
     # For the case of inversion or sensitivity analysis, and if zb is the active parameter, 
-    # we need to interpolate zb from cell to face and compute bed slope at cells
+    # we need to update bed data from zb_cells
     if ((settings.bPerform_Inversion || settings.bPerform_Sensitivity_Analysis) && active_param_name == "zb")
 
         Zygote.ignore() do
             if settings.bVerbose
-                println("calling interploate_zb_from_cell_to_face_and_compute_S0")
+                println("calling update_bed_data")
             end
         end
 
         #zb_cells_local points to params_vector, which is the zb parameter vector to be inverted
         zb_cells_local = params_vector
 
-        zb_ghostCells_local, zb_faces_local, S0_faces_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_faces(my_mesh_2D, params_vector)
-        #zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
-        #zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_local = interploate_zb_from_nodes_to_cells_ghostCells_faces_and_compute_S0(my_mesh_2D, params_vector)
+        zb_ghostCells_local, zb_faces_local, S0_cells_local, S0_faces_local = update_bed_data(my_mesh_2D, params_vector)        
     end
 
     Zygote.ignore() do
         #if settings.bVerbose
             #@show typeof(zb_ghostCells_local)
             #@show typeof(zb_faces_local)
-            #@show typeof(S0_local)
-            #@show size(S0_local)
-            #@show S0_local[1]
+            #@show typeof(S0_cells_local)
+            #@show size(S0_cells_local)
+            #@show S0_cells_local[1]
         #end
     end
 
@@ -198,7 +196,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 
     #compute the contribution of inviscid fluxes
     updates_inviscid = compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost_local, q_x_ghost_local, q_y_ghost_local, ManningN_cells_local, 
-                            zb_cells_local, zb_ghostCells_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
+                            zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_faces_local, my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #@show typeof(updates_inviscid)
     #@show size(updates_inviscid)
@@ -209,7 +207,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #@show updates_inviscid
     
     #compute the contribution of source terms
-    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_local, ManningN_cells_local, params_vector, p_extra, g, k_n, h_small)
+    updates_source = compute_source_terms(settings, my_mesh_2D, h, q_x, q_y, S0_cells_local, ManningN_cells_local, params_vector, p_extra, g, k_n, h_small)
 
     #combine inviscid and source terms
     if p_extra.bInPlaceODE    
@@ -241,7 +239,7 @@ end
 
 #function to compute the inviscid fluxes
 #serial version
-function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, zb_cells_local, zb_ghostCells_local, 
+function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_ghost, ManningN_cells, zb_cells_local, zb_ghostCells_local, zb_faces_local, S0_faces_local, 
     my_mesh_2D, g, RiemannSolver, h_small, data_type)
 
     #compute the inviscid fluxes for each cell (in the order of cells)
@@ -261,38 +259,51 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 face_normal = my_mesh_2D.cell_normals[iCell][iFace]
 
                 if !my_mesh_2D.bFace_is_boundary[faceID]  # internal face
+                    #hL, huL, hvL = h[left_cellID]+zb_cells_local[left_cellID]-zb_faces_local[faceID], q_x[left_cellID], q_y[left_cellID]
+                    #hR, huR, hvR = h[right_cellID]+zb_cells_local[right_cellID]-zb_faces_local[faceID], q_x[right_cellID], q_y[right_cellID]
+
                     hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
                     hR, huR, hvR = h[right_cellID], q_x[right_cellID], q_y[right_cellID]
+
                     zb_L = zb_cells_local[left_cellID]
                     zb_R = zb_cells_local[right_cellID]
                 else  # boundary face
+                    #hL, huL, hvL = h[left_cellID]+zb_cells_local[left_cellID]-zb_faces_local[faceID], q_x[left_cellID], q_y[left_cellID]
+                    #hR = h_ghost[right_cellID]+zb_ghostCells_local[right_cellID]-zb_faces_local[faceID]
+
                     hL, huL, hvL = h[left_cellID], q_x[left_cellID], q_y[left_cellID]
                     hR = h_ghost[right_cellID]
+
                     huR = q_x_ghost[right_cellID]
                     hvR = q_y_ghost[right_cellID]
                     zb_L = zb_cells_local[left_cellID]
                     zb_R = zb_ghostCells_local[right_cellID]
                 end
 
+                #get face bed elevation
+                zb_face = zb_faces_local[faceID]
+
                 Zygote.ignore() do
-                    if iCell == -7  # Print for first cell only
+                    if iCell == -8  
                         println("Before Riemann solver:")
-                        @show iCell, iFace, left_cellID, right_cellID
+                        @show iCell, iFace, left_cellID, right_cellID, my_mesh_2D.bFace_is_boundary[faceID]
                         #@show typeof(hL), typeof(huL), typeof(hvL)
                         @show hL, huL, hvL
                         #@show typeof(hR), typeof(huR), typeof(hvR)
                         @show hR, huR, hvR
                         #@show typeof(face_normal)
                         @show face_normal
+                        
                     end
                 end
 
-                S0_on_face = S0_faces[iCell][iFace]
+                #left cell is the current cell
+                S0_on_face = S0_faces_local[left_cellID][iFace]
 
                 #Compute the inviscid fluxes using the Riemann solver. In fact, 
                 #the return flux also contains the bed slope term contribution
                 if RiemannSolver == "Roe"
-                    flux = Riemann_2D_Roe(settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, S0_on_face, g, face_normal, hmin=h_small)
+                    flux = Riemann_2D_Roe(iCell, settings, hL, huL, hvL, zb_L, hR, huR, hvR, zb_R, zb_face, S0_on_face, g, face_normal, hmin=h_small)
                 elseif RiemannSolver == "HLL"
                     error("HLL solver not implemented yet")
                 elseif RiemannSolver == "HLLC"
@@ -302,7 +313,7 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
                 end
 
                 Zygote.ignore() do
-                    if iCell == -7  # Print for first cell only
+                    if iCell == -8  
                         println("After Riemann solver:")
                         @show iCell, iFace, left_cellID, right_cellID
                         #@show typeof(flux)
@@ -341,7 +352,7 @@ function compute_inviscid_fluxes(settings, h, q_x, q_y, h_ghost, q_x_ghost, q_y_
 
             Zygote.ignore() do
                 #if settings.bVerbose
-                    if iCell == -7
+                    if iCell == -8
                         println("after accumulating flux_sum")
                         @show iCell
                         #@show typeof(flux_sum)

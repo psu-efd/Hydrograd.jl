@@ -21,7 +21,7 @@ struct SWE2D_Extra_Parameters{T<:Real}
     zb_cells::Vector{T}
     zb_ghostCells::Vector{T}
     zb_faces::Vector{T}
-    S0::Matrix{T}
+    S0_cells::Matrix{T}
     S0_faces::Vector{Vector{Vector{T}}}
     b_dry_wet::BitVector
     b_Adjacent_to_dry_land::BitVector

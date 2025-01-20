@@ -18,23 +18,13 @@ function setup_bed(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinat
     #interpolate zb from nodes to cells
     zb_cells = nodes_to_cells_scalar(my_mesh_2D, zb_nodes)
    
-    #update the ghost cells for zb from zb_cells
-    zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
-
-    #interpolate zb from nodes to faces
-    #zb_faces = nodes_to_faces_scalar(my_mesh_2D, zb_nodes)
-    #or interpolate zb from cells to faces
-    zb_faces = cells_to_faces_scalar(my_mesh_2D, zb_cells)
-
-    #compute the bed slope at cells from zb_faces
-    S0 = -1.0 * compute_scalar_gradients_from_faces(my_mesh_2D, zb_faces)
-
-    #@show typeof(S0)
+    #update bed data from zb_cells
+    zb_ghostCells, zb_faces, S0_cells, S0_faces = update_bed_data(my_mesh_2D, zb_cells)
 
     # optionally plot the bed for checking
     if bPlotBed
-        vector_data = [S0]
-        vector_names = ["S0"]
+        vector_data = [S0_cells]
+        vector_names = ["S0_cells"]
 
         scalar_data = [zb_cells]
         scalar_names = ["zb_cells"]
@@ -48,12 +38,12 @@ function setup_bed(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinat
         end
     end
 
-    return zb_cells, zb_ghostCells, zb_faces, S0
+    return zb_cells, zb_ghostCells, zb_faces, S0_cells, S0_faces
 
 end
 
-#This function computes the bed slope S0 at cells from zb_cells
-function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_cells(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
+#This function updates bed data from zb_cells: zb_ghostCells, zb_faces, S0_cells, S0_faces
+function update_bed_data(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
    
     #update the ghost cells for zb from zb_cells
     zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
@@ -62,33 +52,16 @@ function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_cells(my_m
     zb_faces = cells_to_faces_scalar(my_mesh_2D, zb_cells)
 
     #compute the bed slope at cells from zb_faces
-    S0 = -1.0 * compute_scalar_gradients_from_faces(my_mesh_2D, zb_faces)
+    S0_cells = -1.0 * compute_scalar_gradients_from_faces(my_mesh_2D, zb_faces)
 
-    #@show typeof(S0)
-    #@show size(S0)
-    #@show S0[1]
-    
-    return zb_ghostCells, zb_faces, S0
-
-end
-
-#This function computes the bed slope S0 at faces from zb_cells
-function interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVector{T}) where {T<:Real}
-   
-    #update the ghost cells for zb from zb_cells
-    zb_ghostCells = update_ghost_cells_scalar(my_mesh_2D, zb_cells)
-
-    #interpolate zb from cells to faces
-    zb_faces = cells_to_faces_scalar(my_mesh_2D, zb_cells)
-
-    #compute the bed slope at faces
+    #compute the bed slope at faces from zb_cells
     S0_faces = compute_bed_slope_at_faces(my_mesh_2D, zb_cells)
 
     #@show typeof(S0)
     #@show size(S0)
     #@show S0[1]
     
-    return zb_ghostCells, zb_faces, S0_faces
+    return zb_ghostCells, zb_faces, S0_cells, S0_faces
 
 end
 
@@ -105,8 +78,13 @@ function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVecto
     for iCell in 1:my_mesh_2D.numOfCells
         cell_faces = my_mesh_2D.cellFacesList[iCell,:]
         nNodes = my_mesh_2D.cellNodesCount[iCell]        
-
+        
+        # Initialize the vector for this cell's faces
+        S0_faces[iCell] = Vector{Vector{T}}(undef, nNodes)
+        
         for iFace in 1:nNodes
+            # Initialize the vector for this face's components
+            S0_faces[iCell][iFace] = zeros(T, 2)  # 2D vector for x,y components
            
             faceID = cell_faces[iFace]
             neighbor_cellID = my_mesh_2D.cellNeighbors_Dict[iCell][iFace]
@@ -121,8 +99,9 @@ function compute_bed_slope_at_faces(my_mesh_2D::mesh_2D, zb_cells::AbstractVecto
             #compute the bed slope at the face (alway neighbor cell - current cell)
             S0_faces[iCell][iFace] = -(zb_n - zb_cells[iCell]) / my_mesh_2D.cell_distances_to_neighbors[iCell][iFace] .* my_mesh_2D.cell_normals[iCell][iFace]
         end
-        
     end
+
+    #@show S0_faces
 
     return S0_faces
 end

@@ -83,12 +83,10 @@ export SRH_2D_Case
 include("controls/control_settings_2D.jl")
 
 #constants
-include("constants/swe_1D_constants.jl")
 include("constants/swe_2D_constants.jl")
 
 
 #meshes
-include("meshes/mesh_1D.jl")
 include("meshes/mesh_2D.jl")
 
 include("fvm/boundary_conditions/bc_2D.jl")
@@ -100,7 +98,6 @@ include("applications/application_commons.jl")
 include("fvm/discretization/semi_discretize_swe_2D.jl")
 include("fvm/discretization/sparsity_swe_2D.jl")
 include("fvm/discretization/fvm_schemes_2D.jl")
-include("fvm/discretization/Riemman_solvers/swe_1D_solvers.jl")
 include("fvm/discretization/Riemman_solvers/swe_2D_solvers.jl")
 include("fvm/initial_conditions/process_ICs_2D.jl")
 include("fvm/discretization/process_dry_wet.jl")
@@ -121,7 +118,6 @@ include("UDE/process_FlowResistance_UDE.jl")
 include("utilities/misc_tools.jl")
 include("utilities/process_SRH_2D_input.jl")
 include("utilities/smooth_functions.jl")
-include("utilities/swe_1D_tools.jl")
 include("utilities/swe_2D_tools.jl")
 include("utilities/debug_AD.jl")
 
@@ -142,7 +138,6 @@ export greet_your_package_name
 
 
 # Constants
-export swe_1D_consts
 export swe_2D_consts
 
 # Controls
@@ -155,9 +150,7 @@ export parse_control_file
 export BoundaryConditions2D
 
 # Meshes
-export mesh_1D
 export mesh_2D
-export initialize_mesh_1D
 export initialize_mesh_2D
 export check_cell_nodes_counter_clockwise_srhgeom
 export compute_mesh_properties_srhgeom
@@ -171,7 +164,6 @@ export initialize_boundary_conditions_2D
 export process_all_boundaries_2d
 
 #     discretization - Riemann solvers
-export Riemann_1D_hll!
 export Riemann_2D_Roe
 
 #     discretization - fvm schemes
@@ -191,7 +183,6 @@ export setup_initial_condition!
 export setup_ghost_cells_initial_condition!
 
 
-
 # ODE Solvers
 export custom_ODE_solve
 export custom_ODE_update_cells
@@ -205,6 +196,7 @@ export create_NN_model
 export save_NN_model
 export load_NN_model
 export update_FlowResistance_UDE
+
 # Utilities
 export update_1d_array
 export save_ode_solution

@@ -253,17 +253,34 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         end
     end
     
-    #println("cellNeighbors_Dict: ")
-    #for key in sort(collect(keys(cellNeighbors_Dict)))
-    #    println("Key: $key, Value: $(cellNeighbors_Dict[key])")
-    #end
+    println("cellNeighbors_Dict: ")
+    for key in sort(collect(keys(cellNeighbors_Dict)))
+        println("Key: $key, Value: $(cellNeighbors_Dict[key])")
+    end
     
     #check cell's nodes counter-clockwise
     check_cell_nodes_counter_clockwise_srhgeom(numOfCells, cellNodesList, nodeCoordinates, cellNodesCount)
+
+    #for all faces, check if the face is boundary
+    bFace_is_boundary = zeros(Bool, numOfFaces)
+
+    for iFace in keys(faceCells_Dict)
+        
+        faceCells = faceCells_Dict[iFace]
+        
+        if length(faceCells) == 2   #internal face
+            bFace_is_boundary[iFace] = false
+        else  #boundary face
+            bFace_is_boundary[iFace] = true
+        end
+    end
+
+    @show bFace_is_boundary
     
     #compute mesh properties
     cell_areas, cell_centroids, cell_normals, cell_distances_to_neighbors, face_normals, face_lengths = 
-                     compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, faceNodes_r_Dict)
+                     compute_mesh_properties_srhgeom(numOfCells, numOfFaces, numOfNodes, nodeCoordinates, cellNodesList, cellNodesCount, 
+                     faceNodes_r_Dict, cellNeighbors_Dict, cellFacesList, bFace_is_boundary)
     
     #let counter_temp = 0
     #    println("cell_areas: ")
@@ -329,14 +346,14 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
     faceRightCellID_Dict = Dict{Int, Int}()
     faceBoundaryID_Dict = Dict{Int, Int}()
 
-    bFace_is_boundary = zeros(Bool, numOfFaces)
+    #bFace_is_boundary = zeros(Bool, numOfFaces)
 
     for iFace in keys(faceCells_Dict)
         
         faceCells = faceCells_Dict[iFace]
         
         if length(faceCells) == 2   #internal face
-            bFace_is_boundary[iFace] = false
+            #bFace_is_boundary[iFace] = false
 
             #get the face normals
             face_normal = face_normals[iFace]
@@ -362,7 +379,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
             faceBoundaryID_Dict[iFace] = 0  #0 means internal face
 
         else  #boundary face
-            bFace_is_boundary[iFace] = true
+            #bFace_is_boundary[iFace] = true
 
             #get the ghost cell ID
             ghostCellID = boundaryFaceID_to_ghostCellID_Dict[iFace]
@@ -437,7 +454,8 @@ end
 
 # Function to compute geometric and topological properties
 function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Integer, numOfNodes::Integer, nodeCoordinates::Matrix{T}, 
-    cellNodesList::Matrix{Int}, cellNodesCount::Vector{Int}, faceNodes_r_Dict::Dict{Int, Tuple{Int64, Int64}}) where T <: Real
+    cellNodesList::Matrix{Int}, cellNodesCount::Vector{Int}, faceNodes_r_Dict::Dict{Int, Tuple{Int64, Int64}}, cellNeighbors_Dict::Dict{Int, Vector{Int}},
+    cellFacesList::Matrix{Int}, bFace_is_boundary::Vector{Bool}) where T <: Real
 
     cell_areas = zeros(Float64, numOfCells)
     cell_centroids = zeros(Float64, numOfCells, 2)
@@ -463,7 +481,7 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
         area = compute_polygon_area_srhgeom(vertices)
         cell_areas[cellID] = area
 
-        # Compute centroid
+        # Compute centroid (in 2D; does not have the z-coordinate)
         centroid = compute_polygon_centroid_srhgeom(vertices)
         cell_centroids[cellID,:] = centroid
 
@@ -474,6 +492,8 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
 
     #compute the distance from the cell to its neighbors
     for cellID in eachindex(cellNodesCount)
+        #get the faces of the current cell
+        cell_faces = cellFacesList[cellID,:]        
 
         #number of nodes (neighbors) for the current cell
         nNodes = cellNodesCount[cellID]
@@ -481,8 +501,30 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
         distances = Vector{Float64}(undef, nNodes)
 
         #loop over all neighbors
-        for iNeighbor in 1:nNodes
-            distances[iNeighbor] = norm(cell_centroids[cellID,:] - cell_centroids[cellNeighbors_Dict[cellID][iNeighbor],:])
+        for iFace in 1:nNodes
+
+            faceID = cell_faces[iFace]
+            neighbor_cellID = cellNeighbors_Dict[cellID][iFace]
+
+            #if the neighbor is a ghost cell, then the distance is the distance from the cell to the boundary
+            if bFace_is_boundary[faceID]
+                # Get the node IDs for the current face
+                nodeList = faceNodes_r_Dict[faceID]
+
+                # Get coordinates of the face's nodes
+                face_centroid = (nodeCoordinates[nodeList[1],:][1:2] .+ nodeCoordinates[nodeList[2],:][1:2]) / 2
+
+                @show typeof(face_centroid)
+                @show typeof(cell_centroids[cellID,:])
+                @show size(face_centroid)
+                @show size(cell_centroids[cellID,:])
+                @show cell_centroids[cellID,:]
+                @show face_centroid
+
+                distances[iFace] = norm(cell_centroids[cellID,:] - face_centroid)
+            else
+                distances[iFace] = norm(cell_centroids[cellID,:] - cell_centroids[neighbor_cellID,:])
+            end
         end
         cell_distances_to_neighbors[cellID] = distances
     end

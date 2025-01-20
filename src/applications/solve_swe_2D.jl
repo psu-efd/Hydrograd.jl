@@ -136,20 +136,18 @@ function solve_swe_2D(control_file::String)
 
     #setup bed elevation: compute zb at cell centers (zb_cells) from nodes, 
     #then interpolate zb from cell to face (zb_faces) and ghost cells (zb_ghostCells),
-    #and compute the bed slope at cells (S0). 
+    #and compute the bed slope at cells (S0_cells) and faces (S0_faces). 
     #Note: If performing inversion on zb_cells, these values are not used in the inversion process. 
     #      Instead, they are updated in the inversion process.
-    zb_cells, zb_ghostCells, zb_faces, S0, S0_faces = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
+    zb_cells, zb_ghostCells, zb_faces, S0_cells, S0_faces = Hydrograd.setup_bed(settings, my_mesh_2D, nodeCoordinates, case_path, true)
 
     #define the true bed elevation at cells and nodes
-    zb_cells_truth = zeros(size(zb_cells))
-    #zb_nodes_truth = zeros(size(zb_nodes))
+    zb_cells_truth = zeros(size(zb_cells))    
 
     #If performing forward simulation, make a copy of the bathymetry truth: zb_cell_truth; otherwise for 
     #inversion and sensitivity analysis, it is zero (its value will be loaded from the forward simulation result in the inversion).
     if settings.bPerform_Forward_Simulation
         zb_cells_truth = deepcopy(zb_cells)
-        #zb_nodes_truth = deepcopy(zb_nodes)
     end
 
     #get the true Manning's n and inlet discharges
@@ -247,7 +245,7 @@ function solve_swe_2D(control_file::String)
         zb_cells,
         zb_ghostCells,
         zb_faces,
-        S0,
+        S0_cells,
         S0_faces,
         b_dry_wet,
         b_Adjacent_to_dry_land,

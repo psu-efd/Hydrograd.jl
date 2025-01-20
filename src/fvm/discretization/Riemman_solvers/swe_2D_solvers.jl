@@ -1,9 +1,9 @@
 #Riemann solvers for 2D SWE: In fact, the Riemann problem is 1D in the normal direction of the face. 
 
 #Roe Riemann solver
-function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, 
-    hR::T5, huR::T6, hvR::T7, zb_R::T8, 
-    S0_on_face::Vector{T9},
+function Riemann_2D_Roe(iCell::Int, settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_L::T4, 
+    hR::T5, huR::T6, hvR::T7, zb_R::T8, zb_face::T9, 
+    S0_on_face::Vector{T10},
     g::Float64, normal::Vector{T10}; hmin::Float64=1e-6) where {T1, T2, T3, T4, T5, T6, T7, T8, T9, T10}
     
     #Data type 
@@ -11,6 +11,10 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_
 
     # Extract unit normal components
     nx, ny = normal
+
+    # Free surface elevation
+    xi_L = zb_L + hL
+    xi_R = zb_R + hR
 
     # Handle dry bed conditions (need to be smoothed; see notes)
     if (hL <= hmin && hR <= hmin)  #both sides are dry
@@ -100,17 +104,19 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_
     SR = unRoe + cRoe
 
     # define matrices 
-    R_mat = @SMatrix [data_type(0.0) data_type(1.0) data_type(1.0); ny uRoe-cRoe*nx uRoe+cRoe*nx; -nx vRoe-cRoe*ny vRoe+cRoe*ny]
-    #L_mat = [-(uRoe*ny-vRoe*nx) ny -nx; unRoe/2/cRoe+0.5 -nx/2/cRoe -ny/2/cRoe; -unRoe/2/cRoe+0.5 nx/2/cRoe ny/2/cRoe]
-    L_mat = @SMatrix [-(uRoe*ny-vRoe*nx) ny -nx; unRoe*over_two_cRoe+data_type(0.5) -nx*over_two_cRoe -ny*over_two_cRoe; -unRoe*over_two_cRoe+data_type(0.5) nx*over_two_cRoe ny*over_two_cRoe]
-    absLamda = @SMatrix [smooth_abs(unRoe) data_type(0.0) data_type(0.0); data_type(0.0) smooth_abs(unRoe-cRoe) data_type(0.0); data_type(0.0) data_type(0.0) smooth_abs(unRoe+cRoe)]
+    R_mat = @SMatrix [data_type(0.0) data_type(1.0) data_type(1.0); 
+                      ny uRoe-cRoe*nx uRoe+cRoe*nx; 
+                      -nx vRoe-cRoe*ny vRoe+cRoe*ny]
+    
+    L_mat = @SMatrix [-(uRoe*ny-vRoe*nx) ny -nx; 
+                      unRoe*over_two_cRoe+data_type(0.5) -nx*over_two_cRoe -ny*over_two_cRoe; 
+                      -unRoe*over_two_cRoe+data_type(0.5) nx*over_two_cRoe ny*over_two_cRoe]
+    
+    absLamda = @SMatrix [smooth_abs(unRoe) data_type(0.0) data_type(0.0); 
+                         data_type(0.0) smooth_abs(unRoe-cRoe) data_type(0.0); 
+                         data_type(0.0) data_type(0.0) smooth_abs(unRoe+cRoe)]
 
-    #absA = R_mat * absLamda * L_mat 
-
-    #dQ = @SVector (hR-hL, huR-huL, hvR-hvL)
     dQ = @SVector [hR - hL, huR - huL, hvR - hvL]
-
-    #absA_dQ = absA * dQ
 
     #parenthesis to enforce only matrix-vector multiplication, not matrix-matrix multiplication, for better performance
     absA_dQ = R_mat * (absLamda * (L_mat * dQ))
@@ -130,10 +136,32 @@ function Riemann_2D_Roe(settings::ControlSettings, hL::T1, huL::T2, hvL::T3, zb_
     hu_flux = (hu_flux_L + hu_flux_R - absA_dQ[2]) / 2.0
     hv_flux = (hv_flux_L + hv_flux_R - absA_dQ[3]) / 2.0
 
+    Zygote.ignore() do
+        if iCell == -8  
+            @show iCell
+            println("before bed slope term:")
+            @show h_flux_L, hu_flux_L, hv_flux_L
+            @show h_flux_R, hu_flux_R, hv_flux_R
+            @show absA_dQ
+            @show h_flux, hu_flux, hv_flux
+            @show zb_L, zb_R
+        end
+    end
+
+
     #add the bed slope term contribution to the momentum fluxes    
-    slope_term = S0_on_face .* g .* hRoe 
-    hu_flux += slope_term[1]
-    hv_flux += slope_term[2]
+    slope_term = g * hRoe * (zb_L - zb_face)
+    hu_flux -= slope_term * nx
+    hv_flux -= slope_term * ny
+
+    Zygote.ignore() do
+        if iCell == -8  
+            println("after bed slope term:")
+            @show S0_on_face, hRoe
+            @show slope_term
+            @show h_flux, hu_flux, hv_flux
+        end
+    end
 
     return [h_flux, hu_flux, hv_flux]
 

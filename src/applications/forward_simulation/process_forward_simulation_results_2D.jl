@@ -28,7 +28,7 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     #end
 
     #compute bed slope 
-    zb_ghostCells, zb_faces, S0 = interploate_zb_from_cells_to_ghostCells_faces_and_compute_S0(my_mesh_2D, zb_cells)
+    zb_ghostCells, zb_faces, S0_cells, S0_faces = update_bed_data(my_mesh_2D, zb_cells)
 
     #compute the friction terms
     friction_x_truth, friction_y_truth = compute_friction_terms(settings, h_truth, q_x_truth, q_y_truth, swe2d_extra_params.ManningN_cells, 
@@ -47,7 +47,8 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
             "u_truth" => replace_nan(u_truth),
             "v_truth" => replace_nan(v_truth),
             "zb_cell_truth" => replace_nan(zb_cell_truth),
-            "S0_truth" => replace_nan(S0),
+            "S0_cells_truth" => replace_nan(S0_cells),
+            "S0_faces_truth" => replace_nan(S0_faces),
             "ManningN_cells_truth" => replace_nan(ManningN_cells),
             "friction_x_truth" => replace_nan(friction_x_truth),
             "friction_y_truth" => replace_nan(friction_y_truth),
@@ -57,7 +58,7 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params, zb_c
     end
 
     #save the simulation results to vtk files
-    swe_2D_save_results_SciML(swe2d_extra_params, forward_simulation_results, friction_x_truth, friction_y_truth, S0)
+    swe_2D_save_results_SciML(swe2d_extra_params, forward_simulation_results, friction_x_truth, friction_y_truth, S0_cells, S0_faces)
     
 end
 
