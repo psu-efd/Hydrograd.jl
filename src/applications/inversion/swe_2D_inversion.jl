@@ -74,7 +74,7 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    #sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, case_path)
+    sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, case_path)
 
     #compute all the losses and ODE solutions for each inversion iteration
     println("   Computing all the losses and ODE solutions for each inversion iteration ...")

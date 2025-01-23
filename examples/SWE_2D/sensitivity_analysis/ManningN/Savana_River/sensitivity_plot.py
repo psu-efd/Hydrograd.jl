@@ -77,12 +77,26 @@ def plot_one_subplot(iRow, iCol, sensitivity_name, fig, axs, xCoord, yCoord, tri
     axs.set_aspect('equal')
     #axs.set_title(sensitivity_name, fontsize=14)
 
+    if iRow == 0 and iCol == 0:
+        axs.set_title('$WSE$\nsensitivity', fontsize=14)
+    elif iRow == 0 and iCol == 1:
+        axs.set_title('$hu$\nsensitivity', fontsize=14)
+    elif iRow == 0 and iCol == 2:
+        axs.set_title('$hv$\nsensitivity', fontsize=14)
+
     axs.text(600, 340, sensitivity_name, ha='center', va='bottom', fontsize=14)
 
-    if bShow_x_title: axs.set_xlabel('$x$ (m)', fontsize=16)
-    axs.tick_params(axis='x', labelsize=14)
-    if bShow_y_title: axs.set_ylabel('$y$ (m)', fontsize=16)
-    axs.tick_params(axis='y', labelsize=14)
+    if bShow_x_title:
+        axs.set_xlabel('$x$ (m)', fontsize=16)
+        axs.tick_params(axis='x', labelsize=14)
+    else:
+        axs.tick_params(axis='x', length=0, labelbottom=False, labelleft=False)
+
+    if bShow_y_title:
+        axs.set_ylabel('$y$ (m)', fontsize=16)
+        axs.tick_params(axis='y', labelsize=14)
+    else:
+        axs.tick_params(axis='y', length=0, labelbottom=False, labelleft=False)
 
     divider = make_axes_locatable(axs)
     cax = divider.append_axes("right", size="3%", pad=0.2)
@@ -276,10 +290,21 @@ def plot_sensitivity_result():
                      min_value, max_value, xl_5, xh_5, yl_5, yh_5, bShow_x_title=True, bShow_y_title=False)
 
     #add caption
-    #axs[0,0].text(-0.1, 1.05, "(a)", size=16, ha="center", transform=axs[0,0].transAxes)  # upper left
-    #axs[0,1].text(-0.1, 1.05, "(b)", size=16, ha="center", transform=axs[0,1].transAxes)
-    #axs[1, 0].text(-0.1, 1.05, "(c)", size=16, ha="center", transform=axs[1, 0].transAxes)  # upper left
-    #axs[1, 1].text(-0.1, 1.05, "(d)", size=16, ha="center", transform=axs[1, 1].transAxes)
+    axs[0, 0].text(-0.05, 1.05, "(a)", size=16, ha="center", transform=axs[0, 0].transAxes)  # upper left
+    axs[0, 1].text(-0.05, 1.05, "(b)", size=16, ha="center", transform=axs[0, 1].transAxes)
+    axs[0, 2].text(-0.05, 1.05, "(c)", size=16, ha="center", transform=axs[0, 2].transAxes)
+    axs[1, 0].text(-0.05, 1.05, "(d)", size=16, ha="center", transform=axs[1, 0].transAxes)  # upper left
+    axs[1, 1].text(-0.05, 1.05, "(e)", size=16, ha="center", transform=axs[1, 1].transAxes)
+    axs[1, 2].text(-0.05, 1.05, "(f)", size=16, ha="center", transform=axs[1, 2].transAxes)
+    axs[2, 0].text(-0.05, 1.05, "(g)", size=16, ha="center", transform=axs[2, 0].transAxes)  # upper left
+    axs[2, 1].text(-0.05, 1.05, "(h)", size=16, ha="center", transform=axs[2, 1].transAxes)
+    axs[2, 2].text(-0.05, 1.05, "(i)", size=16, ha="center", transform=axs[2, 2].transAxes)
+    axs[3, 0].text(-0.05, 1.05, "(j)", size=16, ha="center", transform=axs[3, 0].transAxes)  # upper left
+    axs[3, 1].text(-0.05, 1.05, "(k)", size=16, ha="center", transform=axs[3, 1].transAxes)
+    axs[3, 2].text(-0.05, 1.05, "(l)", size=16, ha="center", transform=axs[3, 2].transAxes)
+    axs[4, 0].text(-0.05, 1.05, "(m)", size=16, ha="center", transform=axs[4, 0].transAxes)  # upper left
+    axs[4, 1].text(-0.05, 1.05, "(n)", size=16, ha="center", transform=axs[4, 1].transAxes)
+    axs[4, 2].text(-0.05, 1.05, "(o)", size=16, ha="center", transform=axs[4, 2].transAxes)
 
     plt.savefig("Savana_sensitivity_result.png", dpi=300, bbox_inches='tight', pad_inches=0)
     plt.show()

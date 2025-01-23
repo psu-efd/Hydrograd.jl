@@ -37,7 +37,7 @@
         
         "inversion_optimizers": ["Adam", "LBFGS"],
         "inversion_learning_rates": [0.001, 0.01],
-        "inversion_max_iterations": [100, 0],
+        "inversion_max_iterations": [300, 0],
         "inversion_abs_tols": [1e-6, 1e-6],
         "inversion_rel_tols": [1e-6, 1e-6],
         "inversion_save_frequency": 1,
