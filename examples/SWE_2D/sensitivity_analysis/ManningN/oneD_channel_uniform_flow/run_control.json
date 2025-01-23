@@ -11,7 +11,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 200.0],
+        "tspan": [0.0, 100.0],
         "dt": 0.02,
         "dt_save": 0.1,
         "nSave": 100
@@ -26,7 +26,7 @@
         "sensitivity_inlet_discharge_values": [0.2],
         "sensitivity_forward_simulation_initial_condition_options": "constant",
         "sensitivity_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "sensitivity_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
+        "sensitivity_forward_simulation_initial_condition_constant_values": [3.857205, 3.0, 0.0, 0.0],
         "sensitivity_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",

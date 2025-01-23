@@ -253,10 +253,10 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         end
     end
     
-    println("cellNeighbors_Dict: ")
-    for key in sort(collect(keys(cellNeighbors_Dict)))
-        println("Key: $key, Value: $(cellNeighbors_Dict[key])")
-    end
+    #println("cellNeighbors_Dict: ")
+    #for key in sort(collect(keys(cellNeighbors_Dict)))
+    #    println("Key: $key, Value: $(cellNeighbors_Dict[key])")
+    #end
     
     #check cell's nodes counter-clockwise
     check_cell_nodes_counter_clockwise_srhgeom(numOfCells, cellNodesList, nodeCoordinates, cellNodesCount)
@@ -275,7 +275,7 @@ function initialize_mesh_2D(srhgeom_obj, srhhydro_BC)
         end
     end
 
-    @show bFace_is_boundary
+    #@show bFace_is_boundary
     
     #compute mesh properties
     cell_areas, cell_centroids, cell_normals, cell_distances_to_neighbors, face_normals, face_lengths = 
@@ -514,12 +514,12 @@ function compute_mesh_properties_srhgeom(numOfCells::Integer, numOfFaces::Intege
                 # Get coordinates of the face's nodes
                 face_centroid = (nodeCoordinates[nodeList[1],:][1:2] .+ nodeCoordinates[nodeList[2],:][1:2]) / 2
 
-                @show typeof(face_centroid)
-                @show typeof(cell_centroids[cellID,:])
-                @show size(face_centroid)
-                @show size(cell_centroids[cellID,:])
-                @show cell_centroids[cellID,:]
-                @show face_centroid
+                #@show typeof(face_centroid)
+                #@show typeof(cell_centroids[cellID,:])
+                #@show size(face_centroid)
+                #@show size(cell_centroids[cellID,:])
+                #@show cell_centroids[cellID,:]
+                #@show face_centroid
 
                 distances[iFace] = norm(cell_centroids[cellID,:] - face_centroid)
             else

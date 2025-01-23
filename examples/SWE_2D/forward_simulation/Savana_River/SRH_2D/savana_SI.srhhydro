@@ -4,7 +4,7 @@ Description "Description"
 RunType FLOW
 ModelTemp OFF
 UnsteadyOutput UNSTEADY
-SimTime 0.0 1.0 3.0
+SimTime 0.0 1.0 1.0
 TurbulenceModel PARABOLIC
 ParabolicTurbulence 0.7
 InitCondOption DRY
@@ -14,7 +14,11 @@ OutputFormat XMDFC SI
 OutputOption 1
 OutputInterval 0.2
 ManningsN 0 0.02
-ManningsN 1 0.02
+ManningsN 1 0.04
+ManningsN 2 0.05
+ManningsN 3 0.03
+ManningsN 4 0.045
+ManningsN 5 0.05
 BC 1 INLET-Q
 BC 2 EXIT-H
 BC 3 WALL

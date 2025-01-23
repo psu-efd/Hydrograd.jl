@@ -56,7 +56,7 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
             "v_truth" => replace_nan(v_truth),
             "zb_cell_truth" => replace_nan(zb_cell_truth),
             "S0_cells_truth" => replace_nan(S0_cells),
-            "S0_faces_truth" => replace_nan(S0_faces),
+            #"S0_faces_truth" => replace_nan(S0_faces),
             "ManningN_cells_truth" => replace_nan(ManningN_cells),
             "friction_x_truth" => replace_nan(friction_x_truth),
             "friction_y_truth" => replace_nan(friction_y_truth),

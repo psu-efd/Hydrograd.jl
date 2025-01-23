@@ -1,7 +1,11 @@
 #Functions to process the sensitivity analysis results: 
 #The process_sensitivity_results function is used to plot the sensitivity analysis results.
 
-function postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, params_vector, active_param_name, case_path)
+function postprocess_sensitivity_results_swe_2D(settings, swe_extra_params, my_mesh_2D, nodeCoordinates, params_vector, active_param_name, case_path)
+
+    #get the still water surface elevation and still water depth
+    wstill = swe_extra_params.wstill    
+    hstill = swe_extra_params.hstill
 
     #get the number of cells
     n_cells = my_mesh_2D.numOfCells

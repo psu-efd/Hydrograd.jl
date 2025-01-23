@@ -1,0 +1,63 @@
+{
+    "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
+    "bVerbose": false,
+    "control_variables": {
+        "srhhydro_file_name": "savana_SI.srhhydro",
+        "comment": "Choose what to perform: forward simulation, inversion, or sensitivity analysis. Only one of them can be true.",
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": true,
+        "bPerform_Sensitivity_Analysis": false,
+        "bPerform_UDE": false
+    },
+    "time_settings": {
+        "comment": "Time settings for the simulation (overrides the srhhydro file)",
+        "bUse_srhhydro_time_settings": false,
+        "tspan": [0.0, 200.0],
+        "dt": 0.02,
+        "dt_save": 0.1,
+        "nSave": 10
+    },
+    "inversion_options": {
+        "comment": "Options for the inversion.parameter_initial_values_options is the option for the parameter initial values: constant or from_file.",
+        "active_param_names": ["ManningN"],
+        "inversion_parameter_initial_values_options": "constant",
+        "inversion_parameter_initial_values_file_name": "parameters_checkpoint_350.json",
+        "inversion_zb_initial_values": [0.0],
+        "comment_inversion_ManningN_initial_values": "ManningN values for the zones in the domain (the first is the default value)",
+        "inversion_ManningN_initial_values": [0.03, 0.03, 0.03, 0.03, 0.03, 0.03],
+        "inversion_inlet_discharge_initial_values": [0.2],
+
+        "inversion_bInversion_WSE_loss": true,
+        "inversion_bInversion_uv_loss": true,
+        "inversion_bInversion_bound_loss": true,
+        "inversion_bInversion_slope_loss": false,
+        "inversion_parameter_value_lower_bound": 0.01,
+        "inversion_parameter_value_upper_bound": 0.06,
+        "inversion_parameter_slope_upper_bound": 0.2,
+        
+        "inversion_optimizers": ["Adam", "LBFGS"],
+        "inversion_learning_rates": [0.001, 0.01],
+        "inversion_max_iterations": [100, 0],
+        "inversion_abs_tols": [1e-6, 1e-6],
+        "inversion_rel_tols": [1e-6, 1e-6],
+        "inversion_save_frequency": 1,
+        "inversion_save_checkpoint": true,
+        "inversion_checkpoint_frequency": 10,
+        "inversion_sensealg": "AutoForwardDiff()",
+        "inversion_truth_file_name": "forward_simulation_solution_truth.json",
+        "inversion_forward_simulation_initial_condition_options": "from_file",
+        "inversion_forward_simulation_initial_condition_file_name": "forward_simulation_initial_condition.json",
+        "inversion_forward_simulation_initial_condition_constant_values": [0.33, 0.5, 0.0, 0.0],
+        "inversion_ode_solver_options": {
+            "comment": "Options for the ode solver in the forward pass",
+            "ode_solver": "Tsit5()",
+            "ode_solver_adaptive": true,
+            "ode_solver_sensealg": "ForwardDiffSensitivity()",
+            "ode_solver_b_jac_sparsity": true,
+            "ode_solver_nSave": 100
+        },
+        "inversion_save_file_name": "inversion_results.jld2",
+        "inversion_save_loss_history_file_name": "inversion_loss_history.csv",
+        "inversion_save_parameters_file_name": "inversion_parameters_history.csv"
+    }
+}

@@ -3,6 +3,7 @@ import meshio
 import vtk
 from vtk.util import numpy_support as VN
 import h5py
+import os
 
 import matplotlib.pyplot as plt
 
@@ -72,7 +73,7 @@ if __name__ == "__main__":
     #exit()
 
     # Define the filename of VTK file
-    srh_filename = 'SRH2D_oneD_channel_with_bump_refined_C_0010.vtk'
+    srh_filename = os.path.join('SRH_2D', 'SRH2D_oneD_channel_with_bump_refined_C_0010.vtk')
 
     Hydrograd_filename = 'forward_simulation_results_0101.vtk'
 

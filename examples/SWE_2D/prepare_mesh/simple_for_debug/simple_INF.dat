@@ -1,4 +1,0 @@
-     ITIME      Time(Hours)    Net_Q/INLET_Q    Mass_Error      Cumu_Mass_Error  No_Wet_Cell
-       100      2.7778E-02     -5.7595E-09      8.2541E-10      4.3671E-03          12
-       200      5.5556E-02     -3.2678E-12      3.4866E-13      2.5475E-03          12
-       300      8.3333E-02     -5.5511E-16      5.5511E-16      1.7982E-03          12

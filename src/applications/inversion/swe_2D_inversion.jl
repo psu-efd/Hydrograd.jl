@@ -10,10 +10,14 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
     active_param_name = swe_extra_params.active_param_name
     settings = swe_extra_params.settings
     my_mesh_2D = swe_extra_params.my_mesh_2D
+    srh_all_Dict = swe_extra_params.srh_all_Dict
     swe_2D_constants = swe_extra_params.swe_2D_constants
     case_path = swe_extra_params.case_path
 
     nodeCoordinates = swe_extra_params.nodeCoordinates
+
+    wstill = swe_extra_params.wstill
+    hstill = swe_extra_params.hstill
 
     if settings.bVerbose
         println("       inversion parameter name = ", active_param_name)
@@ -21,7 +25,7 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #some sanity check
     if settings.inversion_settings.bInversion_slope_loss && active_param_name !== "zb"
-        throw(ArgumentError("The slope regularization is only applicable to the bed elevation parameter (zb). No inversion is performed. Please check the inversion settings."))
+        println("Warning: The slope (gradient) regularization is only applicable to the bed elevation parameter (zb). It is set true, but not used.")
     end
 
     #open the forward simulation result (as the ground truth)
@@ -70,11 +74,11 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 
     #perform the inversion
     println("   Performing inversion ...\n")
-    #sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    #sol, ITER, LOSS, PARS = optimize_parameters_inversion(ode_f, Q0, params_vector, settings, my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, case_path)
 
     #compute all the losses and ODE solutions for each inversion iteration
     println("   Computing all the losses and ODE solutions for each inversion iteration ...")
-    compute_all_losses_inversion(ode_f, Q0, settings, nodeCoordinates, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+    compute_all_losses_inversion(ode_f, Q0, settings, nodeCoordinates, my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, case_path)
 
     #save the inversion results
     #jldsave(joinpath(case_path, settings.inversion_settings.save_file_name); ITER, LOSS, PARS)
@@ -88,8 +92,8 @@ function swe_2D_inversion(ode_f, Q0, params_vector, swe_extra_params)
 end
 
 # compute all the losses for each inversion iteration
-function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, settings::ControlSettings, nodeCoordinates::Matrix{T2}, 
-    my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T2}}, active_param_name::String, case_path::String) where {T1<:Real,T2<:Real}
+function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, settings::ControlSettings, nodeCoordinates::Matrix{T2}, my_mesh_2D::mesh_2D, srh_all_Dict::Dict{String,Any}, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T3}}, 
+    wstill::AbstractVector{T4}, hstill::AbstractVector{T5}, active_param_name::String, case_path::String) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real,T5<:Real}
 
     data_type = eltype(Q0)
     
@@ -149,7 +153,7 @@ function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}
         #@show typeof(θ_from_file)
 
         loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ_from_file, settings,
-            my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+            my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, data_type)
             
 
         #assert the total loss is the same as the one in the file
@@ -173,14 +177,14 @@ function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}
             zb_i = zb_cell_truth
         end
 
-        @show size(ode_pred.u[end])
-        @show size(zb_i)
+        #@show size(ode_pred.u[end])
+        #@show size(zb_i)
 
         #append the ODE solution to the accumulator
-        push!(inverted_WSEs, ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ zb_i)
-        push!(inverted_hs, ode_pred.u[end][1:my_mesh_2D.numOfCells])
-        push!(inverted_us, ode_pred.u[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells])
-        push!(inverted_vs, ode_pred.u[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells])
+        push!(inverted_WSEs, ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ wstill)
+        push!(inverted_hs, ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ hstill)
+        push!(inverted_us, ode_pred.u[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells] ./ (ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ hstill)) 
+        push!(inverted_vs, ode_pred.u[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells] ./ (ode_pred.u[end][1:my_mesh_2D.numOfCells] .+ hstill))
 
 
         #save the inverted results to vtk
@@ -192,12 +196,13 @@ function compute_all_losses_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}
             field_type = "integer"
             field_value = iter_number
 
-            h_array = ode_pred.u[end][1:my_mesh_2D.numOfCells]
+            xi_array = ode_pred.u[end][1:my_mesh_2D.numOfCells]
+            h_array = xi_array .+ hstill
             q_x_array = ode_pred.u[end][my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
             q_y_array = ode_pred.u[end][2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
 
-            u_temp = q_x_array ./ h_array
-            v_temp = q_y_array ./ h_array
+            u_temp = q_x_array ./ (h_array .+ eps(eltype(h_array)))
+            v_temp = q_y_array ./ (h_array .+ eps(eltype(h_array)))
             U_vector = hcat(u_temp, v_temp)
                             
             vector_data = [U_vector] 
@@ -240,7 +245,17 @@ end
 
 # Define the loss function
 function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::AbstractVector{T2}, settings::ControlSettings, 
-    my_mesh_2D::mesh_2D, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T3}}, active_param_name::String, data_type::DataType) where {T1<:Real,T2<:Real,T3<:Real}
+    my_mesh_2D::mesh_2D, srh_all_Dict::Dict{String,Any}, swe_2D_constants::swe_2D_consts, observed_data::Dict{String,Vector{T3}},
+    wstill::AbstractVector{T4}, hstill::AbstractVector{T5}, active_param_name::String, 
+    data_type::DataType) where {T1<:Real,T2<:Real,T3<:Real,T4<:Real,T5<:Real}
+
+    # Add dimension checks
+    Zygote.ignore() do
+        #println("Q0 size: ", size(Q0))
+        #println("p size: ", size(p))
+        #println("wstill size: ", size(wstill))
+        #println("hstill size: ", size(hstill))
+    end
 
     # Solve the ODE (forward pass)
 
@@ -256,6 +271,8 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
         ode_solver = Rosenbrock23()
     elseif settings.inversion_settings.ode_solver == "Euler()"
         ode_solver = Euler()
+    elseif settings.inversion_settings.ode_solver == "AB3()"
+        ode_solver = AB3()
     else
         error("Not implemented yet")
     end
@@ -292,8 +309,11 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
         ode_solver_sensealg = ForwardDiffSensitivity()
     elseif settings.inversion_settings.ode_solver_sensealg == "BacksolveAdjoint(autojacvec=nothing)"
         ode_solver_sensealg = BacksolveAdjoint(autojacvec=nothing)    
-    elseif settings.inversion_settings.ode_solver_sensealg == "GaussAdjoint(autojacvec=ZygoteVJP())"
-        ode_solver_sensealg = GaussAdjoint(autojacvec=ZygoteVJP())
+    elseif settings.inversion_settings.ode_solver_sensealg == "GaussAdjoint(autojacvec=nothing)"
+        #ode_solver_sensealg = GaussAdjoint(autojacvec=ZygoteVJP())     #breaking
+        #ode_solver_sensealg = GaussAdjoint(autojacvec=true)      #Jacobian is computed using ForwardDiff.jl (breaking)
+        ode_solver_sensealg = GaussAdjoint(autojacvec=false)      #Jacobian is computed using FiniteDiff.jl
+        #ode_solver_sensealg = GaussAdjoint(autojacvec=nothing)   #falling back to numerical vjp
     elseif settings.inversion_settings.ode_solver_sensealg == "QuadratureAdjoint(autojacvec=nothing)"
         ode_solver_sensealg = QuadratureAdjoint(autojacvec = nothing)
     elseif settings.inversion_settings.ode_solver_sensealg == "ReverseDiffAdjoint()"
@@ -301,7 +321,9 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
     elseif settings.inversion_settings.ode_solver_sensealg == "ForwardSensitivity()"
         ode_solver_sensealg = ForwardSensitivity()
     elseif settings.inversion_settings.ode_solver_sensealg == "AutoEnzyme()"
-        ode_solver_sensealg = AutoEnzyme()                
+        ode_solver_sensealg = AutoEnzyme()    
+    elseif settings.inversion_settings.ode_solver_sensealg == "SensitivityADPassThrough()"
+        ode_solver_sensealg = SensitivityADPassThrough()
     else
         error("Not implemented yet")
     end
@@ -315,6 +337,12 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
     # Solve the ODE with the updated parameters p
     #@time 
     ode_pred = solve(ode_prob, ode_solver, p=p, adaptive=settings.inversion_settings.ode_solver_adaptive, dt=swe_2D_constants.dt, saveat=t_save, sensealg=ode_solver_sensealg)
+
+    Zygote.ignore() do
+        #println("parameters for ODE solve: ", p)
+        #println("ode_pred size: ", size(ode_pred))
+        #println("ode_pred[end] size: ", size(ode_pred[end]))
+    end
 
     Zygote.ignore() do
         if settings.bVerbose
@@ -352,11 +380,24 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
 
         Zygote.ignore() do
             #@show size(ode_pred)
+            #@show size(wstill)
+            #@show size(hstill)
+            #@show data_type
         end
 
-        h_pred = @view ode_pred[1:my_mesh_2D.numOfCells, end]
+        xi_pred = @view ode_pred[1:my_mesh_2D.numOfCells, end]
+        Zygote.ignore() do
+            #@show size(xi_pred)
+        end
+        h_pred = xi_pred .+ hstill
         q_x_pred = @view ode_pred[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells, end]
         q_y_pred = @view ode_pred[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells, end]
+        Zygote.ignore() do
+            #@show size(q_x_pred)
+            #@show size(q_y_pred)
+            #@show size(h_pred)
+            #@show size(ϵ)
+        end
         u_pred = @. q_x_pred / (h_pred + ϵ)
         v_pred = @. q_y_pred / (h_pred + ϵ)
 
@@ -399,12 +440,27 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
 
         #loss for parameter bound regularization
         if settings.inversion_settings.bInversion_bound_loss
-            loss_bound = compute_bound_loss(p, settings.inversion_settings.parameter_value_lower_bound, settings.inversion_settings.parameter_value_upper_bound)/my_mesh_2D.numOfCells  #mean square error
+
+            # if active_param_name == "ManningN"
+            #     # Convert parameter values to cell values before computing loss
+            #     #param_cells = update_ManningN_inversion_sensitivity_analysis(my_mesh_2D, srh_all_Dict, p)
+            #     #loss_bound = compute_bound_loss(param_cells, settings.inversion_settings.parameter_value_lower_bound, 
+            #     #settings.inversion_settings.parameter_value_upper_bound)/my_mesh_2D.numOfCells  #mean square error
+            # else
+            #     #loss_bound = compute_bound_loss(p, settings.inversion_settings.parameter_value_lower_bound, 
+            #     #settings.inversion_settings.parameter_value_upper_bound)/my_mesh_2D.numOfCells  #mean square error
+            # end 
+
+            loss_bound = compute_bound_loss(p, settings.inversion_settings.parameter_value_lower_bound, 
+                settings.inversion_settings.parameter_value_upper_bound)/my_mesh_2D.numOfCells  #mean square error
+            
         end
 
-        #loss for bed slope regularization
+        #loss for slope (gradient) regularization (only makes sense for zb)
         if settings.inversion_settings.bInversion_slope_loss    #if bed slope is included in the loss 
-            loss_slope = calc_slope_loss(zb_cells_temp, settings, my_mesh_2D)  #slope loss is already normalized by the number of cells
+            if active_param_name == "zb"
+                loss_slope = calc_slope_loss(zb_cells_temp, settings, my_mesh_2D)  #slope loss is already normalized by the number of cells
+            end
         end
 
         #combined loss due to free surface elevation mismatch, velocity mismatch, and bed slope regularization
@@ -426,7 +482,7 @@ function compute_loss_inversion(ode_f::ODEFunction, Q0::AbstractVector{T1}, p::A
     return loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred
 end
 
-function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, active_param_name, case_path)
+function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, case_path)
     #start the timer for the inversion
     inversion_start_time = now()  # Current date and time
 
@@ -444,7 +500,7 @@ function optimize_parameters_inversion(ode_f, Q0, p_init, settings, my_mesh_2D, 
         end
 
         loss_total, loss_pred, loss_pred_WSE, loss_pred_uv, loss_bound, loss_slope, ode_pred = compute_loss_inversion(ode_f, Q0, θ, settings,
-            my_mesh_2D, swe_2D_constants, observed_data, active_param_name, data_type)
+            my_mesh_2D, srh_all_Dict, swe_2D_constants, observed_data, wstill, hstill, active_param_name, data_type)
 
         return loss_total
     end

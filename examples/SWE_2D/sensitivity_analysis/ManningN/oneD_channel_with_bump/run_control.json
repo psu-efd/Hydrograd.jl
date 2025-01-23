@@ -26,7 +26,8 @@
         "sensitivity_inlet_discharge_values": [0.2],
         "sensitivity_forward_simulation_initial_condition_options": "constant",
         "sensitivity_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "sensitivity_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
+        "comment_forward_simulation_initial_condition_constant_values": "wse, wstill, q_x, q_y",        
+        "sensitivity_forward_simulation_initial_condition_constant_values": [0.33, 0.2, 0.0, 0.0],
         "sensitivity_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",

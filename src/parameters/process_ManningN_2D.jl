@@ -48,9 +48,22 @@ function update_ManningN_inversion_sensitivity_analysis(
     #material ID for each cell (0-based): 0-default material, 1-first material, 2-second material, etc.
     matID_cells = srh_all_Dict["matID_cells"]
 
+    Zygote.ignore() do
+        #println("In update_ManningN_inversion_sensitivity_analysis:")
+        #println("  new_ManningN_values size: ", size(new_ManningN_values))
+        #println("  num cells: ", my_mesh_2D.numOfCells)
+        #println("  matID_cells size: ", size(srh_all_Dict["matID_cells"]))
+    end
+
     # Create array directly with comprehension
     ManningN_cells = [new_ManningN_values[matID_cells[i]+1] for i in 1:my_mesh_2D.numOfCells]  #+1 to make matID_cells 1-based (to be consistent with the new_ManningN_values)
 
+    Zygote.ignore() do
+        #println("  ManningN_cells size: ", size(ManningN_cells))
+        #println("  Sample values:")
+        #println("    First 3 matID_cells: ", matID_cells[1:3])
+        #println("    First 3 ManningN_cells: ", ManningN_cells[1:3])
+    end
 
     return ManningN_cells
 end

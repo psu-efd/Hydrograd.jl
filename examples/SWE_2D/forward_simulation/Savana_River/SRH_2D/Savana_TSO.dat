@@ -9,13 +9,3 @@
      i_Index  ITIME  TIME(hour) =     3      2160      0.60
      i_Index  ITIME  TIME(hour) =     4      2880      0.80
      i_Index  ITIME  TIME(hour) =     5      3600      1.00
-     i_Index  ITIME  TIME(hour) =     6      4320      1.20
-     i_Index  ITIME  TIME(hour) =     7      5040      1.40
-     i_Index  ITIME  TIME(hour) =     8      5760      1.60
-     i_Index  ITIME  TIME(hour) =     9      6480      1.80
-     i_Index  ITIME  TIME(hour) =    10      7200      2.00
-     i_Index  ITIME  TIME(hour) =    11      7920      2.20
-     i_Index  ITIME  TIME(hour) =    12      8640      2.40
-     i_Index  ITIME  TIME(hour) =    13      9360      2.60
-     i_Index  ITIME  TIME(hour) =    14     10080      2.80
-     i_Index  ITIME  TIME(hour) =    15     10800      3.00

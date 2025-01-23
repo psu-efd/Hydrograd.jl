@@ -199,7 +199,7 @@ function solve_swe_2D(control_file::String)
     ManningN_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
     #setup initial condition for wse, wstill, h, hstill, xi, q_x, q_y at cells
-    Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells,
+    Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells, ManningN_cells,
                                       swe_2D_constants, case_path, true)
 
     #setup initial condition for wse, h, q_x, q_y at ghost cells
@@ -220,10 +220,6 @@ function solve_swe_2D(control_file::String)
     #set up initial condition for for solution state variables for ODE solver
     Q0 = vcat(xi, q_x, q_y)   #Q0 is a 1D array
 
-    @show xi 
-
-    Q_ghost = vcat(xi_ghostCells, q_x_ghostCells, q_y_ghostCells)  #Q_ghost is a 1D array
-
     # Define the UDE model (if not performing UDE, ude_model, ude_model_params, ude_model_state will not be used)
     ude_model, ude_model_params, ude_model_state = Hydrograd.create_NN_model(settings)
 
@@ -235,7 +231,7 @@ function solve_swe_2D(control_file::String)
         bInPlaceODE = true
     end
 
-    @show bInPlaceODE
+    #@show bInPlaceODE
 
     # Create the extra parameters struct
     swe_extra_params = SWE2D_Extra_Parameters(

@@ -12,6 +12,10 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
     case_path = swe_extra_params.case_path
     zb_cells = swe_extra_params.zb_cells
 
+    #get the still water surface elevation and still water depth
+    wstill = swe_extra_params.wstill    
+    hstill = swe_extra_params.hstill
+
     println("   Active parameter name = ", active_param_name)
 
     #define the time for saving the results (for sensitivity analysis, which may be different from the time for saving the results in forward simulation)
@@ -48,22 +52,22 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
         Zygote.ignore() do
             #@show pred.retcode
             #@show typeof(pred)
-            @show size(pred)
+            #@show size(pred)
             #@show pred
 
-            @show size(pred_final)
+            #@show size(pred_final)
 
             #save the forward simulation results in a JSON file
             pred_array = Array(pred)
             #convert from ForwardDiff.Dual to Float64
             pred_array = map(x -> ForwardDiff.value(x), pred_array)
             
-            @show typeof(pred_array) 
-            @show size(pred_array)
+            #@show typeof(pred_array) 
+            #@show size(pred_array)
             #@show pred_array            
 
             open(joinpath(case_path, "forward_simulation_results.json"), "w") do io
-                JSON3.pretty(io, Dict("forward_simulation_results" => pred_array, "zb_cells" => zb_cells))
+                JSON3.pretty(io, Dict("forward_simulation_results" => pred_array, "zb_cells" => zb_cells, "wstill" => wstill, "hstill" => hstill))
                 println(io)
             end
             
@@ -93,6 +97,6 @@ function swe_2D_sensitivity(ode_f, Q0, params_vector, swe_extra_params)
     println("   Post-processing sensitivity results ...")
 
     #process sensitivity results
-    Hydrograd.postprocess_sensitivity_results_swe_2D(settings, my_mesh_2D, nodeCoordinates, params_vector, active_param_name, case_path)
+    Hydrograd.postprocess_sensitivity_results_swe_2D(settings, swe_extra_params, my_mesh_2D, nodeCoordinates, params_vector, active_param_name, case_path)
 
 end

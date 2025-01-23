@@ -7,7 +7,7 @@ FLOW
 // Steady-or-Unsteady (STEADY/UNS)
 UNSTEADY
 // Time Parameters: T_Start(hr) T_end(hr) Dt(s) [Dt_max(s) CFL]
-0.0 3.0 1.0
+0.0 1.0 1.0
 // Turbulence-Model
 PARABOLIC
 // A_TURB for the PARA Model (0.05 to 1.0)
@@ -21,9 +21,13 @@ DRY
 // Manning Coefficient n Input Options: SPATIAL or SPATIAL VEG GRAIN for 2D Model; SPATIAL for 3D model
 VARY NONE D90
 // Number of Material Types in 2D Mesh File
-           1
+           5
 // Manning Coefficient in each mesh zone: a real value or a WD~n file name or Landuse
-0.02
+0.04
+0.05
+0.03
+0.045
+0.05
 // Any-Special-Modeling-Options? (0/1=no/yes)
 0
 // Boundary Type (INLET-Q EXIT-H etc)

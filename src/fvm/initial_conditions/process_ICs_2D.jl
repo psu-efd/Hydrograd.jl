@@ -5,7 +5,7 @@
 function setup_initial_condition(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, wse::AbstractVector{T},
     wstill::AbstractVector{T}, h::AbstractVector{T}, hstill::AbstractVector{T}, xi::AbstractVector{T}, 
     q_x::AbstractVector{T}, q_y::AbstractVector{T},
-    zb_cells::AbstractVector{T},
+    zb_cells::AbstractVector{T}, ManningN_cells::AbstractVector{T},
     swe_2D_constants::swe_2D_consts, case_path::String, bPlot::Bool=false) where {T<:Real}
 
     initial_condition_options = nothing
@@ -35,14 +35,14 @@ function setup_initial_condition(settings::ControlSettings, my_mesh_2D::mesh_2D,
     #if settings.bVerbose
     println("setup_initial_condition")
     println("initial_condition_options = ", initial_condition_options)
-    println("initial_condition_constant_values = ", initial_condition_constant_values)
+    #println("initial_condition_constant_values = ", initial_condition_constant_values)
     #println("initial_condition_values_from_file = ", initial_condition_values_from_file)
-    if initial_condition_options == "from_file"
-        println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["wse"]))
-        println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["wstill"]))
-        println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_x"]))
-        println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_y"]))
-    end
+    #if initial_condition_options == "from_file"
+    #    println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["wse"]))
+    #    println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["wstill"]))
+    #    println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_x"]))
+    #    println("initial_condition_values_from_file = ", length(initial_condition_values_from_file["q_y"]))
+    #end
     #end
 
     if initial_condition_options == "constant"
@@ -116,8 +116,8 @@ function setup_initial_condition(settings::ControlSettings, my_mesh_2D::mesh_2D,
         vector_data = []
         vector_names = []
 
-        scalar_data = [wse, wstill, h, hstill, xi, q_x, q_y, zb_cells]
-        scalar_names = ["wse", "wstill", "h", "hstill", "xi", "q_x", "q_y", "zb_cells"]
+        scalar_data = [wse, wstill, h, hstill, xi, q_x, q_y, zb_cells, ManningN_cells]
+        scalar_names = ["wse", "wstill", "h", "hstill", "xi", "q_x", "q_y", "zb_cells", "ManningN_cells"]
 
         file_path = joinpath(case_path, "initial_conditions.vtk")
         export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount,

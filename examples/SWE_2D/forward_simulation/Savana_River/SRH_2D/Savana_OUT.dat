@@ -10,7 +10,7 @@
  *                                                                 *
  *******************************************************************
 
- ==> Code Execution Year-Month-Date:  2025  1 18
+ ==> Code Execution Year-Month-Date:  2025  1 21
 
 
  ************************************************************
@@ -37,7 +37,7 @@
       Initial Condition:   New run from user specified initial condition
       Number of time steps (ntstep):                   -1
       Number of iterations within each time step:       3
-      Tstart(s) DT(s) DT_CHAN(s) Total_simu_time(hr):    0.0000E+00   1.0000E+00   1.0000E+00   3.0000E+00
+      Tstart(s) DT(s) DT_CHAN(s) Total_simu_time(hr):    0.0000E+00   1.0000E+00   1.0000E+00   1.0000E+00
       Laminar kinematic viscosity:                       1.0000E-06
       Turbulent Parabolic Model Constant:                7.0000E-01
 
@@ -77,11 +77,11 @@
  =      (Note:FLUX useful for STEADY modeling; VOLUME for UNSTEADY)
  ================================================================
 
- Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -2.0239E+06
+ Boundary patch =  1 Total Water Volume (m^3) out of the boundary =  -6.7464E+05
                       Flux in m^3/s at the end of the computation =  -1.8740E+02
 
- Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   1.6504E+06
-                      Flux in m^3/s at the end of the computation =   1.8740E+02
+ Boundary patch =  2 Total Water Volume (m^3) out of the boundary =   2.9207E+05
+                      Flux in m^3/s at the end of the computation =   1.8906E+02
 
  Boundary patch =  3 Total Water Volume (m^3) out of the boundary =   0.0000E+00
                       Flux in m^3/s at the end of the computation =   0.0000E+00
@@ -94,21 +94,21 @@
  ==============================================================
 
  Initial Water Volume (m3) in Domain ............................. =   0.0000E+00
- Final   Water Volume (m3) in Domain ............................. =   3.6771E+05
+ Final   Water Volume (m3) in Domain ............................. =   3.7660E+05
 
- Total Water Volume entering domain from boundary (m3) ........... =   2.0239E+06
- Total Water Volume exiting  domain from boundary (m3) ........... =   1.6504E+06
+ Total Water Volume entering domain from boundary (m3) ........... =   6.7464E+05
+ Total Water Volume exiting  domain from boundary (m3) ........... =   2.9207E+05
  Net Water Volume exiting domain from internal boundary (m3) ..... =   0.0000E+00
 
  Total Rainfall Volume (m3) into domain (V_rain) ................. =   0.0000E+00
  Total Infiltrated Volume (m3) lost from domain................... =   0.0000E+00
 
- Water Conservation Error in Volume (m3) ......................... =   5.8306E+03
- Percentage of above Error relative to Total_Incoming_Volume ..... =   0.24%
+ Water Conservation Error in Volume (m3) ......................... =   5.9706E+03
+ Percentage of above Error relative to Total_Incoming_Volume ..... =   0.57%
  [errors due primarily to numerical discretization etc.]
 
- ==> CPU-TIME(hours) =    6.532E-03
+ ==> CPU-TIME(hours) =    2.214E-03
 
- ==> Wall-TIME(hours) =    7.007E-03
+ ==> Wall-TIME(hours) =    2.398E-03
 
  ==> SRH is successfully executed

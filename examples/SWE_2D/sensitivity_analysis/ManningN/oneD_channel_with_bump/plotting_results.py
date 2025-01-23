@@ -139,6 +139,7 @@ def plot_sensitivity():
         data = json.load(file)
 
         forward_simulation_results = data['forward_simulation_results']
+        wstill = data['wstill']
         zb_cells = data['zb_cells']
 
     nCells = len(zb_cells)
@@ -149,16 +150,16 @@ def plot_sensitivity():
     print("Number of time steps: {}".format(nTimeSteps))
 
     #only get the result from the last time step
-    h_step = forward_simulation_results[3*nCells*(nTimeSteps-1):3*nCells*(nTimeSteps-1)+nCells]
+    xi_step = forward_simulation_results[3*nCells*(nTimeSteps-1):3*nCells*(nTimeSteps-1)+nCells]
     hu_step = forward_simulation_results[3*nCells*(nTimeSteps-1)+nCells:3*nCells*(nTimeSteps-1)+2*nCells]
     hv_step = forward_simulation_results[3*nCells*(nTimeSteps-1)+2*nCells:3*nCells*(nTimeSteps-1)+3*nCells]
 
     #convert to numpy array
-    h_step = np.array(h_step)
+    xi_step = np.array(xi_step)
     hu_step = np.array(hu_step)
     hv_step = np.array(hv_step)
 
-    WSE_step = h_step + zb_cells
+    WSE_step = xi_step + wstill
 
     #get the x coordinates 
     x_Coordinates = np.linspace(0, 25, nCells)        

@@ -18,7 +18,9 @@
 function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vector::AbstractVector{T3}, 
     t::Float64, p_extra::Hydrograd.SWE2D_Extra_Parameters{T4})::AbstractVector{promote_type(T1, T2, T3, T4)} where {T1,T2,T3,T4}
 
-    @show t
+    Zygote.ignore() do
+        #@show t
+    end
 
     # Unpack the extra parameters
     active_param_name = p_extra.active_param_name
@@ -93,10 +95,10 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 
     h = xi .+ hstill_local
 
-    #make sure h is larger than h_small
-    h[h.<=h_small] .= h_small
-    q_x[h.<=h_small] .= zero(data_type)
-    q_y[h.<=h_small] .= zero(data_type)
+    # Replace in-place mutations with functional style
+    h = ifelse.(h .<= h_small, h_small, h)
+    q_x = ifelse.(h .<= h_small, zero(data_type), q_x)
+    q_y = ifelse.(h .<= h_small, zero(data_type), q_y)
 
     #@show h
     #@show q_x
@@ -139,7 +141,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 
         Zygote.ignore() do
             if settings.bVerbose
-                println("calling update_ManningN")
+                println("calling update_ManningN_inversion_sensitivity_analysis")
             end
         end
 
