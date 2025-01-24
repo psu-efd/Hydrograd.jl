@@ -3,6 +3,7 @@
 **/statprof/
 **/parameters_checkpoint_*.*
 **/inversion_callback_save_iter_*.*
+**/UDE_callback_save_iter_*.*
 **/oneD_channel_with_bump_*.dat
 **/*.vtk
 *.mp4

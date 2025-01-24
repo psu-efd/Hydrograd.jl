@@ -133,6 +133,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step (no need to update here).
     #If ManningN_option is variable_as_function_of_h, ManningN_cells_local is updated here.
     if settings.bPerform_Forward_Simulation && settings.forward_settings.ManningN_option == "variable_as_function_of_h"
+        #ManningN_cells_local is a new allocated array, so it is not the same as p_extra.ManningN_cells as the update. 
         ManningN_cells_local = update_ManningN_forward_simulation(h, settings)
 
         #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 

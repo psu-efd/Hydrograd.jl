@@ -381,7 +381,11 @@ function solve_swe_2D(control_file::String)
         end
 
         #perform UDE
-        Hydrograd.swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
+        if swe_extra_params.bInPlaceODE
+            Hydrograd.swe_2D_UDE(ode_f_in_place, Q0, params_vector, swe_extra_params)
+        else
+            Hydrograd.swe_2D_UDE(ode_f_out_of_place, Q0, params_vector, swe_extra_params)
+        end
     end
 
     #Timing 

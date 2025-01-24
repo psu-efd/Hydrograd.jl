@@ -122,12 +122,12 @@ function sigmoid_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T, h_mid::T) 
 end
 
 #update Manning's n values from the UDE model's neural network
-function update_ManningN_UDE(h::AbstractVector{T}, 
+function update_ManningN_UDE(h::AbstractVector{T1}, 
                            ude_model::Lux.Chain, 
-                           NN_model_params, 
+                           NN_model_params::AbstractVector{T2}, 
                            ude_model_state,
-                           h_bounds::Vector{T},
-                           num_of_cells::Integer) where T <: Real
+                           h_bounds::Vector{T3},
+                           num_of_cells::Integer) where {T1 <: Real, T2 <: Real, T3 <: Real}
     
     #ManningN_cells = [
     #    ude_model(@SMatrix([h[iCell];;]), NN_model_params, ude_model_state)[1][1]

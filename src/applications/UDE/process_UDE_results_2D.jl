@@ -19,17 +19,14 @@ function  postprocess_UDE_training_results_swe_2D(swe2d_extra_params, zb_cell_tr
     UDE_training_results_file_name = joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name)
     UDE_training_save_loss_history_file_name = settings.UDE_settings.UDE_training_save_loss_history_file_name
 
-
     UDE_training_results = load(UDE_training_results_file_name)
     
     ITER = UDE_training_results["ITER"]
     LOSS = UDE_training_results["LOSS"]
-    PRED = UDE_training_results["PRED"]
     PARS = UDE_training_results["PARS"]
 
     #println("ITER: ", ITER)
     #println("LOSS: ", LOSS)
-    #println("PRED: ", PRED)
     #println("PARS: ", PARS)
 
     #Load the UDE model, parameters (only the last iteration), and state
@@ -46,7 +43,7 @@ function  postprocess_UDE_training_results_swe_2D(swe2d_extra_params, zb_cell_tr
 
     for curLoss in LOSS
         append!(loss_total, curLoss[1])
-        append!(loss_pred_WSE, curLoss[2])
+        append!(loss_pred_WSE, curLoss[2])        
         append!(loss_pred_uv, curLoss[3])
     end 
 

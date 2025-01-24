@@ -2,7 +2,7 @@
     "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
     "bVerbose": false,
     "control_variables": {
-        "srhhydro_file_name": "oneD_channel_with_bump_coarse.srhhydro",
+        "srhhydro_file_name": "oneD_channel_with_bump_refined.srhhydro",
         "comment": "Choose what to perform: forward simulation, inversion, sensitivity analysis, or UDE. Only one of them can be true.",
         "bPerform_Forward_Simulation": false,
         "bPerform_Inversion": false,
@@ -12,7 +12,7 @@
     "time_settings": {
         "comment": "Time settings for the simulation (overrides the srhhydro file)",
         "bUse_srhhydro_time_settings": false,
-        "tspan": [0.0, 10.0],
+        "tspan": [0.0, 100.0],
         "dt": 0.1,
         "dt_save": 0.1,
         "nSave": 10
@@ -20,7 +20,6 @@
     "UDE_options": {
         "comment_UDE_mode": "training, inference (must provide NN_weights_state_file_name)",
         "UDE_mode": "training",
-
         "comment_UDE_choice": "Choice for UDE: ManningN_h, FlowResistance. For ManningN_h, a NN is used to fit ManningN as a function of water depth h. For FlowResistance, a NN is used to fit the flow resistance term (tau_b) as a function of h, u, and v.",
         "comment_how_to_initialize_NN": "random, from_pretrained (for inference or continued training; file name must be provided as NN_weights_state_file_name)",
         "UDE_choice": "ManningN_h",
@@ -37,29 +36,29 @@
         },
         
         "UDE_bWSE_loss": true,
-        "UDE_b_uv_loss": false,
+        "UDE_b_uv_loss": true,
                 
         "comment_UDE_optimizers": "Optimizers for the UDE training: A list with the order of the optimizers for the UDE training",
         "UDE_optimizers": ["Adam", "LBFGS"],
         "comment_UDE_learning_rates": "Learning rates for the UDE training: A list with the order of the learning rates for the UDE training",
         "UDE_learning_rates": [0.1, 0.1],
         "comment_UDE_max_iterations": "Maximum number of epochs/iterations for the optimizer: A list with the order of the maximum number of epochs/iterations for the optimizer",
-        "UDE_max_iterations": [5, 3],
-        "UDE_abs_tols": [1e-6, 1e-6],
-        "UDE_rel_tols": [1e-6, 1e-6],
+        "UDE_max_iterations": [100, 0],
+        "UDE_abs_tols": [1e-8, 1e-8],
+        "UDE_rel_tols": [1e-8, 1e-8],
         "UDE_training_save_frequency": 1,
         "UDE_training_save_checkpoint": true,
         "UDE_training_checkpoint_frequency": 10,
-        "UDE_sensealg": "AutoZygote()",
+        "UDE_sensealg": "AutoForwardDiff()",
         "UDE_truth_file_name": "forward_simulation_solution_truth.json",
         "UDE_forward_simulation_initial_condition_options": "constant",
         "UDE_forward_simulation_initial_condition_file_name": "forward_simulation_initial_conditions.json",
-        "UDE_forward_simulation_initial_condition_constant_values": [0.33, 0.18, 0.0],
+        "UDE_forward_simulation_initial_condition_constant_values":  [0.33, 0.2, 0.0, 0.0],
         "UDE_ode_solver_options": {
             "comment": "Options for the ode solver in the forward pass",
             "ode_solver": "Tsit5()",
             "ode_solver_adaptive": true,
-            "ode_solver_sensealg": "InterpolatingAdjoint(autojacvec=ZygoteVJP())",
+            "ode_solver_sensealg": "ForwardDiffSensitivity()",
             "ode_solver_b_jac_sparsity": true,
             "ode_solver_nSave": 10
         },

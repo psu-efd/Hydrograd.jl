@@ -1,0 +1,23 @@
+SRHHYDRO 30
+Case "oneD_channel_with_bump_refined"
+Description "1D channel with a bump refined"
+RunType FLOW
+ModelTemp OFF
+UnsteadyOutput UNSTEADY
+SimTime 0.0 0.01 1
+TurbulenceModel PARABOLIC
+ParabolicTurbulence 0.7
+InitCondOption DRY
+Grid "oneD_channel_with_bump_refined.srhgeom"
+HydroMat "oneD_channel_with_bump_refined.srhmat"
+OutputFormat XMDFC SI
+OutputOption 1
+OutputInterval 0.1
+ManningsN 0 0.02
+ManningsN 1 0.02
+BC 1 INLET-Q
+BC 2 EXIT-H
+BC 3 SYMM
+BC 4 SYMM
+IQParams 1 0.18 SI CONVEYANCE
+EWSParamsC 2 0.33 SI C

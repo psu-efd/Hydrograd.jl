@@ -10,6 +10,8 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
     zb_cells = swe2d_extra_params.zb_cells
     case_path = swe2d_extra_params.case_path
 
+    #Note: if ManningN_option is variable_as_function_of_h or from UDE, ManningN_cells is updated in the semi_discretize_swe_2D function.
+    #      Thus, ManningN_cells in swe2d_extra_params cannot be used (because it can not be updated in the imutable struct swe2d_extra_params).
     ManningN_cells = swe2d_extra_params.ManningN_cells
 
     wstill = swe2d_extra_params.wstill    
@@ -28,9 +30,9 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
     v_truth = q_y_truth ./ (h_truth .+ swe2d_extra_params.swe_2D_constants.h_small)
 
     #If ManningN_option is variable_as_function_of_h, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
-    #if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
-    #    ManningN_cells = update_ManningN_forward_simulation(h_truth, settings)
-    #end
+    if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
+        ManningN_cells = update_ManningN_forward_simulation(h_truth, settings)
+    end
 
     #compute bed slope 
     zb_ghostCells, zb_faces, S0_cells, S0_faces = update_bed_data(my_mesh_2D, zb_cells)
