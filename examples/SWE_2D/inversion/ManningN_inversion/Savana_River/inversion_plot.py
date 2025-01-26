@@ -224,6 +224,129 @@ def plot_loss_history(nIterations):
     plt.savefig("inversion_losses.png", dpi=300, bbox_inches='tight', pad_inches=0)
     plt.show()
 
+
+def plot_n_history_trajectories(nIterations):
+    """
+    Plot the n history and trajectories in one figure
+
+    Parameters
+    ----------
+    nIterations
+
+    Returns
+    -------
+
+    """
+
+    n_truth_values = [0.03, 0.04, 0.05, 0.03, 0.045, 0.05]
+
+    n_0 = []
+    n_1 = []
+    n_2 = []
+    n_3 = []
+    n_4 = []
+    n_5 = []
+
+    iter_numbers = np.arange(nIterations - 1)
+
+    # loop over all inversion_callback_save_iter_*.json files to read the n value histories
+    for iter in range(1, nIterations):
+        print("reading n values from iteration ", iter)
+        file_name = "inversion_callback_save_iter_" + str(iter) + ".json"
+        with open(file_name, 'r') as file:
+            data = json.load(file)
+            n_0.append(data['theta'][0])
+            n_1.append(data['theta'][1])
+            n_2.append(data['theta'][2])
+            n_3.append(data['theta'][3])
+            n_4.append(data['theta'][4])
+            n_5.append(data['theta'][5])
+
+    fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharex=False, sharey=False, facecolor='w', edgecolor='k')
+
+    # fig.subplots_adjust(hspace=.15, wspace=.01)
+
+    # plot n histories
+    axs[0].plot(iter_numbers, n_1, 'k', label=r'$n_1$')
+    axs[0].plot(iter_numbers, n_2, 'r--', label=r'$n_2$')
+    axs[0].plot(iter_numbers, n_3, 'b-.', label=r'$n_3$')
+    axs[0].plot(iter_numbers, n_4, 'g:', label=r'$n_4$')
+    axs[0].plot(iter_numbers[::4], n_5[::4], 'c-o', markersize=2, label=r'$n_5$',
+             markerfacecoloralt='c', markerfacecolor='none', markeredgecolor='c', alpha=0.5)
+
+    # plot truth values
+    x_truth_text = 200
+    axs[0].plot([x_truth_text, nIterations + 10], [n_truth_values[1], n_truth_values[1]], 'k', alpha=0.5)
+    axs[0].plot([x_truth_text, nIterations + 10], [n_truth_values[2], n_truth_values[2]], 'r', alpha=0.5)
+    axs[0].plot([x_truth_text, nIterations + 10], [n_truth_values[3], n_truth_values[3]], 'b', alpha=0.5)
+    axs[0].plot([x_truth_text, nIterations + 10], [n_truth_values[4], n_truth_values[4]], 'g', alpha=0.5)
+    axs[0].plot([x_truth_text, nIterations + 10], [n_truth_values[5], n_truth_values[5]], 'c', alpha=0.5)
+
+    # add truth text
+    axs[0].text(x_truth_text, n_truth_values[1] + 0.0005, r'$n_1$ truth', fontsize=14)
+    axs[0].text(x_truth_text, n_truth_values[2] + 0.0005, r'$n_2$ and $n_5$ truth', fontsize=14)
+    axs[0].text(x_truth_text, n_truth_values[3] + 0.0005, r'$n_3$ truth', fontsize=14)
+    axs[0].text(x_truth_text, n_truth_values[4] + 0.0005, r'$n_4$ truth', fontsize=14)
+
+    axs[0].xaxis.set_major_formatter(FormatStrFormatter('%.0f'))
+    axs[0].yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+
+    axs[0].tick_params(axis='both', which='major', labelsize=14)
+
+    axs[0].set_xlabel('Iteration', fontsize=16)
+    axs[0].set_ylabel('Manning\'s $n$ values', fontsize=16)
+    # axs[0].set_xlim([0, 100])
+    # axs[0].set_ylim([0, 0.01])
+    # axs[0].set_yscale('log')
+    legend = axs[0].legend(loc='lower right', fontsize=14, frameon=True, facecolor='white')
+
+    #plot n trajectories
+    # Create color array from indices
+    colors = np.arange(len(n_1))
+
+    print("len(n_1)", len(n_1))
+
+    # Plot line
+    plot_trajectory = axs[1].plot(n_1, n_5, 'b-', alpha=0.25, label='Inversion')
+
+    # Add colored markers
+    scatter = axs[1].scatter(n_1, n_5, c=colors, cmap='jet')
+    clb = fig.colorbar(scatter, ticks=np.linspace(0, len(n_1) + 1, 11))  # Optional: add colorbar
+    clb.ax.yaxis.set_major_formatter(tick.FormatStrFormatter('%.0f'))
+    clb.ax.tick_params(labelsize=14)
+    clb.ax.set_title("Iteration", loc='center', fontsize=14)
+
+    # plot the truth (target)
+    axs[1].plot(n_truth_values[1], n_truth_values[5], 'x',
+             markersize=15,
+             markeredgewidth=2,  # Line width of the cross
+             color='red',
+             label='Truth')
+
+    axs[1].text(0.04, 0.047, 'Truth', fontsize=14, ha='center')
+
+    axs[1].text(0.033, 0.029, 'Inversion trajectory', rotation=40, fontsize=14, ha='left')
+    # Draw an arrow
+    axs[1].annotate('', xy=(0.042, 0.0402), xytext=(0.032, 0.030),
+                 arrowprops=dict(facecolor='blue', edgecolor='blue', linewidth=0.1))
+
+    axs[1].xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+    axs[1].yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+
+    axs[1].tick_params(axis='both', which='major', labelsize=14)
+
+    axs[1].set_xlabel('Manning\'s $n_1$', fontsize=16)
+    axs[1].set_ylabel('Manning\'s $n_5$', fontsize=16)
+    axs[1].set_xlim([0.025, 0.05])
+    axs[1].set_ylim([0.025, 0.055])
+
+    # add caption
+    axs[0].text(-0.1, 1.05, "(a)", size=16, ha="center", transform=axs[0].transAxes)  # upper left
+    axs[1].text(-0.1, 1.05, "(b)", size=16, ha="center", transform=axs[1].transAxes)
+
+    plt.savefig("inversion_ManningN_histories_trajectories.png", dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.show()
+
 def plot_n_history(nIterations):
     """
     Plot this history of n values vs iterations
@@ -522,14 +645,10 @@ if __name__ == '__main__':
 
     nIterations = 300
 
-    #plot_loss_history(nIterations)
-
-    #plot_n_history(nIterations)
-
-    #plot_n_trajectories(nIterations)
+    plot_n_history_trajectories(nIterations)
 
     #plot comparison of flow field (WSE, u, v) between truth and inversion result
     inversion_result_vtk_file_name = 'forward_simulation_results_0300.vtk'
-    plot_flow_field_comparison(inversion_result_vtk_file_name)
+    #plot_flow_field_comparison(inversion_result_vtk_file_name)
 
     print("Done!")
