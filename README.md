@@ -10,6 +10,7 @@ Hydrograd provides ***differentiable models*** for solving the hydrodynamics gov
 - Forward simulation of flow dynamics
 - Parameter inversion 
 - Sensitivity analysis through automatic differentiation
+- Physics discovery through universal differential equations (UDEs)
 
 For parameter inversion and sensitivity analysis, the package uses the automatic differentiation capabilities of [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) and [Zygote](https://github.com/FluxML/Zygote.jl). The parameters currently supported are Manning's coefficient, bed elevation, and inlet discharge, which cover many common cases in the field of hydrodynamics, such as river flow, flood wave, and dam break. More parameters will be supported in the future. Users can also define their own parameters and use them in the parameter inversion and sensitivity analysis.
 
@@ -20,16 +21,14 @@ For parameter inversion and sensitivity analysis, the package uses the automatic
 - Automatic differentiation using [ForwardDiff](https://github.com/JuliaDiff/ForwardDiff.jl) and [Zygote](https://github.com/FluxML/Zygote.jl)
 
 ## Other notable features
-- Finite volume discretization
-- Gudonov-type Riemann solver
+- Finite volume discretization on unstructured meshes
+- Gudonov-type Riemann solver for the inviscid part of the fluxes
 - Support for various boundary conditions
-
-- For 2D cases, the package directly supports the format of the [SRH-2D](https://www.usbr.gov/tsc/techreferences/computer%20software/models/srh2d/index.html) solver (USBR's Sedimentation and River Hydraulics - Two-Dimensional model; GUI with [SMS](https://aquaveo.com/software/sms/introduction)).
+- For 2D cases, the package directly supports the file format of the [SRH-2D](https://www.usbr.gov/tsc/techreferences/computer%20software/models/srh2d/index.html) solver (USBR's Sedimentation and River Hydraulics - Two-Dimensional model; GUI with [SMS](https://aquaveo.com/software/sms/introduction)).
 
 ## Prerequisites
 - Julia 1.11 or later
-- Python 3.10 or later (for SRH-2D support)
-- [pyHMT2D](https://github.com/psu-efd/pyHMT2D) package (for SRH-2D support)
+- Python 3.10 or later (optional, mostly for post-processing)
 
 ## Installation
 
@@ -57,6 +56,8 @@ MIT License
 Xiaofeng Liu, Ph.D., P.E.
 
 Department of Civil and Environmental Engineering
+
+Institute of Computational and Data Sciences
 
 Penn State University
 
