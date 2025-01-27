@@ -28,26 +28,46 @@ For parameter inversion and sensitivity analysis, the package uses the automatic
 
 ## Prerequisites
 - Julia 1.11 or later
-- Python 3.10 or later (optional, mostly for post-processing)
+- Python 3.10 or later (optional, for post-processing)
+- Git
 
 ## Installation
 
-1. Clone the repository:
+### Installation Steps
 
+1. Clone the repository:
 ```bash
 git clone https://github.com/psu-efd/Hydrograd.jl.git
 cd Hydrograd.jl
 ```
 
-2. Activate and instantiate the Julia environment:
+2. Start Julia with the project environment:
+```bash
+julia --project=.
+```
 
+3. Enter the package mode by pressing `]`, then instantiate the environment:
+```julia
+pkg> instantiate
+```
+
+Or alternatively, you can run this as a single command:
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-This will automatically install all required Julia dependencies specified in `Project.toml`.
+### Verification
+To verify your installation, run the test suite:
+```julia
+pkg> test
+```
 
-3. Run an example: See [Running Instructions](examples/SWE_2D/README.md) for detailed usage.
+
+### Troubleshooting
+If you encounter any issues during installation:
+1. Make sure you have the correct versions of Julia and Python installed
+2. Check that all prerequisites are properly installed
+3. For further assistance, please open an issue on our GitHub repository
 
 ## License
 MIT License
