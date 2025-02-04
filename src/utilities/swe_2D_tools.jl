@@ -16,6 +16,7 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
     save_path = swe2d_extra_params.case_path
 
     ManningN_cells = swe2d_extra_params.ManningN_cells
+    ks_cells = swe2d_extra_params.ks_cells
 
     wstill = swe2d_extra_params.wstill    
     hstill = swe2d_extra_params.hstill
@@ -34,10 +35,13 @@ function swe_2D_save_results_SciML(swe2d_extra_params, sol, friction_x_truth, fr
         h_array = xi_array .+ hstill
         q_x_array = state[my_mesh_2D.numOfCells+1:2*my_mesh_2D.numOfCells]
         q_y_array = state[2*my_mesh_2D.numOfCells+1:3*my_mesh_2D.numOfCells]
+        u_array = q_x_array ./ (h_array .+ swe2d_extra_params.swe_2D_constants.h_small)
+        v_array = q_y_array ./ (h_array .+ swe2d_extra_params.swe_2D_constants.h_small)
+        Umag_array = sqrt.(u_array.^2 .+ v_array.^2)
 
-        #If ManningN_option is variable_as_function_of_h, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
-        if settings.forward_settings.ManningN_option == "variable_as_function_of_h"
-            ManningN_cells = update_ManningN_forward_simulation(h_array, settings)
+        #If ManningN_option is variable, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
+        if settings.forward_settings.ManningN_option == "variable"
+            ManningN_cells = update_ManningN_forward_simulation(h_array, Umag_array, ks_cells, settings)
         end
 
         #computer wet/dry flags

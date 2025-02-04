@@ -40,6 +40,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     # ManningN_cells, inletQ_TotalQ, exitH_WSE, or
     # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector (computed later in the function)
     ManningN_cells_local = p_extra.ManningN_cells          #get a reference to these vectors
+    ks_cells_local = p_extra.ks_cells
     inletQ_Length_local = p_extra.inletQ_Length
     inletQ_TotalQ_local = p_extra.inletQ_TotalQ
     exitH_WSE_local = p_extra.exitH_WSE
@@ -131,10 +132,17 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     end
 
     #For the case of forward simulation: if ManningN_option is constant, ManningN_cells_local is already updated in the preprocess step (no need to update here).
-    #If ManningN_option is variable_as_function_of_h, ManningN_cells_local is updated here.
-    if settings.bPerform_Forward_Simulation && settings.forward_settings.ManningN_option == "variable_as_function_of_h"
-        #ManningN_cells_local is a new allocated array, so it is not the same as p_extra.ManningN_cells as the update. 
-        ManningN_cells_local = update_ManningN_forward_simulation(h, settings)
+    #If ManningN_option is variable, ManningN_cells_local is updated here. The variable ManningN can be a function of h only, or a function of h, Umag, and ks.
+    if settings.bPerform_Forward_Simulation 
+        if settings.forward_settings.ManningN_option == "variable" 
+            #compute Umag
+            u = q_x ./ h
+            v = q_y ./ h
+            Umag = sqrt.(u.^2 .+ v.^2)
+
+            #ManningN_cells_local is a new allocated array, so it is not the same as p_extra.ManningN_cells as the update. 
+            ManningN_cells_local = update_ManningN_forward_simulation(h, Umag, ks_cells_local, settings)
+        end
 
         #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 
         # we need to update ManningN at cells and ghost cells

@@ -151,6 +151,19 @@ function process_SRH_2D_input(settings, case_path)
             push!(srhmat_matZoneCells[0], iCell)
         end
     end
+
+    println("srhmat_numOfMaterials: ", srhmat_numOfMaterials)
+    println("srhmat_matNameList: ", srhmat_matNameList)
+
+    #add additional roughness height ks for each material. ks is not in the srhmat file. But it is needed if Manning's n is a function of h, ks, and Umag.
+    srhmat_ks_dict = Dict{Int, Float64}()
+    if settings.bPerform_Forward_Simulation 
+        if settings.forward_settings.ManningN_option == "variable"
+            for iMat in 1:srhmat_numOfMaterials               
+                srhmat_ks_dict[iMat] = settings.forward_settings.ManningN_function_parameters["ks"][iMat]
+            end
+        end
+    end    
     
     if settings.bVerbose
         println("numOfMaterials: ", srhmat_numOfMaterials)
@@ -195,6 +208,7 @@ function process_SRH_2D_input(settings, case_path)
     srh_all_Dict["srhmat_matNameList"] = srhmat_matNameList
     srh_all_Dict["srhmat_matZoneCells"] = srhmat_matZoneCells
     srh_all_Dict["matID_cells"] = matID_cells
+    srh_all_Dict["srhmat_ks_dict"] = srhmat_ks_dict
 
     return srh_all_Dict  
 end

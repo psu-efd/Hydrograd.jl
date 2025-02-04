@@ -20,7 +20,7 @@ struct ForwardSimulationSettings
     initial_condition_constant_values::Vector{Float64}
     save_file_name::String
     save_solution_truth_file_name::String
-    ManningN_option::String  # "constant", "variable_as_function_of_h", "custom"
+    ManningN_option::String  # "constant" or "variable"
     ManningN_function_type::String
     ManningN_function_parameters::Dict
 end
@@ -379,8 +379,8 @@ function parse_forward_settings(options::Dict, control_file_dir::String)
     end
 
     #sanity check on ManningN_option
-    if options["forward_simulation_ManningN_option"] != "constant" && options["forward_simulation_ManningN_option"] != "variable_as_function_of_h"
-        error("Invalid ManningN_option: $(options["forward_simulation_ManningN_option"]). Supported options: constant, variable_as_function_of_h.")
+    if options["forward_simulation_ManningN_option"] != "constant" && options["forward_simulation_ManningN_option"] != "variable"
+        error("Invalid ManningN_option: $(options["forward_simulation_ManningN_option"]). Supported options: constant, variable.")
     end
 
     ForwardSimulationSettings(

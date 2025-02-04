@@ -2,13 +2,15 @@
 
 function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
-    # Initialize Manning's n values for cells
+    # Initialize Manning's n values for cells (just for initialization; will be updated later if Manning's n is a function of h, ks, or Umag)
     ManningN_cells = zeros(Float64, my_mesh_2D.numOfCells)
+    ks_cells = zeros(Float64, my_mesh_2D.numOfCells)
 
     srhhydro_ManningsN = srh_all_Dict["srhhydro_ManningsN"]
     srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
     srhmat_matNameList = srh_all_Dict["srhmat_matNameList"]
     srhmat_matZoneCells = srh_all_Dict["srhmat_matZoneCells"]
+    srhmat_ks_dict = srh_all_Dict["srhmat_ks_dict"]    #this is extra roughness height information for each material (not in srhmat file)
     matID_cells = srh_all_Dict["matID_cells"]
 
     if settings.bVerbose
@@ -31,13 +33,23 @@ function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
         end
     end
 
+    #if it is forward simulation and the Manning's n variable, then create the variable ks_cells
+    if settings.bPerform_Forward_Simulation 
+        if settings.forward_settings.ManningN_option == "variable"            
+            for iCell in 1:my_mesh_2D.numOfCells
+                matID = matID_cells[iCell]
+                ks_cells[iCell] = srhmat_ks_dict[matID]
+            end
+        end
+    end
+
     #println("ManningN_cells: ", ManningN_cells)
 
-    return ManningN_cells
+    return ManningN_cells, ks_cells
 end
 
 #update Manning's n values for inversion or sensitivity analysis
-# UPdate based on the provided Manning's n values for each material (zone)
+# Update based on the provided Manning's n values for each material (zone)
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
 function update_ManningN_inversion_sensitivity_analysis(
     my_mesh_2D::mesh_2D,
@@ -72,6 +84,8 @@ end
 # new_ManningN_values is a vector of Manning's n values for each material (zone)
 function update_ManningN_forward_simulation(
     h::AbstractArray{T},
+    Umag::AbstractArray{T},
+    ks::AbstractArray{T},
     settings::ControlSettings) where {T<:Real}
 
     manning_func = create_manning_function(
@@ -79,19 +93,23 @@ function update_ManningN_forward_simulation(
             settings.forward_settings.ManningN_function_parameters
         )
 
-    ManningN_cells = manning_func(h)
+    ManningN_cells = manning_func(h, Umag, ks)
 
     return ManningN_cells
 end
 
 # Function factory to create Manning's n function from parameters
+# For types "power_law", "sigmoid", and "inverse", the function is a function of h only (Umag and ks are not used)
+# For type "h_Umag_ks", the function is a function of h, Umag, and ks
 function create_manning_function(type::String, params::Dict)
     if type == "power_law"
-        return h -> power_law_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]))
+        return (h, Umag, ks) -> power_law_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]))
     elseif type == "sigmoid"
-        return h -> sigmoid_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]), Float64(params["h_mid"]))
+        return (h, Umag, ks) -> sigmoid_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]), Float64(params["h_mid"]))
     elseif type == "inverse"
-        return h -> inverse_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]))
+        return (h, Umag, ks) -> inverse_n(h, Float64(params["n_lower"]), Float64(params["n_upper"]), Float64(params["k"]))
+    elseif type == "h_Umag_ks"
+        return (h, Umag, ks) -> manning_n_h_Umag_ks(h, Umag, ks)
     else
         error("Unknown Manning's n function type: $type. Supported types: constant, power_law, sigmoid, inverse.")
     end
@@ -119,6 +137,37 @@ function sigmoid_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T, h_mid::T) 
     @assert(k > 0, "k must be a positive scaling factor")
     @assert(h_mid > 0, "h_mid must be a positive water depth")
     return n_lower .+ (n_upper - n_lower) ./ (1 .+ exp.(k .* (h .- h_mid)))
+end
+
+# Manning's n as a function of h, ks, and Umag
+# See Cheng (2008) JHE, "Formulas for Friction Factor in Transitional Regimes", Eq. (17) to get f, then the Manning's n
+function manning_n_h_Umag_ks(h::AbstractArray{T}, Umag::AbstractArray{T}, ks::AbstractArray{T}) where {T<:Real}
+
+    # Computer the Reynolds number
+    ν = 1.0e-6 # kinematic viscosity of water (m^2/s)
+    Re = Umag .* h ./ ν
+
+    # Compute h/ks 
+    h_ks = h ./ ks
+
+    #compute alpha
+    alpha = 1.0 ./ (1.0 .+ (Re./850.0).^9)
+
+    #compute beta
+    beta = 1.0 ./ (1.0 .+ (Re./(h_ks.*160.0)).^2)
+
+    # Compute the friction factor f in parts 
+    part1 = (Re./24.0).^alpha 
+    part2 = (1.8 .* log10.(Re./2.1)).^(2.0.*(1.0 .- alpha).*beta)
+    part3 = (2.0 .* log10.(11.8 .* h_ks)).^(2.0.*(1.0 .- alpha).*(1.0 .- beta))
+
+    # Compute the friction factor f
+    f = 1.0 ./ (part1 .* part2 .* part3).^2
+
+    # Compute Manning's n = sqrt(f/8.0) * h^(1/6) /sqrt(9.81)
+    n = sqrt.(f./8.0) .* h.^(1.0./6.0) ./ sqrt.(9.81)       #need to fix this if in English units
+
+    return n
 end
 
 #update Manning's n values from the UDE model's neural network

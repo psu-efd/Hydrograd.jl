@@ -5,7 +5,7 @@
 function setup_initial_condition(settings::ControlSettings, my_mesh_2D::mesh_2D, nodeCoordinates::Matrix{T}, wse::AbstractVector{T},
     wstill::AbstractVector{T}, h::AbstractVector{T}, hstill::AbstractVector{T}, xi::AbstractVector{T}, 
     q_x::AbstractVector{T}, q_y::AbstractVector{T},
-    zb_cells::AbstractVector{T}, ManningN_cells::AbstractVector{T},
+    zb_cells::AbstractVector{T}, ManningN_cells::AbstractVector{T}, ks_cells::AbstractVector{T},
     swe_2D_constants::swe_2D_consts, case_path::String, bPlot::Bool=false) where {T<:Real}
 
     initial_condition_options = nothing

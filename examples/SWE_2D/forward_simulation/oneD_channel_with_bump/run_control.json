@@ -18,7 +18,7 @@
     },
     "forward_simulation_options": {
         "comment": "Options for the forward simulation.",
-        "comment_ManningN_option": "options: constant, variable_as_function_of_h",
+        "comment_ManningN_option": "options: constant, variable",
         "forward_simulation_ManningN_option": "constant",
         "forward_simulation_ManningN_function_type": "sigmoid",
         "forward_simulation_ManningN_function_parameters": {

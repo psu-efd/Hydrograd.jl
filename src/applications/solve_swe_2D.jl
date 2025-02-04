@@ -193,13 +193,14 @@ function solve_swe_2D(control_file::String)
     params_vector, active_param_name = Hydrograd.setup_model_parameters_2D(settings, my_mesh_2D, srh_all_Dict, zb_cells_truth, ManningN_zone_values_truth, inlet_discharges_truth)
 
     #Initial setup of Manning's n at cells and ghost cells using the SRH-2D data 
-    #If performing forward simulation and the ManningN_option is "variable_as_function_of_h", ManningN_cells will be updated later in the forward simulation process.
+    #If performing forward simulation and the ManningN_option is "variable", 
+    # ManningN_cells will be updated later in the forward simulation process.
     #If performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process.
     #If performing UDE and UDE_choice is ManningN_h, ManningN_cells will be updated later in the UDE process.
-    ManningN_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
+    ManningN_cells, ks_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
 
     #setup initial condition for wse, wstill, h, hstill, xi, q_x, q_y at cells
-    Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells, ManningN_cells,
+    Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells, ManningN_cells, ks_cells,
                                       swe_2D_constants, case_path, true)
 
     #setup initial condition for wse, h, q_x, q_y at ghost cells
@@ -245,6 +246,7 @@ function solve_swe_2D(control_file::String)
         boundary_conditions,
         swe_2D_constants,
         ManningN_cells,
+        ks_cells,
         inletQ_Length,
         inletQ_TotalQ,
         exitH_WSE,
