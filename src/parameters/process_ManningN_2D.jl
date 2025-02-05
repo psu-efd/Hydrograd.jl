@@ -5,6 +5,10 @@ function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
     # Initialize Manning's n values for cells (just for initialization; will be updated later if Manning's n is a function of h, ks, or Umag)
     ManningN_cells = zeros(Float64, my_mesh_2D.numOfCells)
     ks_cells = zeros(Float64, my_mesh_2D.numOfCells)
+    h_ks_cells = zeros(Float64, my_mesh_2D.numOfCells)
+    friction_factor_cells = zeros(Float64, my_mesh_2D.numOfCells)
+    Re_cells = zeros(Float64, my_mesh_2D.numOfCells)
+
 
     srhhydro_ManningsN = srh_all_Dict["srhhydro_ManningsN"]
     srhmat_numOfMaterials = srh_all_Dict["srhmat_numOfMaterials"]
@@ -33,19 +37,32 @@ function setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
         end
     end
 
-    #if it is forward simulation and the Manning's n variable, then create the variable ks_cells
+    #if it is forward simulation and the Manning's n variable, or for UDE and UDE_choice is ManningN_h_Umag_ks, then create the variable ks_cells
+    bNeed_ks_cells = false
     if settings.bPerform_Forward_Simulation 
-        if settings.forward_settings.ManningN_option == "variable"            
-            for iCell in 1:my_mesh_2D.numOfCells
-                matID = matID_cells[iCell]
-                ks_cells[iCell] = srhmat_ks_dict[matID]
-            end
+        if settings.forward_settings.ManningN_option == "variable" 
+            bNeed_ks_cells = true
         end
+    end
+
+    if settings.bPerform_UDE 
+        if settings.UDE_settings.UDE_choice == "ManningN_h_Umag_ks" 
+            bNeed_ks_cells = true
+        end
+    end
+
+    println("srhmat_ks_dict: ", srhmat_ks_dict)
+
+    if bNeed_ks_cells
+        for iCell in 1:my_mesh_2D.numOfCells
+            matID = matID_cells[iCell]
+            ks_cells[iCell] = srhmat_ks_dict[matID]
+        end        
     end
 
     #println("ManningN_cells: ", ManningN_cells)
 
-    return ManningN_cells, ks_cells
+    return ManningN_cells, ks_cells, h_ks_cells, friction_factor_cells, Re_cells
 end
 
 #update Manning's n values for inversion or sensitivity analysis
@@ -93,9 +110,10 @@ function update_ManningN_forward_simulation(
             settings.forward_settings.ManningN_function_parameters
         )
 
-    ManningN_cells = manning_func(h, Umag, ks)
+    #ManningN_cells = manning_func(h, Umag, ks)
+    ManningN_cells, h_ks, friction_factor, Re = manning_func(h, Umag, ks)   #debug
 
-    return ManningN_cells
+    return ManningN_cells, h_ks, friction_factor, Re
 end
 
 # Function factory to create Manning's n function from parameters
@@ -120,14 +138,30 @@ end
 #    k is a positive scaling factor that contrrols the the rate of decrease of Manning's n with increasing water depth
 function inverse_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T) where {T<:Real}
     @assert(k > 0, "k must be a positive scaling factor")
-    return n_lower .+ (n_upper - n_lower) ./ (1 .+ k .* h)
+    
+    #h_ks, f, and Re are not used for inverse_n
+    h_ks = zeros(eltype(h), size(h))
+    f = zeros(eltype(h), size(h))
+    Re = zeros(eltype(h), size(h))
+
+    n = n_lower .+ (n_upper - n_lower) ./ (1 .+ k .* h)
+
+    return n, h_ks, f, Re
 end
 
 # Power law function: n(h) = n_lower + (n_upper - n_lower) * h^(-k)
 #    k is a positive scaling factor that contrrols the the rate of decrease of Manning's n with increasing water depth
 function power_law_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T) where {T<:Real}
     @assert(k > 0, "k must be a positive scaling factor")
-    return n_lower .+ (n_upper - n_lower) .* (h .+ eps(eltype(h))) .^ (-k)
+
+    #h_ks, f, and Re are not used for power_law_n
+    h_ks = zeros(eltype(h), size(h))
+    f = zeros(eltype(h), size(h))
+    Re = zeros(eltype(h), size(h))
+
+    n = n_lower .+ (n_upper - n_lower) .* (h .+ eps(eltype(h))) .^ (-k)
+
+    return n, h_ks, f, Re
 end
 
 # sigmoid based on water depth: n(h) = n_lower + (n_upper - n_lower) / (1 + exp(-k*(h-h_mid)))
@@ -136,7 +170,15 @@ end
 function sigmoid_n(h::AbstractArray{T}, n_lower::T, n_upper::T, k::T, h_mid::T) where {T<:Real}
     @assert(k > 0, "k must be a positive scaling factor")
     @assert(h_mid > 0, "h_mid must be a positive water depth")
-    return n_lower .+ (n_upper - n_lower) ./ (1 .+ exp.(k .* (h .- h_mid)))
+
+    #h_ks, f, and Re are not used for sigmoid_n
+    h_ks = zeros(eltype(h), size(h))
+    f = zeros(eltype(h), size(h))
+    Re = zeros(eltype(h), size(h))
+
+    n = n_lower .+ (n_upper - n_lower) ./ (1 .+ exp.(k .* (h .- h_mid)))
+
+    return n, h_ks, f, Re
 end
 
 # Manning's n as a function of h, ks, and Umag
@@ -162,22 +204,27 @@ function manning_n_h_Umag_ks(h::AbstractArray{T}, Umag::AbstractArray{T}, ks::Ab
     part3 = (2.0 .* log10.(11.8 .* h_ks)).^(2.0.*(1.0 .- alpha).*(1.0 .- beta))
 
     # Compute the friction factor f
-    f = 1.0 ./ (part1 .* part2 .* part3).^2
+    f = 1.0 ./ (part1 .* part2 .* part3)
 
     # Compute Manning's n = sqrt(f/8.0) * h^(1/6) /sqrt(9.81)
     n = sqrt.(f./8.0) .* h.^(1.0./6.0) ./ sqrt.(9.81)       #need to fix this if in English units
 
-    return n
+    return n, h_ks, f, Re
 end
 
 #update Manning's n values from the UDE model's neural network
-function update_ManningN_UDE(h::AbstractVector{T1}, 
+function update_ManningN_UDE(UDE_choice::String,
+                           h::AbstractVector{T1}, 
+                           Umag::AbstractVector{T2},
+                           ks::AbstractVector{T3},
                            ude_model::Lux.Chain, 
-                           NN_model_params::AbstractVector{T2}, 
+                           NN_model_params::AbstractVector{T4}, 
                            ude_model_state,
-                           h_bounds::Vector{T3},
-                           num_of_cells::Integer) where {T1 <: Real, T2 <: Real, T3 <: Real}
-    
+                           h_bounds::Vector{Float64},
+                           Umag_bounds::Vector{Float64},
+                           ks_bounds::Vector{Float64},
+                           num_of_cells::Integer) where {T1 <: Real, T2 <: Real, T3 <: Real, T4 <: Real}    
+
     #ManningN_cells = [
     #    ude_model(@SMatrix([h[iCell];;]), NN_model_params, ude_model_state)[1][1]
     #    for iCell in 1:num_of_cells
@@ -186,11 +233,34 @@ function update_ManningN_UDE(h::AbstractVector{T1},
     # Create batch of inputs and normalize to [-1, 1]
     h_normalized = @. 2.0 * (h - h_bounds[1]) / (h_bounds[2] - h_bounds[1]) - 1.0
 
+    if UDE_choice == "ManningN_h_Umag_ks"
+        Umag_normalized = @. 2.0 * (Umag - Umag_bounds[1]) / (Umag_bounds[2] - Umag_bounds[1]) - 1.0
+        ks_normalized = @. 2.0 * (ks - ks_bounds[1]) / (ks_bounds[2] - ks_bounds[1]) - 1.0
+    end
+
     # Reshape for Lux
     h_matrix = reshape(h_normalized, 1, num_of_cells)
-    
+
+    if UDE_choice == "ManningN_h_Umag_ks"
+        Umag_matrix = reshape(Umag_normalized, 1, num_of_cells)
+        ks_matrix = reshape(ks_normalized, 1, num_of_cells)
+    end
+
+    Zygote.ignore() do
+        #print a few values
+        #println("h_matrix: ", ForwardDiff.value.(h_matrix[1:5]))
+        #println("Umag_normalized: ", ForwardDiff.value.(Umag_normalized[1:5]))
+        #println("ks_normalized: ", ForwardDiff.value.(ks_normalized[1:5]))
+    end
+
     # Apply model to entire batch
-    outputs = ude_model(h_matrix, NN_model_params, ude_model_state)[1]
+    if UDE_choice == "ManningN_h"
+        outputs = ude_model(h_matrix, NN_model_params, ude_model_state)[1]
+    elseif UDE_choice == "ManningN_h_Umag_ks"
+        outputs = ude_model(vcat(h_normalized', Umag_normalized', ks_normalized'), NN_model_params, ude_model_state)[1]
+    else
+        error("Unknown UDE choice: $UDE_choice")
+    end
 
     Zygote.ignore() do
         #@show typeof(ManningN_cells)

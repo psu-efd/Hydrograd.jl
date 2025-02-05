@@ -76,14 +76,14 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
     sol, ITER, LOSS, PARS = nothing, nothing, nothing, nothing
     if settings.UDE_settings.UDE_mode == "training"
         println("   Performing UDE training: ", settings.UDE_settings.UDE_choice, " ...\n")
-        sol, ITER, LOSS, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, wstill, hstill, case_path)
+        #sol, ITER, LOSS, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, wstill, hstill, case_path)
 
         #@show typeof(sol.u)
         #@show sol.u
 
         #save the UDE results
-        jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PARS,
-            ude_model_params=sol.u, ude_model_state=swe_extra_params.ude_model_state)
+        #jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PARS,
+        #    ude_model_params=sol.u, ude_model_state=swe_extra_params.ude_model_state)
 
         #compute all the losses and ODE solutions for each inversion iteration
         println("   Computing all the losses and ODE solutions for each UDE iteration ...")
@@ -411,7 +411,7 @@ function compute_all_losses_UDE(ode_f::ODEFunction, Q0::AbstractVector{T1}, sett
         #save the inverted results to vtk
         bSave_vtk = true
         if bSave_vtk
-            println("       Saving forward simulation results to vtk file for iteration: ", iter_number)
+            println("       Saving UDE iteration results to vtk file for iteration: ", iter_number)
 
             field_name = "iter_number"
             field_type = "integer"
@@ -425,6 +425,7 @@ function compute_all_losses_UDE(ode_f::ODEFunction, Q0::AbstractVector{T1}, sett
             u_temp = q_x_array ./ (h_array .+ eps(eltype(h_array)))
             v_temp = q_y_array ./ (h_array .+ eps(eltype(h_array)))
             U_vector = hcat(u_temp, v_temp)
+            Umag = sqrt.(u_temp.^2 .+ v_temp.^2)
                             
             vector_data = [U_vector] 
             vector_names = ["U"]
@@ -432,15 +433,61 @@ function compute_all_losses_UDE(ode_f::ODEFunction, Q0::AbstractVector{T1}, sett
             WSE_array = h_array + zb_i
 
             #update ManningN_cells from h and the NN if needed
-            if settings.UDE_settings.UDE_choice == "ManningN_h"
-                ManningN_cells = update_ManningN_UDE(h_array, swe_extra_params.ude_model, θ_from_file, swe_extra_params.ude_model_state, Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), my_mesh_2D.numOfCells)
+            if settings.UDE_settings.UDE_choice == "ManningN_h" || settings.UDE_settings.UDE_choice == "ManningN_h_Umag_ks"
+                ManningN_cells = update_ManningN_UDE(settings.UDE_settings.UDE_choice, 
+                           h_array, Umag, swe_extra_params.ks_cells, 
+                           swe_extra_params.ude_model, θ_from_file, swe_extra_params.ude_model_state, 
+                           Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), 
+                           Float64.(settings.UDE_settings.UDE_NN_config["Umag_bounds"]), 
+                           Float64.(settings.UDE_settings.UDE_NN_config["ks_bounds"]), 
+                           my_mesh_2D.numOfCells)                        
             end
-                
-            scalar_data = [h_array, q_x_array, q_y_array, zb_i, WSE_array, ManningN_cells, ManningN_cell_truth]
-            scalar_names = ["h", "hu", "hv", "zb_cell", "WSE", "ManningN_cells", "ManningN_cell_truth"]
 
-            vtk_fileName = @sprintf("forward_simulation_results_%04d.vtk", iter_number)
+            ks_cells = swe_extra_params.ks_cells
+            h_ks_cells = swe_extra_params.h_ks_cells
+            friction_factor_cells = swe_extra_params.friction_factor_cells
+            Re_cells = swe_extra_params.Re_cells
+
+            ManningN_cells_from_formula = deepcopy(ManningN_cells)
+
+            #If the UDE choice is ManningN_h_Umag_ks, then compute the Reynolds number, h_ks, and friction factor
+            if settings.UDE_settings.UDE_choice == "ManningN_h_Umag_ks"
                 
+                # Computer the Reynolds number
+
+                ν = 1.0e-6 # kinematic viscosity of water (m^2/s)
+                Re_cells = Umag .* h_array ./ ν
+
+                Zygote.ignore() do
+                    println("Re_cells: ", ForwardDiff.value.(Re_cells[1:5]))
+                end
+
+                # Compute h/ks 
+                h_ks_cells = h_array ./ ks_cells
+
+                #compute alpha
+                alpha = 1.0 ./ (1.0 .+ (Re_cells ./ 850.0) .^ 9)
+
+                #compute beta
+                beta = 1.0 ./ (1.0 .+ (Re_cells ./ (h_ks_cells .* 160.0)) .^ 2)
+
+                # Compute the friction factor f in parts 
+                part1 = (Re_cells ./ 24.0) .^ alpha
+                part2 = (1.8 .* log10.(Re_cells ./ 2.1)) .^ (2.0 .* (1.0 .- alpha) .* beta)
+                part3 = (2.0 .* log10.(11.8 .* h_ks_cells)) .^ (2.0 .* (1.0 .- alpha) .* (1.0 .- beta))
+
+                # Compute the friction factor f
+                friction_factor_cells = 1.0 ./ (part1 .* part2 .* part3)
+
+                # Compute Manning's n = sqrt(f/8.0) * h^(1/6) /sqrt(9.81)
+                ManningN_cells_from_formula = sqrt.(friction_factor_cells ./ 8.0) .* h_array .^ (1.0 ./ 6.0) ./ sqrt.(9.81)
+            end
+
+            scalar_data = [h_array, q_x_array, q_y_array, zb_i, WSE_array, ManningN_cells, ManningN_cell_truth, ks_cells, h_ks_cells, friction_factor_cells, Re_cells, ManningN_cells_from_formula, WSE_truth, h_truth, u_truth, v_truth]
+            scalar_names = ["h", "hu", "hv", "zb_cell", "WSE", "ManningN_cells", "ManningN_cell_truth", "ks", "h_ks", "friction_factor_from_formula", "Re", "ManningN_from_formula", "WSE_truth", "h_truth", "u_truth", "v_truth"]
+
+            vtk_fileName = @sprintf("UDE_iteration_results_%04d.vtk", iter_number)                
+
             file_path = joinpath(case_path, vtk_fileName ) 
             export_to_vtk_2D(file_path, nodeCoordinates, my_mesh_2D.cellNodesList, my_mesh_2D.cellNodesCount, field_name, field_type, field_value, scalar_data, scalar_names, vector_data, vector_names)    
         end
@@ -462,13 +509,14 @@ function compute_all_losses_UDE(ode_f::ODEFunction, Q0::AbstractVector{T1}, sett
             "inverted_us" => inverted_us,
             "inverted_vs" => inverted_vs,
             "ManningN_cells" => ManningN_cells,
-            "ManningN_cell_truth" => ManningN_cell_truth
+            "ManningN_cell_truth" => ManningN_cell_truth,
+            "ks_cells" => swe_extra_params.ks_cells,
+            "h_ks_cells" => swe_extra_params.h_ks_cells,
+            "friction_factor_cells" => swe_extra_params.friction_factor_cells,
+            "Re_cells" => swe_extra_params.Re_cells
         ))
     end
-    
-
 end
-
 
 # Define the loss function
 function compute_loss_UDE(ode_f, Q0, tspan, p, settings, my_mesh_2D, swe_2D_constants, observed_data, wstill, hstill, data_type)

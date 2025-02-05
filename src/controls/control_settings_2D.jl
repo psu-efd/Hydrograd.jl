@@ -86,6 +86,7 @@ end
 struct UDESettings
     UDE_mode::String
     UDE_choice::String
+    UDE_ManningN_function_parameters::Dict
     UDE_NN_config::Dict
     UDE_bWSE_loss::Bool
     UDE_b_uv_loss::Bool
@@ -527,6 +528,18 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
 
     end
 
+    #for the option of ManningN_h_Umag_ks, the input dimension must be 3 (ks, h, Umag) and the output dimension must be 1 (ManningN)
+    if options["UDE_choice"] == "ManningN_h_Umag_ks" 
+
+        input_dim = options["UDE_NN_config"]["input_dim"]
+        output_dim = options["UDE_NN_config"]["output_dim"]
+
+        if input_dim != 3 || output_dim != 1
+            error("For ManningN_h_Umag_ks, the input dimension must be 3 (ks, h, Umag) and the output dimension must be 1 (ManningN).")
+        end
+
+    end
+
     #for the option of FlowResistance, the input dimension must be 2 (h, q_magnitude) and the output dimension must be 1 (tau_b magnitude)
     if options["UDE_choice"] == "FlowResistance" 
 
@@ -547,6 +560,7 @@ function parse_UDE_settings(options::Dict, control_file_dir::String)
     UDESettings(
         String(options["UDE_mode"]),
         String(options["UDE_choice"]),
+        Dict(options["UDE_ManningN_function_parameters"]),
         Dict(options["UDE_NN_config"]),
         Bool(options["UDE_bWSE_loss"]),
         Bool(options["UDE_b_uv_loss"]),

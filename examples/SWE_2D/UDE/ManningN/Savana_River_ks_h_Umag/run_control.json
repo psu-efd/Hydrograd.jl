@@ -1,0 +1,75 @@
+{
+    "comment": "This is the control file for the SWE_2D case. It contains the control variables and options.",
+    "bVerbose": false,
+    "control_variables": {
+        "srhhydro_file_name": "Savana_SI.srhhydro",
+        "comment": "Choose what to perform: forward simulation, inversion, sensitivity analysis, or UDE. Only one of them can be true.",
+        "bPerform_Forward_Simulation": false,
+        "bPerform_Inversion": false,
+        "bPerform_Sensitivity_Analysis": false,
+        "bPerform_UDE": true
+    },
+    "time_settings": {
+        "comment": "Time settings for the simulation (overrides the srhhydro file)",
+        "bUse_srhhydro_time_settings": false,
+        "tspan": [0.0, 200.0],
+        "dt": 0.02,
+        "dt_save": 0.1,
+        "nSave": 1
+    },
+    "UDE_options": {
+        "comment_UDE_mode": "training, inference (must provide NN_weights_state_file_name)",
+        "UDE_mode": "training",
+        "comment_UDE_choice": "Choice for UDE: ManningN_h, ManningN_h_Umag_ks, FlowResistance. For ManningN_h, a NN is used to fit ManningN as a function of water depth h. For ManningN_h_Umag_ks, a NN is used to fit ManningN as a function of h, Umag, and ks. For FlowResistance, a NN is used to fit the flow resistance term (tau_b) as a function of h, u, and v.",
+        "UDE_choice": "ManningN_h_Umag_ks",       
+        "UDE_ManningN_function_parameters": {
+            "ks": [0.02, 0.25, 0.3, 0.1, 0.2, 0.3]            
+        },
+        "UDE_NN_config": {
+            "comment": "Configuration for the NN",
+            "comment_how_to_initialize_NN": "random, from_pretrained (for inference or continued training; file name must be provided as NN_weights_state_file_name)",
+            "how_to_initialize_NN": "random",
+            "NN_weights_state_file_name": "pretrained_NN_weights_state.jld2",
+            "input_dim": 3,
+            "output_dim": 1,
+            "hidden_layers": [3, 3],
+            "activations": ["tanh", "tanh"],
+            "h_bounds": [0.7, 7.0],
+            "Umag_bounds": [0.1, 1.2],
+            "ks_bounds": [0.1, 0.3],
+            "output_bounds": [0.02, 0.04]
+        },
+
+        "UDE_bWSE_loss": true,
+        "UDE_b_uv_loss": true,
+                
+        "comment_UDE_optimizers": "Optimizers for the UDE training: A list with the order of the optimizers for the UDE training",
+        "UDE_optimizers": ["Adam", "LBFGS"],
+        "comment_UDE_learning_rates": "Learning rates for the UDE training: A list with the order of the learning rates for the UDE training",
+        "UDE_learning_rates": [0.1, 0.1],
+        "comment_UDE_max_iterations": "Maximum number of epochs/iterations for the optimizer: A list with the order of the maximum number of epochs/iterations for the optimizer",
+        "UDE_max_iterations": [200, 0],
+        "UDE_abs_tols": [1e-8, 1e-8],
+        "UDE_rel_tols": [1e-8, 1e-8],
+        "UDE_training_save_frequency": 1,
+        "UDE_training_save_checkpoint": true,
+        "UDE_training_checkpoint_frequency": 10,
+        "UDE_sensealg": "AutoForwardDiff()",
+        "UDE_truth_file_name": "forward_simulation_solution_truth.json",
+        "UDE_forward_simulation_initial_condition_options": "from_file",
+        "UDE_forward_simulation_initial_condition_file_name": "forward_simulation_initial_condition.json",
+        "UDE_forward_simulation_initial_condition_constant_values":  [0.33, 0.2, 0.0, 0.0],
+        "UDE_ode_solver_options": {
+            "comment": "Options for the ode solver in the forward pass",
+            "ode_solver": "Tsit5()",
+            "ode_solver_adaptive": true,
+            "ode_solver_sensealg": "ForwardDiffSensitivity()",
+            "ode_solver_b_jac_sparsity": true,
+            "ode_solver_nSave": 10
+        },
+        "UDE_training_save_file_name": "UDE_training_results.jld2",
+        "UDE_training_save_loss_history_file_name": "UDE_training_loss_history.csv",
+        "UDE_training_save_NN_weights_state_file_name": "UDE_training_NN_weights_state.jld2",
+        "UDE_inference_save_file_name": "UDE_inference_results.jld2"
+    }
+}

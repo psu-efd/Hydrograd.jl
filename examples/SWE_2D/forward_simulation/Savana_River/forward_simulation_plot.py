@@ -28,35 +28,6 @@ from pathlib import Path
 plt.rc('text', usetex=True)  #allow the use of Latex for math expressions and equations
 plt.rc('font', family='serif') #specify the default font family to be "serif"
 
-def extract_vtk_outer_boundary(vtk_file_name):
-    reader = vtk.vtkUnstructuredGridReader()
-    reader.SetFileName(vtk_file_name)
-    reader.Update()
-    mesh = reader.GetOutput()
-
-    # Extract the boundary edges
-    boundary_filter = vtk.vtkExtractEdges()
-    boundary_filter.SetInputData(mesh)
-    boundary_filter.Update()
-
-    boundary = boundary_filter.GetOutput()
-
-    # Get the boundary points and edges
-    boundary_points = boundary.GetPoints()
-    boundary_lines = boundary.GetLines()
-
-    # Extract coordinates of boundary points
-    points = np.array([boundary_points.GetPoint(i) for i in range(boundary_points.GetNumberOfPoints())])
-
-    # Extract connectivity of boundary edges
-    edges = []
-    lines_iter = vtk.vtkIdList()
-    boundary_lines.InitTraversal()
-    while boundary_lines.GetNextCell(lines_iter):
-        edge = [lines_iter.GetId(0), lines_iter.GetId(1)]
-        edges.append(edge)
-
-    return points, edges
 
 def plot_forward_simulation_result():
     """

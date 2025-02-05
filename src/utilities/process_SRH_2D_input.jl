@@ -159,11 +159,22 @@ function process_SRH_2D_input(settings, case_path)
     srhmat_ks_dict = Dict{Int, Float64}()
     if settings.bPerform_Forward_Simulation 
         if settings.forward_settings.ManningN_option == "variable"
-            for iMat in 1:srhmat_numOfMaterials               
-                srhmat_ks_dict[iMat] = settings.forward_settings.ManningN_function_parameters["ks"][iMat]
+            for iMat in 1:srhmat_numOfMaterials    
+                #print("imat: ", iMat)           
+                srhmat_ks_dict[iMat-1] = settings.forward_settings.ManningN_function_parameters["ks"][iMat]  #-1 because the first element is the default value in the srhmat file
             end
         end
     end    
+
+    if settings.bPerform_UDE 
+        if settings.UDE_settings.UDE_choice == "ManningN_h_Umag_ks"
+            for iMat in 1:srhmat_numOfMaterials    
+                #print("imat: ", iMat)           
+                srhmat_ks_dict[iMat-1] = settings.UDE_settings.UDE_ManningN_function_parameters["ks"][iMat]  #-1 because the first element is the default value in the srhmat file
+            end
+        end
+    end    
+
     
     if settings.bVerbose
         println("numOfMaterials: ", srhmat_numOfMaterials)

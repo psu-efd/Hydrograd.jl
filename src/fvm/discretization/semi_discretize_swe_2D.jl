@@ -41,11 +41,15 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
     # zb_cells, zb_ghostCells, zb_faces, and S0 are all derived from params_vector (computed later in the function)
     ManningN_cells_local = p_extra.ManningN_cells          #get a reference to these vectors
     ks_cells_local = p_extra.ks_cells
+    h_ks_cells_local = p_extra.h_ks_cells
+    friction_factor_cells_local = p_extra.friction_factor_cells
+    Re_cells_local = p_extra.Re_cells
     inletQ_Length_local = p_extra.inletQ_Length
     inletQ_TotalQ_local = p_extra.inletQ_TotalQ
     exitH_WSE_local = p_extra.exitH_WSE
     zb_cells_local = p_extra.zb_cells
     zb_ghostCells_local = p_extra.zb_ghostCells
+
     zb_faces_local = p_extra.zb_faces
     S0_cells_local = p_extra.S0_cells
     S0_faces_local = p_extra.S0_faces
@@ -141,7 +145,7 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
             Umag = sqrt.(u.^2 .+ v.^2)
 
             #ManningN_cells_local is a new allocated array, so it is not the same as p_extra.ManningN_cells as the update. 
-            ManningN_cells_local = update_ManningN_forward_simulation(h, Umag, ks_cells_local, settings)
+            ManningN_cells_local, h_ks_cells_local, friction_factor_cells_local, Re_cells_local = update_ManningN_forward_simulation(h, Umag, ks_cells_local, settings)
         end
 
         #For the case of inversion or sensitivity analysis, and if ManningN is the active parameter, 
@@ -158,13 +162,19 @@ function swe_2d_rhs(dQdt::AbstractVector{T1}, Q::AbstractVector{T2}, params_vect
 
         #For the case of UDE, we need to update ManningN or flow resistance based on the UDE model
         #In this case, params_vector is the trainable NN parameters
-    elseif settings.bPerform_UDE && settings.UDE_settings.UDE_choice == "ManningN_h"
-        #ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, p_extra.ude_model_params, p_extra.ude_model_state, my_mesh_2D)
+    elseif settings.bPerform_UDE && (settings.UDE_settings.UDE_choice == "ManningN_h" || settings.UDE_settings.UDE_choice == "ManningN_h_Umag_ks")
+        #compute Umag
+        u = q_x ./ h
+        v = q_y ./ h
+        Umag = sqrt.(u.^2 .+ v.^2)
 
-        #@show typeof(Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]))
-        #@show Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"])
-
-        ManningN_cells_local = update_ManningN_UDE(h, p_extra.ude_model, params_vector, p_extra.ude_model_state, Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), my_mesh_2D.numOfCells)
+        ManningN_cells_local = update_ManningN_UDE(settings.UDE_settings.UDE_choice, 
+                       h, Umag, ks_cells_local, 
+                       p_extra.ude_model, params_vector, p_extra.ude_model_state, 
+                       Float64.(settings.UDE_settings.UDE_NN_config["h_bounds"]), 
+                       Float64.(settings.UDE_settings.UDE_NN_config["Umag_bounds"]), 
+                       Float64.(settings.UDE_settings.UDE_NN_config["ks_bounds"]), 
+                       my_mesh_2D.numOfCells)
     end
 
     Zygote.ignore() do

@@ -196,8 +196,10 @@ function solve_swe_2D(control_file::String)
     #If performing forward simulation and the ManningN_option is "variable", 
     # ManningN_cells will be updated later in the forward simulation process.
     #If performing inversion on Manning's n, ManningN_cells will be updated later in the inversion process.
-    #If performing UDE and UDE_choice is ManningN_h, ManningN_cells will be updated later in the UDE process.
-    ManningN_cells, ks_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
+    #If performing UDE and UDE_choice is ManningN_h or ManningN_h_Umag_ks, ManningN_cells will be updated later in the UDE process.
+    ManningN_cells, ks_cells, h_ks_cells, friction_factor_cells, Re_cells = Hydrograd.setup_ManningN(settings, my_mesh_2D, srh_all_Dict)
+
+    println("ks_cells: ", ks_cells[1:5])
 
     #setup initial condition for wse, wstill, h, hstill, xi, q_x, q_y at cells
     Hydrograd.setup_initial_condition(settings, my_mesh_2D, nodeCoordinates, wse, wstill, h, hstill, xi, q_x, q_y, zb_cells, ManningN_cells, ks_cells,
@@ -247,6 +249,9 @@ function solve_swe_2D(control_file::String)
         swe_2D_constants,
         ManningN_cells,
         ks_cells,
+        h_ks_cells,
+        friction_factor_cells,
+        Re_cells,
         inletQ_Length,
         inletQ_TotalQ,
         exitH_WSE,

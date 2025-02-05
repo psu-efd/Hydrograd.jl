@@ -23,7 +23,7 @@
         "forward_simulation_ManningN_option": "variable",
         "forward_simulation_ManningN_function_type": "h_Umag_ks",
         "forward_simulation_ManningN_function_parameters": {
-            "ks": [0.02, 0.06, 0.1, 0.02, 0.08, 0.1]            
+            "ks": [0.02, 0.25, 0.3, 0.1, 0.2, 0.3]            
         },
 
         "forward_simulation_solver": "SciML",

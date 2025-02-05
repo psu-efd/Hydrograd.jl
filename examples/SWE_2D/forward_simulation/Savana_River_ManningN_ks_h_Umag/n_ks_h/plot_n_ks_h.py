@@ -9,14 +9,41 @@ import numpy as np
 import matplotlib.ticker as tick
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from matplotlib.tri import Triangulation
-
+from matplotlib.cm import jet
+from matplotlib.colors import Normalize
 import json
+
+import meshio
+import pyvista as pv
+
+
 
 from pathlib import Path
 
 plt.rc('text', usetex=True)  #allow the use of Latex for math expressions and equations
 plt.rc('font', family='serif') #specify the default font family to be "serif"
+
+def triangulate_vtk():
+    #triangulate the vtk
+
+    # Load the VTK file
+    file_path = '../forward_simulation_results_0101.vtk'
+    grid = pv.read(file_path)
+
+    # Triangulate the grid
+    triangulated = grid.triangulate()
+
+    # Interpolate cell data to point data
+    interpolated = triangulated.cell_data_to_point_data()
+
+    # Save the triangulated grid to a new VTK file
+    triangulated_file_path = 'forward_simulation_results_0101_tri.vtk'
+    interpolated.save(triangulated_file_path)
+
+    print(f"Triangulated file saved to: {triangulated_file_path}")
+
+    print("Available point data:", interpolated.point_data.keys())
+
 
 def plot_forward_simulation_result():
     """
@@ -41,7 +68,6 @@ def plot_forward_simulation_result():
     #1. plot bathy in xy and center line
     vtk_fileName = 'forward_simulation_results_0101_tri.vtk'
 
-
     #read data from vtk file
     vtk_result = meshio.read(vtk_fileName)
 
@@ -51,9 +77,6 @@ def plot_forward_simulation_result():
 
     if cells is None:
         raise ValueError("The VTK file does not contain triangular cells.")
-
-    # Create a Triangulation object for plotting
-    triangulation = Triangulation(points[:, 0], points[:, 1], cells)
 
     # number of triangles
     nTri = vtk_result.cells[0].data.shape[0]
@@ -73,21 +96,18 @@ def plot_forward_simulation_result():
     yh = yCoord.max()
 
     #get the data
-    ManningN = np.squeeze(vtk_result.point_data['ManningN'])
-    zb = np.squeeze(vtk_result.point_data['zb_cell'])
-    WSE = np.squeeze(vtk_result.point_data['WSE'])
-    U = np.squeeze(vtk_result.point_data['U'])
-    Ux = U[:,0]
-    Uy = U[:,1]
-    Umag = np.sqrt(Ux**2 + Uy**2)
+    h_ks = np.squeeze(vtk_result.point_data['h_ks'])
+    Re = np.squeeze(vtk_result.point_data['Re'])
+    friction_factor = np.squeeze(vtk_result.point_data['friction_factor'])
+    n = np.squeeze(vtk_result.point_data['ManningN'])
 
-    print("WSE = ", WSE)
-    print("U = ", U)
-    print("Ux = ", Ux)
-    print("Uy = ", Uy)
-    print("Umag = ", Umag)
+    print("h_ks = ", h_ks)
+    print("Re = ", Re)
+    print("friction_factor = ", friction_factor)
+    print("n = ", n)
 
     #plot bathymetry
+
     cf_zb = axs[0, 0].tricontourf(xCoord, yCoord, tri, zb, local_levels,
                                         vmin=zb_min, vmax=zb_max, cmap=plt.cm.terrain, extend='neither')
     axs[0, 0].set_xlim([xl, xh])
@@ -301,19 +321,67 @@ def plot_n_ks_h():
 
 def plot_f_h_ks_Re():
     """
-    Plot the function of f(h/ks, Re).
+    Plot the function of f(h/ks, Re) and the scatter for simulation data.
 
     Reference: Cheng (2008) JHE, "Formulas for Friction Factor in Transitional Regimes", Eq. (17)
     """
 
+    #get simulatio data from the VTK file
+    vtk_fileName = 'forward_simulation_results_0101_tri.vtk'
+
+    #read data from vtk file
+    vtk_result = meshio.read(vtk_fileName)
+
+    # Extract points and cells (triangles)
+    points = vtk_result.points[:, :2]  # Take only the X and Y coordinates
+    cells = vtk_result.cells_dict.get("triangle")
+
+    if cells is None:
+        raise ValueError("The VTK file does not contain triangular cells.")
+
+    # number of triangles
+    nTri = vtk_result.cells[0].data.shape[0]
+
+    tri = np.zeros((nTri, 3))
+    for i in range(nTri):
+        tri[i, 0] = vtk_result.cells[0].data[i, 0]
+        tri[i, 1] = vtk_result.cells[0].data[i, 1]
+        tri[i, 2] = vtk_result.cells[0].data[i, 2]
+
+    xCoord = vtk_result.points[:, 0]
+    yCoord = vtk_result.points[:, 1]
+
+    xl = xCoord.min()
+    xh = xCoord.max()
+    yl = yCoord.min()
+    yh = yCoord.max()
+
+    #get the data
+    h_ks_simulation = np.squeeze(vtk_result.point_data['h_ks'])
+    Re_simulation = np.squeeze(vtk_result.point_data['Re'])
+    friction_factor_simulation = np.squeeze(vtk_result.point_data['friction_factor'])
+    n_simulation = np.squeeze(vtk_result.point_data['ManningN'])
+
+
+    print("h_ks_simulation = ", h_ks_simulation)
+    print("Re_simulation = ", Re_simulation)
+    print("friction_factor_simulation = ", friction_factor_simulation)
+    print("n_simulation = ", n_simulation)
+
+    print("Re_simulation.shape = ", Re_simulation.shape)
+    print("friction_factor_simulation.shape = ", friction_factor_simulation.shape)
+    print("n_simulation.shape = ", n_simulation.shape)
+
+
     #define the range of h/ks and Re
-    h_ks = [5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+    h_ks = [2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
+
 
     #number of points on each line
-    n_points = 100
+    n_points = 200
 
     #Create logarithmically spaced points for Re
-    Re = np.logspace(2, 6, n_points)  # 100 points from 10^2 to 10^6
+    Re = np.logspace(2, 8, n_points)  # 100 points from 10^2 to 10^8
 
     alpha = 1.0/(1.0  + (Re/850.0)**9)    
 
@@ -343,17 +411,29 @@ def plot_f_h_ks_Re():
     #plot the function of f(h/ks, Re)
     fig, axs = plt.subplots(1, 1, figsize=(16, 9), sharex=False, sharey=False, facecolor='w', edgecolor='k')
 
+    # Create normalizer for the color mapping
+    norm = Normalize(vmin=min(h_ks), vmax=max(h_ks))
+
     #loop over the h_ks
     for i in range(len(h_ks)):
-        axs.plot(Re, f[i], label=f'h/ks = {h_ks[i]}')
+        color = jet(norm(h_ks[i]))  # Get color from colormap
+        axs.plot(Re, f[i], color=color, label=f'h/ks = {h_ks[i]}')
+
+    #plot the scatter for simulation data and colored by h/ks
+    scatter = axs.scatter(Re_simulation, friction_factor_simulation, c=h_ks_simulation, alpha=0.5, edgecolors='black', linewidths=0.5, norm=norm, cmap='jet', label='Simulation data')
+
+    #add a color bar and customize the color bar
+    cbar = plt.colorbar(scatter, location='right', pad=0.02)
+    cbar.ax.set_title("$h/k_s$", loc='center', fontsize=16)
+    cbar.ax.tick_params(labelsize=14)
 
     #axs.legend()
     axs.set_xscale('log')
     axs.set_yscale('log')
 
     #set axis limits
-    axs.set_xlim(100, 2E6)
-    axs.set_ylim(0.01, 0.1)
+    axs.set_xlim(100, 3E7)
+    axs.set_ylim(0.02, 0.2)
 
     axs.set_xlabel('$Re$', fontsize=16)
     axs.set_ylabel('$f$', fontsize=16)
@@ -367,7 +447,7 @@ def plot_f_h_ks_Re():
 
     #add text to annotate the h/ks values for each line
     for i in range(len(h_ks)):
-        axs.text(6E5, f[i][-1], f'$h/k_s$ = {h_ks[i]}', fontsize=14)
+        axs.text(6E6, f[i][-1], f'$h/k_s$ = {h_ks[i]:.0f}', fontsize=14)
 
     plt.savefig("f_h_ks_Re.png", dpi=300, bbox_inches='tight', pad_inches=0.01)
     #plt.show()
@@ -375,6 +455,11 @@ def plot_f_h_ks_Re():
 
 if __name__ == '__main__':
 
+    #triangulate the vtk file
+    triangulate_vtk()
+
+    #plot the function of f(h/ks, Re)
     plot_f_h_ks_Re()
+
 
     print("Done!")

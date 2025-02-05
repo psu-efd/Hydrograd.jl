@@ -13,6 +13,9 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
     #Note: if ManningN_option is variable or from UDE, ManningN_cells is updated in the semi_discretize_swe_2D function.
     #      Thus, ManningN_cells in swe2d_extra_params cannot be used (because it can not be updated in the imutable struct swe2d_extra_params).
     ManningN_cells = swe2d_extra_params.ManningN_cells
+    h_ks_cells = swe2d_extra_params.h_ks_cells
+    friction_factor_cells = swe2d_extra_params.friction_factor_cells
+    Re_cells = swe2d_extra_params.Re_cells
 
     wstill = swe2d_extra_params.wstill    
     hstill = swe2d_extra_params.hstill
@@ -32,7 +35,7 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
 
     #If ManningN_option is variable, update ManningN_cell based on the ManningN_function_type and ManningN_function_parameters
     if settings.forward_settings.ManningN_option == "variable"
-        ManningN_cells = update_ManningN_forward_simulation(h_truth, Umag_truth, swe2d_extra_params.ks_cells, settings)
+        ManningN_cells, h_ks_cells, friction_factor_cells, Re_cells = update_ManningN_forward_simulation(h_truth, Umag_truth, swe2d_extra_params.ks_cells, settings)
     end
 
     #compute bed slope 
@@ -61,9 +64,13 @@ function  postprocess_forward_simulation_results_swe_2D(swe2d_extra_params::SWE2
             "S0_cells_truth" => replace_nan(S0_cells),
             #"S0_faces_truth" => replace_nan(S0_faces),
             "ManningN_cells_truth" => replace_nan(ManningN_cells),
+            "h_ks_cells_truth" => replace_nan(h_ks_cells),
+            "friction_factor_cells_truth" => replace_nan(friction_factor_cells),
+            "Re_cells_truth" => replace_nan(Re_cells),
             "friction_x_truth" => replace_nan(friction_x_truth),
             "friction_y_truth" => replace_nan(friction_y_truth),
             "ManningN_zone_values_truth" => replace_nan(ManningN_zone_values_truth),
+
             "inlet_discharges_truth" => replace_nan(inlet_discharges_truth)))
         println(io)
     end
