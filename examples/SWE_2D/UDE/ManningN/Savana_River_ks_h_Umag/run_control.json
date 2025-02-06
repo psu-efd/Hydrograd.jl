@@ -48,7 +48,7 @@
         "comment_UDE_learning_rates": "Learning rates for the UDE training: A list with the order of the learning rates for the UDE training",
         "UDE_learning_rates": [0.1, 0.1],
         "comment_UDE_max_iterations": "Maximum number of epochs/iterations for the optimizer: A list with the order of the maximum number of epochs/iterations for the optimizer",
-        "UDE_max_iterations": [200, 0],
+        "UDE_max_iterations": [150, 0],
         "UDE_abs_tols": [1e-8, 1e-8],
         "UDE_rel_tols": [1e-8, 1e-8],
         "UDE_training_save_frequency": 1,

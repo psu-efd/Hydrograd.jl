@@ -57,7 +57,6 @@ def plot_UDE_training_history_ManningN(iter_number, bPlotTitle=False):
 
     fig, axs = plt.subplots(2, 2, figsize=(14, 9), sharex=False, sharey=False, facecolor='w', edgecolor='k')
 
-
     fig.subplots_adjust(hspace=0.3, wspace=.2)
 
     #1. plot loss history
@@ -82,22 +81,21 @@ def plot_UDE_training_history_ManningN(iter_number, bPlotTitle=False):
 
     axs[0, 0].set_xlabel('Iteration', fontsize=16)
     axs[0, 0].set_ylabel('Loss', fontsize=16)
-    axs[0, 0].set_xlim([0, 100])
-    axs[0, 0].set_ylim([1e-7, 4e-3])
+    axs[0, 0].set_xlim([0, 150])
+    axs[0, 0].set_ylim([5e-8, 4e-3])
     axs[0, 0].set_yscale('log')
 
     axs[0, 0].legend(loc='upper right', fontsize=14, frameon=False)
 
     #2. plot Manning's n truth vs Manning's n UDE 
     # read the Manning's n truth and UDE data from the "forward_simulation_results_iter_number.vtk" file
-    vtk_file_name = f"forward_simulation_results_{iter_number:04d}.vtk"
+    vtk_file_name = f"UDE_iteration_results_{iter_number:04d}.vtk"
     reader = vtk.vtkUnstructuredGridReader()
     reader.SetFileName(vtk_file_name)
     reader.ReadAllScalarsOn()
     reader.ReadAllVectorsOn()
     reader.Update()
     vtk_data = reader.GetOutput()
-
 
     # Get Manning's n truth and UDE data
     ManningN_truth = vtk_to_numpy(vtk_data.GetCellData().GetArray('ManningN_cell_truth'))
@@ -179,28 +177,46 @@ def plot_f_h_ks_Re(plt, fig, ax, iter_number, bPlotTruth=False):
     """
 
     #get simulation data from the VTK file
-    vtk_fileName_truth = 'truth_results_0101_tri.vtk'
-    vtk_fileName_UDE = f'forward_simulation_results_{iter_number:04d}_tri.vtk'
+    vtk_fileName_truth = 'truth_results_0100.vtk'
+    vtk_fileName_UDE = f'UDE_iteration_results_{iter_number:04d}.vtk'
 
-    #read data from vtk file
-    vtk_result_truth = meshio.read(vtk_fileName_truth)
-    vtk_result_UDE = meshio.read(vtk_fileName_UDE)
+     # Read truth data
+    reader_truth = vtk.vtkUnstructuredGridReader()
+    reader_truth.SetFileName(vtk_fileName_truth)
+    reader_truth.ReadAllScalarsOn()
+    reader_truth.ReadAllVectorsOn()
+    reader_truth.Update()
+    vtk_data_truth = reader_truth.GetOutput()
 
-    #print the keys of the vtk_result_truth
-    #print("vtk_result_truth.point_data.keys() = ", vtk_result_truth.point_data.keys())
-    #print("vtk_result_UDE.point_data.keys() = ", vtk_result_UDE.point_data.keys())
+    # Read UDE data
+    reader_UDE = vtk.vtkUnstructuredGridReader()
+    reader_UDE.SetFileName(vtk_fileName_UDE)
+    reader_UDE.ReadAllScalarsOn()
+    reader_UDE.ReadAllVectorsOn()
+    reader_UDE.Update()
+    vtk_data_UDE = reader_UDE.GetOutput()
+
+    # Print array names correctly
+    print("\nArrays in truth data:")
+    cell_data_truth = vtk_data_truth.GetCellData()
+    for i in range(cell_data_truth.GetNumberOfArrays()):
+        print(f"  {cell_data_truth.GetArrayName(i)}")
+
+    print("\nArrays in UDE data:")
+    cell_data_UDE = vtk_data_UDE.GetCellData()
+    for i in range(cell_data_UDE.GetNumberOfArrays()):
+        print(f"  {cell_data_UDE.GetArrayName(i)}")
 
     #get the data
-    h_ks_simulation_truth = np.squeeze(vtk_result_truth.point_data['h_ks'])
-    Re_simulation_truth = np.squeeze(vtk_result_truth.point_data['Re'])
+    h_ks_simulation_truth = np.squeeze(vtk_data_truth.GetCellData().GetArray('h_ks'))
+    Re_simulation_truth = np.squeeze(vtk_data_truth.GetCellData().GetArray('Re'))
+    friction_factor_simulation_truth = np.squeeze(vtk_data_truth.GetCellData().GetArray('friction_factor'))
+    n_simulation_truth = np.squeeze(vtk_data_truth.GetCellData().GetArray('ManningN_cells'))
 
-    friction_factor_simulation_truth = np.squeeze(vtk_result_truth.point_data['friction_factor'])
-    n_simulation_truth = np.squeeze(vtk_result_truth.point_data['ManningN'])
-
-    h_ks_simulation_UDE = np.squeeze(vtk_result_UDE.point_data['h_ks'])
-    Re_simulation_UDE = np.squeeze(vtk_result_UDE.point_data['Re'])
-    friction_factor_simulation_UDE = np.squeeze(vtk_result_UDE.point_data['friction_factor_from_formula'])
-    n_simulation_UDE = np.squeeze(vtk_result_UDE.point_data['ManningN_cells'])
+    h_ks_simulation_UDE = np.squeeze(vtk_data_UDE.GetCellData().GetArray('h_ks'))
+    Re_simulation_UDE = np.squeeze(vtk_data_UDE.GetCellData().GetArray('Re'))
+    friction_factor_simulation_UDE = np.squeeze(vtk_data_UDE.GetCellData().GetArray('friction_factor_from_formula'))
+    n_simulation_UDE = np.squeeze(vtk_data_UDE.GetCellData().GetArray('ManningN_cells'))
 
     #print("h_ks_simulation_truth = ", h_ks_simulation_truth)
     #print("Re_simulation_truth = ", Re_simulation_truth)
@@ -319,7 +335,7 @@ def create_animation_training_history():
 
     #create a list to store the images
     images = []
-    for iImage in range(1, 101):
+    for iImage in range(1, 151):
         image_path = f"Savana_River_UDE_result_training_history_ManningN_{iImage:04d}_with_title.png"
         image = cv2.imread(image_path)
         video.write(image)
@@ -515,7 +531,7 @@ def plot_ManningN_iterations(iter_numbers):
         print(f"Plotting Manning's n, iter_number = {iter_number:04d}")
 
         # read the Manning's n values from the vtk file
-        vtk_file_name = f"forward_simulation_results_{iter_number:04d}.vtk"
+        vtk_file_name = f"UDE_iteration_results_{iter_number:04d}.vtk"
         reader = vtk.vtkUnstructuredGridReader()
         reader.SetFileName(vtk_file_name)
         reader.ReadAllScalarsOn()
@@ -644,7 +660,6 @@ def plot_ManningN_iterations(iter_numbers):
         clb.ax.set_title("(s/m$^{1/3}$)", loc='center', fontsize=14)  
 
         axs[index, 2].text(400, 350, f"RMSE = {rmse:.5f}", fontsize=12, ha='left', va='center')
-
 
     #add title above the first row
     axs[0, 0].set_title("Truth", fontsize=16)
@@ -872,8 +887,7 @@ def plot_Velocity_iterations(iter_numbers, bPlotU=True):
         v_UDE = vtk_to_numpy(vtk_data_UDE.GetCellData().GetArray('U'))[:, 1]
 
         u_truth = vtk_to_numpy(vtk_data_UDE.GetCellData().GetArray('u_truth'))
-        v_truth = vtk_to_numpy(vtk_data_UDE.GetCellData().GetArray('v_truth'))
-      
+        v_truth = vtk_to_numpy(vtk_data_UDE.GetCellData().GetArray('v_truth'))      
 
         u_min = u_truth.min()
         u_max = u_truth.max()
@@ -886,15 +900,12 @@ def plot_Velocity_iterations(iter_numbers, bPlotU=True):
         norm_u = Normalize(vmin=u_min, vmax=u_max)
         norm_v = Normalize(vmin=v_min, vmax=v_max)
 
-
         #compute the difference
         diff_u = u_truth - u_UDE
         diff_v = v_truth - v_UDE
 
-
         print("diff_u min and max = ", diff_u.min(), diff_u.max())
         print("diff_v min and max = ", diff_v.min(), diff_v.max())
-
 
         diff_min_u = -0.1
         diff_max_u = 0.1
@@ -1063,38 +1074,31 @@ def plot_Velocity_iterations(iter_numbers, bPlotU=True):
         plt.savefig("Savana_UDE_V_iterations.png", dpi=300, bbox_inches='tight', pad_inches=0)
 
 
-
 if __name__ == '__main__':
 
     #plot ks contour 
     #plot_ks_contour()
 
-    #triangulate the vtk files
-    #for iter_number in range(1, 101):
-    #    print(f"Triangulating vtk file, iter_number = {iter_number:04d}")
-    #    triangulate_vtk(f"forward_simulation_results_{iter_number:04d}.vtk")
-
     #plot UDE training history, Manning's n vs Manning's n truth on the f-Re plot
-    #for iter_number in range(1, 101):
-        #print(f"Plotting UDE training history, iter_number = {iter_number:04d}")
-        #plot_UDE_training_history_ManningN(iter_number=iter_number, bPlotTitle=True)
+    for iter_number in range(1, 151):
+        print(f"Plotting UDE training history, iter_number = {iter_number:04d}")
+        plot_UDE_training_history_ManningN(iter_number=iter_number, bPlotTitle=True)
 
     #plot the last iteration
-    #plot_UDE_training_history_ManningN(iter_number=100, bPlotTitle=False)
+    plot_UDE_training_history_ManningN(iter_number=150, bPlotTitle=False)
 
     #create animation
-    #create_animation_training_history()
+    create_animation_training_history()
 
     #plot Manning's n iterations
-    iter_numbers = [1, 10, 50, 100]
-    #plot_ManningN_iterations(iter_numbers)
+    iter_numbers = [1, 10, 50, 150]
+    plot_ManningN_iterations(iter_numbers)
 
     #plot WSE iterations
-    #plot_WSE_iterations(iter_numbers)
+    plot_WSE_iterations(iter_numbers)
 
     #plot velocity iterations
     plot_Velocity_iterations(iter_numbers, bPlotU=True)
     plot_Velocity_iterations(iter_numbers, bPlotU=False)
-
 
     print("Done!")

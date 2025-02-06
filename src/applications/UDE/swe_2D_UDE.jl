@@ -76,14 +76,14 @@ function swe_2D_UDE(ode_f, Q0, params_vector, swe_extra_params)
     sol, ITER, LOSS, PARS = nothing, nothing, nothing, nothing
     if settings.UDE_settings.UDE_mode == "training"
         println("   Performing UDE training: ", settings.UDE_settings.UDE_choice, " ...\n")
-        #sol, ITER, LOSS, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, wstill, hstill, case_path)
+        sol, ITER, LOSS, PARS = UDE_training(ode_f, Q0, swe_2D_constants.tspan, p_init, settings, my_mesh_2D, swe_2D_constants, observed_data, wstill, hstill, case_path)
 
         #@show typeof(sol.u)
         #@show sol.u
 
         #save the UDE results
-        #jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PARS,
-        #    ude_model_params=sol.u, ude_model_state=swe_extra_params.ude_model_state)
+        jldsave(joinpath(case_path, settings.UDE_settings.UDE_training_save_file_name); ITER, LOSS, PARS,
+            ude_model_params=sol.u, ude_model_state=swe_extra_params.ude_model_state)
 
         #compute all the losses and ODE solutions for each inversion iteration
         println("   Computing all the losses and ODE solutions for each UDE iteration ...")
