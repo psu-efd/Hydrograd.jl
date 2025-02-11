@@ -10,6 +10,8 @@ import numpy as np
 
 import shapefile
 
+import cv2
+
 import matplotlib.ticker as tick
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.ticker import FormatStrFormatter
@@ -64,7 +66,7 @@ def read_data_from_vtk(vtk_file_name):
     WSE = np.squeeze(vtk_result.point_data['WSE'])
     Vel = np.squeeze(vtk_result.point_data['U'])
 
-    print("Vel: ", Vel.shape)
+    #print("Vel: ", Vel.shape)
 
     #Vel is a vector. Get its components U and V
     U = Vel[:,0]
@@ -124,7 +126,7 @@ def plot_with_pyvista():
     grid = pv.read(file_path)
 
     # Check available scalar data
-    print("Available data arrays:", grid.array_names)
+    #print("Available data arrays:", grid.array_names)
 
     # Extract and visualize the 'zb_cell' data
     if 'zb_cell' in grid.array_names:
@@ -182,7 +184,7 @@ def triangulate_vtk_files(vtk_file_names):
 
         print(f"Triangulated file saved to: {triangulated_file_path}")
 
-        print("Available point data:", interpolated.point_data.keys())
+        #print("Available point data:", interpolated.point_data.keys())
 
 def plot_loss_history(nIterations):
     """
@@ -494,13 +496,14 @@ def plot_n_trajectories(nIterations):
     plt.savefig("inversion_ManningN_trajectory.png", dpi=300, bbox_inches='tight', pad_inches=0)
     plt.show()
 
-def plot_flow_field_comparison(inversion_result_vtk_file_name):
+def plot_flow_field_comparison(iter_number, inversion_result_vtk_file_name, bShow_iteration=False):
     """
     plot flow field comparison between inversion results and inversion
     Parameters
     ----------
+    iter_number: iteration number
     inversion_result_vtk_file_name: inversion result vtk file name
-
+    bShow_iteration: whether to show the iteration number on the plot
     Returns
     -------
 
@@ -526,7 +529,7 @@ def plot_flow_field_comparison(inversion_result_vtk_file_name):
     # plot WSE_truth
     min_value = np.min(WSE_truth)
     max_value = np.max(WSE_truth)
-    print("min and max values: ", min_value, max_value)
+    #print("min and max values: ", min_value, max_value)
 
     local_levels = np.linspace(min_value, max_value, 51)
 
@@ -536,7 +539,7 @@ def plot_flow_field_comparison(inversion_result_vtk_file_name):
     # plot U_truth
     min_value = np.min(U_truth)
     max_value = np.max(U_truth)
-    print("min and max values: ", min_value, max_value)
+    #print("min and max values: ", min_value, max_value)
 
     local_levels = np.linspace(min_value, max_value, 51)
 
@@ -547,7 +550,7 @@ def plot_flow_field_comparison(inversion_result_vtk_file_name):
     # plot V_truth
     min_value = np.min(V_truth)
     max_value = np.max(V_truth)
-    print("min and max values: ", min_value, max_value)
+    #print("min and max values: ", min_value, max_value)
 
     local_levels = np.linspace(min_value, max_value, 51)
 
@@ -638,17 +641,54 @@ def plot_flow_field_comparison(inversion_result_vtk_file_name):
     axs[2, 1].text(-0.05, 1.05, "(h)", size=16, ha="center", transform=axs[2, 1].transAxes)
     axs[2, 2].text(-0.05, 1.05, "(i)", size=16, ha="center", transform=axs[2, 2].transAxes)
 
-    plt.savefig("inversion_Savana_flow_filed_comparison.png", dpi=300, bbox_inches='tight', pad_inches=0)
-    plt.show()
+    if bShow_iteration: 
+        #add iteration number to the title of the whole plot
+        fig.suptitle(f"Iteration {iter_number:04d}", fontsize=18, y=1.01)
+
+    plt.savefig(f"inversion_Savannah_River_flow_filed_comparison_iter_{iter_number:04d}.png", dpi=300, bbox_inches='tight', pad_inches=0)
+
+    #plt.show()
+    plt.close()
+
+def create_video_of_flow_field_comparison(nIterations):
+    """
+    Create a video of the flow field comparison
+    """
+
+    # Read the first image to get the dimensions
+    first_image_path = "inversion_Savannah_River_flow_filed_comparison_iter_0001.png"
+    frame = cv2.imread(first_image_path)
+    height, width, layers = frame.shape
+
+    # Define the video codec and create a VideoWriter object
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4 files
+    video = cv2.VideoWriter('Savana_River_UDE_result_training_history_ManningN.mp4', fourcc, 10.0, (width, height))  
+
+    #create a list to store the images
+    images = []
+    for iImage in range(1, nIterations+1):
+        image_path = f"inversion_Savannah_River_flow_filed_comparison_iter_{iImage:04d}.png"
+        image = cv2.imread(image_path)
+        video.write(image)
+
+    # Release the VideoWriter
+    video.release()
+
+    print(f"Video saved as inversion_Savannah_River_flow_filed_comparison.mp4")
 
 if __name__ == '__main__':
 
     nIterations = 300
 
-    plot_n_history_trajectories(nIterations)
+    #plot_n_history_trajectories(nIterations)
 
     #plot comparison of flow field (WSE, u, v) between truth and inversion result
-    inversion_result_vtk_file_name = 'forward_simulation_results_0300.vtk'
-    #plot_flow_field_comparison(inversion_result_vtk_file_name)
+    #loop over all iteration numbers
+    for iter_number in range(263, nIterations+1):
+        inversion_result_vtk_file_name = f'forward_simulation_results_{iter_number:04d}.vtk'
+        #plot_flow_field_comparison(iter_number, inversion_result_vtk_file_name, bShow_iteration=True)
+
+    #create a video of the flow field comparison
+    create_video_of_flow_field_comparison(nIterations)
 
     print("Done!")

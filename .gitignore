@@ -5,6 +5,8 @@
 **/inversion_callback_save_iter_*.*
 **/UDE_callback_save_iter_*.*
 **/oneD_channel_with_bump_*.dat
+**/*_RST*.dat
+**/*.h5
 **/*.vtk
 *.mp4
 *.jif

@@ -101,11 +101,18 @@ def plot_UDE_training_history_ManningN(iter_number, bPlotTitle=False):
     ManningN_truth = vtk_to_numpy(vtk_data.GetCellData().GetArray('ManningN_cell_truth'))
     ManningN_UDE = vtk_to_numpy(vtk_data.GetCellData().GetArray('ManningN_cells'))
 
+    # compute RMSE 
+    RMSE = np.sqrt(np.mean((ManningN_UDE - ManningN_truth)**2))
+    print(f"RMSE = {RMSE:.4f}")
+
     # Plot Manning's n truth vs Manning's n UDE
     axs[0, 1].scatter(ManningN_UDE, ManningN_truth, edgecolors='blue', facecolors='none', s=50)
 
     #draw the diagonal line
     axs[0, 1].plot([0.02,0.07],[0.02, 0.07], color='black')
+
+    #add RMSE text
+    axs[0, 1].text(0.022, 0.037, f"RMSE = {RMSE:.4f}", fontsize=14)
 
     axs[0, 1].set_xlim([0.02, 0.04])
     axs[0, 1].set_ylim([0.02, 0.04])
@@ -113,7 +120,7 @@ def plot_UDE_training_history_ManningN(iter_number, bPlotTitle=False):
     axs[0, 1].xaxis.set_major_formatter(FormatStrFormatter('%.3f'))
     axs[0, 1].yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
 
-    axs[0, 1].set_xlabel('Manning\'s $n$ from UDE', fontsize=16)
+    axs[0, 1].set_xlabel('Manning\'s $n$ from USWEs', fontsize=16)
     axs[0, 1].set_ylabel('Manning\'s $n$ truth', fontsize=16)
     axs[0, 1].tick_params(axis='both', which='major', labelsize=14)
 
@@ -130,7 +137,7 @@ def plot_UDE_training_history_ManningN(iter_number, bPlotTitle=False):
     plot_f_h_ks_Re(plt, fig, axs[1, 1], iter_number, bPlotTruth=False)
 
     if bPlotTitle:
-        plt.suptitle(f"UDE training history, iter_number = {iter_number:04d}", fontsize=16)
+        plt.suptitle(f"USWEs training history, iter_number = {iter_number:04d}", fontsize=16)
         plt.savefig(f"Savana_River_UDE_result_training_history_ManningN_{iter_number:04d}_with_title.png", dpi=300, bbox_inches='tight', pad_inches=0)
     else:
         plt.savefig(f"Savana_River_UDE_result_training_history_ManningN_{iter_number:04d}.png", dpi=300, bbox_inches='tight', pad_inches=0)
@@ -286,7 +293,7 @@ def plot_f_h_ks_Re(plt, fig, ax, iter_number, bPlotTruth=False):
                              alpha=0.5, edgecolors='black', linewidths=0.5, norm=norm, cmap='jet', label='UDE data')
         
         #add text annotation to the scatter
-        ax.text(1E3, 0.17, 'UDE', fontsize=14)
+        ax.text(1E3, 0.17, 'USWEs', fontsize=14)
 
     #add a color bar and customize the color bar
     cbar = plt.colorbar(scatter, location='right', pad=0.05)
@@ -346,17 +353,43 @@ def create_animation_training_history():
     print(f"Video saved as Savana_River_UDE_result_training_history_ManningN.mp4")
     
 
+def create_animation_ManningN_iterations():
+    """
+    Create an animation of the Manning's n iterations.
+    """
+
+    # Read the first image to get the dimensions
+    first_image_path = "Savana_UDE_ManningN_iteration_0001.png"
+    frame = cv2.imread(first_image_path)
+    height, width, layers = frame.shape
+
+    # Define the video codec and create a VideoWriter object
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for .mp4 files
+    video = cv2.VideoWriter('Savana_UDE_ManningN_iterations.mp4', fourcc, 10.0, (width, height))  
+
+    #create a list to store the images
+    images = []
+    for iImage in range(1, 151):
+        image_path = f"Savana_UDE_ManningN_iteration_{iImage:04d}.png"
+        image = cv2.imread(image_path)
+        video.write(image)
+
+    # Release the VideoWriter
+    video.release()
+
+    print(f"Video saved as Savana_UDE_ManningN_iterations.mp4")
+    
 def plot_ks_contour():
 
     """
     Plot the ks contour
     """
 
-    fig, ax = plt.subplots(1, 1, figsize=(16, 9), sharex=False, sharey=False, facecolor='w', edgecolor='k')
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6), sharex=False, sharey=False, facecolor='w', edgecolor='k')
 
     # Read VTK file
     reader = vtk.vtkUnstructuredGridReader()
-    reader.SetFileName("forward_simulation_results_0100.vtk")
+    reader.SetFileName("UDE_iteration_results_0100.vtk")
     reader.ReadAllScalarsOn()
     reader.ReadAllVectorsOn()
     reader.Update()
@@ -514,6 +547,166 @@ def plot_ks_contour():
     
     #plt.show()
 
+
+def plot_ManningN_one_iteration(iter_number):
+    """
+    Plot the Manning's n at one iteration.
+
+    It plots the UDE Manning's n, the truth Manning's n, and the difference between the UDE and the truth Manning's n.
+    """
+
+    fig, axs = plt.subplots(1, 3, figsize=(16, 3), sharex=False, sharey=True, facecolor='w', edgecolor='k')
+
+    #set the spacing between the subplots
+    plt.subplots_adjust(wspace=0.2, hspace=0.2)
+
+   
+    print(f"Plotting Manning's n, iter_number = {iter_number:04d}")
+
+    # read the Manning's n values from the vtk file
+    vtk_file_name = f"UDE_iteration_results_{iter_number:04d}.vtk"
+    reader = vtk.vtkUnstructuredGridReader()
+    reader.SetFileName(vtk_file_name)
+    reader.ReadAllScalarsOn()
+    reader.ReadAllVectorsOn()
+    reader.Update()
+    vtk_data = reader.GetOutput()
+
+    # Get points/coordinates
+    points = vtk_to_numpy(vtk_data.GetPoints().GetData())
+
+    xCoord = points[:, 0]
+    yCoord = points[:, 1]
+
+    xl = xCoord.min()
+    xh = xCoord.max()
+    yl = yCoord.min()
+    yh = yCoord.max()
+
+    # Get Manning's n values
+    ManningN_truth = vtk_to_numpy(vtk_data.GetCellData().GetArray('ManningN_cell_truth'))
+    ManningN_UDE = vtk_to_numpy(vtk_data.GetCellData().GetArray('ManningN_cells'))
+
+    #ManningN_min = 0.01
+    #ManningN_max = 0.05
+    #local_levels = [0.01, 0.02, 0.03, 0.04, 0.05]
+    ManningN_min = ManningN_truth.min()
+    ManningN_max = ManningN_truth.max()
+    local_levels = np.linspace(ManningN_min, ManningN_max, 6)
+    norm_ManningN = Normalize(vmin=ManningN_min, vmax=ManningN_max)
+
+    #compute the difference
+    diff = ManningN_truth - ManningN_UDE
+
+    print("diff min and max = ", diff.min(), diff.max())
+
+    diff_min = -0.006
+    diff_max = 0.006
+    local_diff_levels = np.linspace(diff_min, diff_max, 7)
+    norm_diff = Normalize(vmin=diff_min, vmax=diff_max)
+
+    #compute rmse
+    rmse = np.sqrt(np.mean(diff**2))
+
+    # Create figure for ManningN_truth
+    polygons = []        
+
+    # Loop through all cells
+    for i in range(vtk_data.GetNumberOfCells()):
+        cell = vtk_data.GetCell(i)
+        n_points = cell.GetNumberOfPoints()            
+
+        # Get vertex indices for this cell
+        vertex_indices = [cell.GetPointId(j) for j in range(n_points)]
+            
+        # Get vertex coordinates
+        vertices = points[vertex_indices]
+            
+        # Create polygon
+        polygon = Polygon(vertices[:, :2])  # Only use x,y coordinates
+        polygons.append(polygon)
+    
+    # Create PatchCollection with the cell data
+    p_truth = PatchCollection(polygons, cmap='jet', norm=norm_ManningN, alpha=1.0)
+    p_UDE = PatchCollection(polygons, cmap='jet', norm=norm_ManningN, alpha=1.0)
+    p_diff = PatchCollection(polygons, cmap='jet', norm=norm_diff, alpha=1.0)        
+
+    p_truth.set_array(ManningN_truth)
+    p_UDE.set_array(ManningN_UDE)
+    p_diff.set_array(diff)    
+
+    # Add to plot
+    axs[0].add_collection(p_truth)
+    axs[1].add_collection(p_UDE)
+    axs[2].add_collection(p_diff)
+
+    axs[0].set_xlim([xl, xh])
+    axs[0].set_ylim([yl, yh])
+    axs[0].set_aspect('equal')
+
+    axs[1].set_xlim([xl, xh])
+    axs[1].set_ylim([yl, yh])
+    axs[1].set_aspect('equal')
+
+    axs[2].set_xlim([xl, xh])
+    axs[2].set_ylim([yl, yh])
+    axs[2].set_aspect('equal')
+
+    axs[0].set_xlabel('$x$ (m)', fontsize=16)        
+    axs[0].tick_params(axis='x', labelsize=14)
+    axs[0].set_ylabel('$y$ (m)', fontsize=16)
+    axs[0].tick_params(axis='y', labelsize=14)
+
+    axs[1].set_xlabel('$x$ (m)', fontsize=16)
+    axs[1].tick_params(axis='x', labelsize=14)
+    #axs[1].set_ylabel('$y$ (m)', fontsize=16)
+    axs[1].tick_params(axis='y', labelsize=14)
+
+    axs[2].set_xlabel('$x$ (m)', fontsize=16)
+    axs[2].tick_params(axis='x', labelsize=14)
+    #axs[2].set_ylabel('$y$ (m)', fontsize=16)
+    axs[2].tick_params(axis='y', labelsize=14)
+
+    divider = make_axes_locatable(axs[0])
+    cax = divider.append_axes("right", size="3%", pad=0.2)
+    clb = fig.colorbar(p_truth, ticks=local_levels, cax=cax)
+    clb.set_ticks(local_levels)
+    clb.ax.yaxis.set_major_formatter(tick.FormatStrFormatter('%.3f'))
+    clb.ax.tick_params(labelsize=14)
+    clb.ax.set_title("(s/m$^{1/3}$)", loc='center', fontsize=14)        
+    
+    divider = make_axes_locatable(axs[1])
+    cax = divider.append_axes("right", size="3%", pad=0.2)
+    clb = fig.colorbar(p_UDE, ticks=local_levels, cax=cax)
+    clb.set_ticks(local_levels)
+    clb.ax.yaxis.set_major_formatter(tick.FormatStrFormatter('%.3f'))
+    clb.ax.tick_params(labelsize=14)
+    clb.ax.set_title("(s/m$^{1/3}$)", loc='center', fontsize=14)      
+
+    divider = make_axes_locatable(axs[2])
+    cax = divider.append_axes("right", size="3%", pad=0.2)
+    clb = fig.colorbar(p_diff, ticks=local_diff_levels, cax=cax)
+    clb.set_ticks(local_diff_levels)
+    clb.ax.yaxis.set_major_formatter(tick.FormatStrFormatter('%.3f'))
+    clb.ax.tick_params(labelsize=14)
+
+    clb.ax.set_title("(s/m$^{1/3}$)", loc='center', fontsize=14)  
+
+    axs[2].text(400, 350, f"RMSE = {rmse:.5f}", fontsize=12, ha='left', va='center')
+
+    #add title above the first row
+    axs[0].set_title("Truth", fontsize=16)
+    axs[1].set_title("From USWEs", fontsize=16)
+    axs[2].set_title("Difference", fontsize=16)
+    
+    #add text for iter_number
+    fig.suptitle(f"Manning's n, Iteration = {iter_number}", fontsize=16)
+    
+    
+    plt.savefig(f"Savana_UDE_ManningN_iteration_{iter_number:04d}.png", dpi=300, bbox_inches='tight', pad_inches=0)
+
+
+
 def plot_ManningN_iterations(iter_numbers):
     """
     Plot the Manning's n at selected iterations.
@@ -663,7 +856,7 @@ def plot_ManningN_iterations(iter_numbers):
 
     #add title above the first row
     axs[0, 0].set_title("Truth", fontsize=16)
-    axs[0, 1].set_title("From UDE", fontsize=16)
+    axs[0, 1].set_title("From USWEs", fontsize=16)
     axs[0, 2].set_title("Difference", fontsize=16)
 
     #add text for iter_number
@@ -827,7 +1020,7 @@ def plot_WSE_iterations(iter_numbers):
 
     #add title above the first row
     axs[0, 0].set_title("Truth", fontsize=16)
-    axs[0, 1].set_title("From UDE", fontsize=16)
+    axs[0, 1].set_title("From USWEs", fontsize=16)
     axs[0, 2].set_title("Difference", fontsize=16)
 
     #add text for iter_number
@@ -1054,7 +1247,7 @@ def plot_Velocity_iterations(iter_numbers, bPlotU=True):
 
     #add title above the first row
     axs[0, 0].set_title("Truth", fontsize=16)
-    axs[0, 1].set_title("From UDE", fontsize=16)
+    axs[0, 1].set_title("From USWEs", fontsize=16)
     axs[0, 2].set_title("Difference", fontsize=16)
 
     #add text for iter_number
@@ -1080,25 +1273,33 @@ if __name__ == '__main__':
     #plot_ks_contour()
 
     #plot UDE training history, Manning's n vs Manning's n truth on the f-Re plot
-    for iter_number in range(1, 151):
-        print(f"Plotting UDE training history, iter_number = {iter_number:04d}")
-        plot_UDE_training_history_ManningN(iter_number=iter_number, bPlotTitle=True)
+    #for iter_number in range(1, 151):
+        #print(f"Plotting UDE training history, iter_number = {iter_number:04d}")
+        #plot_UDE_training_history_ManningN(iter_number=iter_number, bPlotTitle=True)
 
     #plot the last iteration
-    plot_UDE_training_history_ManningN(iter_number=150, bPlotTitle=False)
+    #plot_UDE_training_history_ManningN(iter_number=150, bPlotTitle=False)
 
     #create animation
-    create_animation_training_history()
+    #create_animation_training_history()
 
     #plot Manning's n iterations
-    iter_numbers = [1, 10, 50, 150]
-    plot_ManningN_iterations(iter_numbers)
+    #iter_numbers = [1, 10, 50, 150]
+    #plot_ManningN_iterations(iter_numbers)
 
     #plot WSE iterations
-    plot_WSE_iterations(iter_numbers)
+    #plot_WSE_iterations(iter_numbers)
 
     #plot velocity iterations
-    plot_Velocity_iterations(iter_numbers, bPlotU=True)
-    plot_Velocity_iterations(iter_numbers, bPlotU=False)
+    #plot_Velocity_iterations(iter_numbers, bPlotU=True)
+    #plot_Velocity_iterations(iter_numbers, bPlotU=False)
+
+    #plot Manning's n at all iterations
+    for iter_number in range(1, 151):
+        print(f"Plotting Manning's n, iter_number = {iter_number:04d}")
+        plot_ManningN_one_iteration(iter_number)
+
+    #create animation of Manning's n iterations
+    create_animation_ManningN_iterations()
 
     print("Done!")
