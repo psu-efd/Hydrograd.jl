@@ -6,7 +6,7 @@ Some specific utility functions, such as plotting.
 import matplotlib.pyplot as plt
 import numpy as np
 
-import shapefile
+#import shapefile
 
 import matplotlib.ticker as tick
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -110,6 +110,19 @@ def plot_forward_simulation_result():
     axs[0, 0].tick_params(axis='x', labelsize=14)
     axs[0, 0].set_ylabel('$y$ (m)', fontsize=16)
     axs[0, 0].tick_params(axis='y', labelsize=14)
+
+    #add an arrow for the flow direction
+    axs[0, 0].annotate(
+    'Flow',  # No text
+    xy=(250, 200),  # End point
+    xytext=(50, 300),  # Start point
+    fontsize=16,  # Text size
+    arrowprops=dict(
+        facecolor='blue',  # Arrow color
+        arrowstyle='->',  # Arrow style
+        lw=2  # Line width
+        )
+    )
 
     divider = make_axes_locatable(axs[0, 0])
     cax = divider.append_axes("right", size="3%", pad=0.2)
@@ -285,7 +298,7 @@ def plot_forward_simulation_result():
     axs[1, 1].text(-0.1, 1.05, "(d)", size=16, ha="center", transform=axs[1, 1].transAxes)
 
     plt.savefig("Savana_forward_simulation_result.png", dpi=300, bbox_inches='tight', pad_inches=0)
-    plt.show()
+    #plt.show()
 
 def plot_with_pyvista():
     # Load the VTK file
@@ -352,7 +365,7 @@ def triangulate_vtk():
 
 if __name__ == '__main__':
 
-    triangulate_vtk()
+    #triangulate_vtk()
 
     plot_forward_simulation_result()
 
