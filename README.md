@@ -1,6 +1,9 @@
 # Hydrograd
 ### ***Computational Hydrodynamics with Automatic Differentiation for Scientific Machine Learning***
 
+How to cite: Liu and Song (2025), Universal Shallow Water Equations with Differentiable 
+Programming for Scientific Machine Learning, [https://arxiv.org/abs/2502.12396](https://arxiv.org/abs/2502.12396)
+
 <p align="center">
   <img src="docs/Savana_River_UDE_result_training_history_ManningN.gif" alt="Training History Animation", width="60%">
 </p>
@@ -17,8 +20,6 @@
   <em>Animation of the Manning's n iterations for the Savannah River case. The animation shows the evolution of the Manning's n field during the training process using the Universal Shallow Water Equations (USWEs).</em>
 </p>
 
-How to cite: Liu and Song (2025), Universal Shallow Water Equations with Differentiable 
-Programming for Scientific Machine Learning, arXiv:xxx.xxxx
 
 Hydrograd is a Julia-based computational hydrodynamics package with automatic differentiation (AD) capabilities. The package is designed to solve the partial differential equations (PDEs) of hydrodynamics, including the shallow water equations (SWEs) and the Navier-Stokes equations (NS). Currently, the package is under development and only supports the SWEs.
 
