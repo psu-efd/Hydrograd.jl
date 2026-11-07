@@ -1,8 +1,7 @@
 # Hydrograd
 ### ***Computational Hydrodynamics with Automatic Differentiation for Scientific Machine Learning***
 
-How to cite: Liu and Song (2025), Universal Shallow Water Equations with Differentiable 
-Programming for Scientific Machine Learning, [https://arxiv.org/abs/2502.12396](https://arxiv.org/abs/2502.12396)
+How to cite: X. Liu and Y. Song (2025). Scientific Machine Learning of Flow Resistance Using Universal Shallow Water Equations With Differentiable Programming. Water Resources Research, 61, e2025WR040265, [https://doi.org/10.1029/2025WR040265](https://doi.org/10.1029/2025WR040265)
 
 <p align="center">
   <img src="docs/Savana_River_UDE_result_training_history_ManningN.gif" alt="Training History Animation", width="60%">
