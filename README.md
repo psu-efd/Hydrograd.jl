@@ -1,9 +1,9 @@
 # Hydrograd v1.0
 ### ***Computational Hydrodynamics with Automatic Differentiation for Scientific Machine Learning***
 
-**Update (11/2026): Hydrograd.jl is the first version of Hydrograd, i.e., Hydrograd v1.0, using Julia as its backend. Since 11/2026, a new backend, i.e., JAX, has been added and the new version, Hydrograd v2.0 is at [Hydrograd v2.0](https://github.com/psu-efd/Hydrograd). Hydrograd v1.0 (Julia) is in maintenance only model. Further development of Hydrograd, the differentiable 2D shallow water equations solver, will be in Hydrograd v2.0.**
+**Update (11/2026): Hydrograd.jl is the first version of Hydrograd, i.e., Hydrograd v1.0, using Julia as its backend. Since 11/2026, a new backend, i.e., JAX, has been added and the new version, Hydrograd v2.0 is at [Hydrograd v2.0](https://github.com/psu-efd/Hydrograd). Hydrograd v1.0 (Julia) is in maintenance only mode. Further development of Hydrograd, the differentiable 2D shallow water equations solver, will be in Hydrograd v2.0.**
 
-How to cite: X. Liu and Y. Song (2025). Scientific Machine Learning of Flow Resistance Using Universal Shallow Water Equations With Differentiable Programming. Water Resources Research, 61, e2025WR040265, [https://doi.org/10.1029/2025WR040265](https://doi.org/10.1029/2025WR040265)
+How to cite this work: X. Liu and Y. Song (2025). Scientific Machine Learning of Flow Resistance Using Universal Shallow Water Equations With Differentiable Programming. Water Resources Research, 61, e2025WR040265, [https://doi.org/10.1029/2025WR040265](https://doi.org/10.1029/2025WR040265)
 
 <p align="center">
   <img src="docs/Savana_River_UDE_result_training_history_ManningN.gif" alt="Training History Animation", width="60%">
